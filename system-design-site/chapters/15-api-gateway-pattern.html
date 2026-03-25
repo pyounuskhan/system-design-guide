@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chapter 15 · API Gateway Pattern · System Design Mastery</title>
+  <meta name="description" content="As systems grow into multiple services, clients should not need to understand every internal service boundary. The API gateway pattern introduces a stable edge that handles routing, authentication, rate limits, and sometimes response composition so clients interact with a cleaner interface than the internal architecture might expose directly.">
+  <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script defer src="../assets/js/app.js"></script>
+</head>
+<body class="page-chapter part-4">
+  <div class="progress-bar" aria-hidden="true"><span></span></div>
+  <button class="sidebar-backdrop" type="button" aria-label="Close sidebars" data-overlay-close></button>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="nav-toggle" type="button" aria-label="Open chapter navigation" data-nav-toggle>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <a class="brand" href="../index.html">
+        <span class="brand-mark">SD</span>
+        <span class="brand-text">
+          <strong>System Design Mastery</strong>
+          <small>Interactive learning site</small>
+        </span>
+      </a>
+      <nav class="header-nav">
+        <a href="../index.html">Home</a>
+        <a href="../index.html#roadmap">Roadmap</a>
+        <a href="../index.html#chapter-directory">All chapters</a>
+      </nav>
+      <div class="header-tools">
+        <button class="toc-toggle" type="button" aria-label="Open content navigation" data-toc-toggle>
+          <span>Contents</span>
+        </button>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+          <span data-theme-label>Dark mode</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="sidebar sidebar-left" id="site-sidebar" data-sidebar="left">
+      <div class="sidebar-inner">
+        <div class="sidebar-controls">
+          <div class="sidebar-controls-copy sidebar-header">
+            <p class="eyebrow">System Design Mastery</p>
+            <h2>Chapter navigator</h2>
+            <p>Follow the curriculum in order or jump across parts when you need to revisit a concept.</p>
+          </div>
+          <button
+            class="sidebar-toggle"
+            type="button"
+            data-toggle-sidebar="left"
+            aria-label="Toggle chapter navigation"
+            aria-expanded="true"
+            title="Toggle chapter navigation"
+          >
+            <span class="toggle-icon" aria-hidden="true">«</span>
+          </button>
+        </div>
+        <span class="sidebar-mini-label" aria-hidden="true">Chapters</span>
+
+        <div class="sidebar-content">
+          <label class="search-field search-field-sidebar">
+            <span>Jump to chapter</span>
+            <input
+              type="search"
+              placeholder="Filter by title or part"
+              data-filter-input
+              data-filter-target="#site-sidebar"
+            >
+          </label>
+
+          <nav class="sidebar-nav" aria-label="Chapter navigation">
+            <section class="nav-part part-0" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 0</p>
+                <h3>Design Foundations</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="design principles"
+                  data-part="design foundations"
+                >
+                  <a href="F01-design-principles.html">
+                    <span class="nav-chapter-number">01</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Design Principles</strong>
+                      <small>43 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="design patterns (gof + practical)"
+                  data-part="design foundations"
+                >
+                  <a href="F02-design-patterns.html">
+                    <span class="nav-chapter-number">02</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Design Patterns (GoF + Practical)</strong>
+                      <small>47 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="system architecture styles"
+                  data-part="design foundations"
+                >
+                  <a href="F03-system-architecture-styles.html">
+                    <span class="nav-chapter-number">03</span>
+                    <span class="nav-chapter-copy">
+                      <strong>System Architecture Styles</strong>
+                      <small>65 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="microservices &amp; distributed patterns"
+                  data-part="design foundations"
+                >
+                  <a href="F04-microservices-distributed-patterns.html">
+                    <span class="nav-chapter-number">04</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Microservices &amp; Distributed Patterns</strong>
+                      <small>46 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="scalability &amp; performance"
+                  data-part="design foundations"
+                >
+                  <a href="F05-scalability-performance.html">
+                    <span class="nav-chapter-number">05</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Scalability &amp; Performance</strong>
+                      <small>62 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="data &amp; storage design"
+                  data-part="design foundations"
+                >
+                  <a href="F06-data-storage-design.html">
+                    <span class="nav-chapter-number">06</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Data &amp; Storage Design</strong>
+                      <small>58 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="distributed system fundamentals"
+                  data-part="design foundations"
+                >
+                  <a href="F07-distributed-system-fundamentals.html">
+                    <span class="nav-chapter-number">07</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Distributed System Fundamentals</strong>
+                      <small>79 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="networking fundamentals"
+                  data-part="design foundations"
+                >
+                  <a href="F08-networking-fundamentals.html">
+                    <span class="nav-chapter-number">08</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Networking Fundamentals</strong>
+                      <small>66 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security design"
+                  data-part="design foundations"
+                >
+                  <a href="F09-security-design.html">
+                    <span class="nav-chapter-number">09</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security Design</strong>
+                      <small>73 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="observability &amp; operations"
+                  data-part="design foundations"
+                >
+                  <a href="F10-observability-operations.html">
+                    <span class="nav-chapter-number">10</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Observability &amp; Operations</strong>
+                      <small>58 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="deployment &amp; devops"
+                  data-part="design foundations"
+                >
+                  <a href="F11-deployment-devops.html">
+                    <span class="nav-chapter-number">11</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Deployment &amp; DevOps</strong>
+                      <small>56 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="system design interview thinking"
+                  data-part="design foundations"
+                >
+                  <a href="F12-system-design-interview-thinking.html">
+                    <span class="nav-chapter-number">12</span>
+                    <span class="nav-chapter-copy">
+                      <strong>System Design Interview Thinking</strong>
+                      <small>62 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-1" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 1</p>
+                <h3>Foundations</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="what is system design?"
+                  data-part="foundations"
+                >
+                  <a href="01-what-is-system-design.html">
+                    <span class="nav-chapter-number">01</span>
+                    <span class="nav-chapter-copy">
+                      <strong>What is System Design?</strong>
+                      <small>9 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="types of requirements"
+                  data-part="foundations"
+                >
+                  <a href="02-types-of-requirements.html">
+                    <span class="nav-chapter-number">02</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Types of Requirements</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="estimation &amp; capacity planning"
+                  data-part="foundations"
+                >
+                  <a href="03-estimation-capacity-planning.html">
+                    <span class="nav-chapter-number">03</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Estimation &amp; Capacity Planning</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-2" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 2</p>
+                <h3>Core Building Blocks</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="networking fundamentals"
+                  data-part="core building blocks"
+                >
+                  <a href="04-networking-fundamentals.html">
+                    <span class="nav-chapter-number">04</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Networking Fundamentals</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="databases deep dive"
+                  data-part="core building blocks"
+                >
+                  <a href="05-databases-deep-dive.html">
+                    <span class="nav-chapter-number">05</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Databases Deep Dive</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="caching systems"
+                  data-part="core building blocks"
+                >
+                  <a href="06-caching-systems.html">
+                    <span class="nav-chapter-number">06</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Caching Systems</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="load balancing"
+                  data-part="core building blocks"
+                >
+                  <a href="07-load-balancing.html">
+                    <span class="nav-chapter-number">07</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Load Balancing</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="message queues &amp; event systems"
+                  data-part="core building blocks"
+                >
+                  <a href="08-message-queues-event-systems.html">
+                    <span class="nav-chapter-number">08</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Message Queues &amp; Event Systems</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="storage systems"
+                  data-part="core building blocks"
+                >
+                  <a href="09-storage-systems.html">
+                    <span class="nav-chapter-number">09</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Storage Systems</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-3" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 3</p>
+                <h3>Distributed Systems</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="scalability"
+                  data-part="distributed systems"
+                >
+                  <a href="10-scalability.html">
+                    <span class="nav-chapter-number">10</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Scalability</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="consistency &amp; cap theorem"
+                  data-part="distributed systems"
+                >
+                  <a href="11-consistency-cap-theorem.html">
+                    <span class="nav-chapter-number">11</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Consistency &amp; CAP Theorem</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="fault tolerance &amp; resilience"
+                  data-part="distributed systems"
+                >
+                  <a href="12-fault-tolerance-resilience.html">
+                    <span class="nav-chapter-number">12</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Fault Tolerance &amp; Resilience</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="distributed transactions"
+                  data-part="distributed systems"
+                >
+                  <a href="13-distributed-transactions.html">
+                    <span class="nav-chapter-number">13</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Distributed Transactions</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-4" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 4</p>
+                <h3>Architectural Patterns</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="monolith vs microservices"
+                  data-part="architectural patterns"
+                >
+                  <a href="14-monolith-vs-microservices.html">
+                    <span class="nav-chapter-number">14</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Monolith vs Microservices</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item is-active"
+                  data-filter-item
+                  data-title="api gateway pattern"
+                  data-part="architectural patterns"
+                >
+                  <a href="15-api-gateway-pattern.html">
+                    <span class="nav-chapter-number">15</span>
+                    <span class="nav-chapter-copy">
+                      <strong>API Gateway Pattern</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="event-driven architecture"
+                  data-part="architectural patterns"
+                >
+                  <a href="16-event-driven-architecture.html">
+                    <span class="nav-chapter-number">16</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Event-Driven Architecture</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cqrs pattern"
+                  data-part="architectural patterns"
+                >
+                  <a href="17-cqrs-pattern.html">
+                    <span class="nav-chapter-number">17</span>
+                    <span class="nav-chapter-copy">
+                      <strong>CQRS Pattern</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-5" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 5</p>
+                <h3>Real-World Examples</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="e-commerce &amp; marketplaces"
+                  data-part="real-world examples"
+                >
+                  <a href="18-ecommerce-marketplaces.html">
+                    <span class="nav-chapter-number">18</span>
+                    <span class="nav-chapter-copy">
+                      <strong>E-Commerce &amp; Marketplaces</strong>
+                      <small>65 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="fintech &amp; payments"
+                  data-part="real-world examples"
+                >
+                  <a href="19-fintech-payments.html">
+                    <span class="nav-chapter-number">19</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Fintech &amp; Payments</strong>
+                      <small>75 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="social media &amp; content platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="20-social-media-content-platforms.html">
+                    <span class="nav-chapter-number">20</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Social Media &amp; Content Platforms</strong>
+                      <small>29 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="video &amp; streaming platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="21-video-streaming-platforms.html">
+                    <span class="nav-chapter-number">21</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Video &amp; Streaming Platforms</strong>
+                      <small>68 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="communication systems"
+                  data-part="real-world examples"
+                >
+                  <a href="22-communication-systems.html">
+                    <span class="nav-chapter-number">22</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Communication Systems</strong>
+                      <small>49 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="on-demand services"
+                  data-part="real-world examples"
+                >
+                  <a href="23-on-demand-services.html">
+                    <span class="nav-chapter-number">23</span>
+                    <span class="nav-chapter-copy">
+                      <strong>On-Demand Services</strong>
+                      <small>36 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="analytics &amp; data platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="24-analytics-data-platforms.html">
+                    <span class="nav-chapter-number">24</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Analytics &amp; Data Platforms</strong>
+                      <small>43 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="search &amp; discovery"
+                  data-part="real-world examples"
+                >
+                  <a href="25-search-discovery.html">
+                    <span class="nav-chapter-number">25</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Search &amp; Discovery</strong>
+                      <small>38 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cloud &amp; infrastructure systems"
+                  data-part="real-world examples"
+                >
+                  <a href="26-cloud-infrastructure-systems.html">
+                    <span class="nav-chapter-number">26</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cloud &amp; Infrastructure Systems</strong>
+                      <small>37 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="machine learning &amp; ai systems"
+                  data-part="real-world examples"
+                >
+                  <a href="27-machine-learning-ai-systems.html">
+                    <span class="nav-chapter-number">27</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Machine Learning &amp; AI Systems</strong>
+                      <small>21 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security systems"
+                  data-part="real-world examples"
+                >
+                  <a href="28-security-systems.html">
+                    <span class="nav-chapter-number">28</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security Systems</strong>
+                      <small>38 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="content &amp; knowledge systems"
+                  data-part="real-world examples"
+                >
+                  <a href="29-content-knowledge-systems.html">
+                    <span class="nav-chapter-number">29</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Content &amp; Knowledge Systems</strong>
+                      <small>47 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="gaming systems"
+                  data-part="real-world examples"
+                >
+                  <a href="30-gaming-systems.html">
+                    <span class="nav-chapter-number">30</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Gaming Systems</strong>
+                      <small>27 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="healthcare systems"
+                  data-part="real-world examples"
+                >
+                  <a href="31-healthcare-systems.html">
+                    <span class="nav-chapter-number">31</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Healthcare Systems</strong>
+                      <small>28 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="edtech systems"
+                  data-part="real-world examples"
+                >
+                  <a href="32-edtech-systems.html">
+                    <span class="nav-chapter-number">32</span>
+                    <span class="nav-chapter-copy">
+                      <strong>EdTech Systems</strong>
+                      <small>33 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="enterprise systems"
+                  data-part="real-world examples"
+                >
+                  <a href="33-enterprise-systems.html">
+                    <span class="nav-chapter-number">33</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Enterprise Systems</strong>
+                      <small>56 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="iot &amp; real-time systems"
+                  data-part="real-world examples"
+                >
+                  <a href="34-iot-real-time-systems.html">
+                    <span class="nav-chapter-number">34</span>
+                    <span class="nav-chapter-copy">
+                      <strong>IoT &amp; Real-Time Systems</strong>
+                      <small>44 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="adtech systems"
+                  data-part="real-world examples"
+                >
+                  <a href="35-adtech-systems.html">
+                    <span class="nav-chapter-number">35</span>
+                    <span class="nav-chapter-copy">
+                      <strong>AdTech Systems</strong>
+                      <small>76 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="blockchain &amp; distributed systems"
+                  data-part="real-world examples"
+                >
+                  <a href="36-blockchain-distributed-systems.html">
+                    <span class="nav-chapter-number">36</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Blockchain &amp; Distributed Systems</strong>
+                      <small>82 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="travel &amp; booking systems"
+                  data-part="real-world examples"
+                >
+                  <a href="37-travel-booking-systems.html">
+                    <span class="nav-chapter-number">37</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Travel &amp; Booking Systems</strong>
+                      <small>48 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cross-cutting infrastructure systems"
+                  data-part="real-world examples"
+                >
+                  <a href="38-cross-cutting-systems.html">
+                    <span class="nav-chapter-number">38</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cross-Cutting Infrastructure Systems</strong>
+                      <small>36 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="defi lending platform"
+                  data-part="real-world examples"
+                >
+                  <a href="39-defi-lending-platform.html">
+                    <span class="nav-chapter-number">39</span>
+                    <span class="nav-chapter-copy">
+                      <strong>DeFi Lending Platform</strong>
+                      <small>33 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="nft marketplace"
+                  data-part="real-world examples"
+                >
+                  <a href="40-nft-marketplace.html">
+                    <span class="nav-chapter-number">40</span>
+                    <span class="nav-chapter-copy">
+                      <strong>NFT Marketplace</strong>
+                      <small>17 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cross-border payments &amp; remittance"
+                  data-part="real-world examples"
+                >
+                  <a href="41-cross-border-payments.html">
+                    <span class="nav-chapter-number">41</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cross-Border Payments &amp; Remittance</strong>
+                      <small>15 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="blockchain-based voting system"
+                  data-part="real-world examples"
+                >
+                  <a href="42-blockchain-voting-system.html">
+                    <span class="nav-chapter-number">42</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Blockchain-Based Voting System</strong>
+                      <small>12 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="healthcare data sharing platform"
+                  data-part="real-world examples"
+                >
+                  <a href="43-healthcare-data-sharing.html">
+                    <span class="nav-chapter-number">43</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Healthcare Data Sharing Platform</strong>
+                      <small>48 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-6" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 6</p>
+                <h3>Advanced Architecture</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="observability"
+                  data-part="advanced architecture"
+                >
+                  <a href="38-observability.html">
+                    <span class="nav-chapter-number">38</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Observability</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="kubernetes &amp; devops"
+                  data-part="advanced architecture"
+                >
+                  <a href="39-kubernetes-devops.html">
+                    <span class="nav-chapter-number">39</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Kubernetes &amp; DevOps</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security &amp; authentication"
+                  data-part="advanced architecture"
+                >
+                  <a href="40-security-authentication.html">
+                    <span class="nav-chapter-number">40</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security &amp; Authentication</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cost optimization"
+                  data-part="advanced architecture"
+                >
+                  <a href="41-cost-optimization.html">
+                    <span class="nav-chapter-number">41</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cost Optimization</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="ai in system design"
+                  data-part="advanced architecture"
+                >
+                  <a href="42-ai-in-system-design.html">
+                    <span class="nav-chapter-number">42</span>
+                    <span class="nav-chapter-copy">
+                      <strong>AI in System Design</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+          </nav>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content-column">
+      <div class="breadcrumbs">
+        <a href="../index.html">Home</a>
+        <span>/</span>
+        <a href="../index.html#part-4">Architectural Patterns</a>
+        <span>/</span>
+        <span>Chapter 15</span>
+      </div>
+
+      <article class="chapter-article">
+        <header class="chapter-hero part-4">
+          <div class="chapter-hero-top">
+            <span class="chapter-kicker">Chapter 15 of 60</span>
+            <span class="part-badge">Architectural Patterns</span>
+          </div>
+          <h1>API Gateway Pattern</h1>
+          <p class="chapter-lead">As systems grow into multiple services, clients should not need to understand every internal service boundary. The API gateway pattern introduces a stable edge that handles routing, authentication, rate limits, and sometimes response composition so clients interact with a cleaner interface than the internal architecture might expose directly.</p>
+          <div class="chapter-meta-strip">
+            <div class="summary-pill">
+              <span class="summary-label">Reading time</span>
+              <strong>6 min read</strong>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-label">Focus</span>
+              <strong>Compare common architecture choices and learn when patterns like microservices, event-driven systems, and CQRS actually help.</strong>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-label">Study cue</span>
+              <strong>Read, sketch the system, compare trade-offs, revisit the case study</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="chapter-body article-body">
+          <h2 id="part-context">Part Context</h2>
+<p><strong>Part:</strong> Part 4 - Architectural Patterns<br>
+<strong>Position:</strong> Chapter 15 of 42<br>
+<strong>Why this part exists:</strong> This section explains the structural patterns teams use to organize services, APIs, reads, writes, and event flows as systems and organizations grow.<br>
+<strong>This chapter builds toward:</strong> client-facing architecture, edge policy design, and service composition strategies</p>
+<h2 id="overview">Overview</h2>
+<p>As systems grow into multiple services, clients should not need to understand every internal service boundary. The API gateway pattern introduces a stable edge that handles routing, authentication, rate limits, and sometimes response composition so clients interact with a cleaner interface than the internal architecture might expose directly.</p>
+<p>A gateway is valuable when it simplifies clients, centralizes edge concerns, and protects internal evolution. It becomes harmful when it turns into an overloaded god-service full of business logic.</p>
+<h2 id="why-this-matters-in-real-systems">Why This Matters in Real Systems</h2>
+<ul>
+<li>Gateways simplify clients and reduce their coupling to backend topology.</li>
+<li>They centralize concerns such as auth, rate limiting, and request transformation.</li>
+<li>They help teams evolve internal services without constantly changing public contracts.</li>
+<li>They are a common interview topic because they sit at the intersection of client experience and backend architecture.</li>
+</ul>
+<h2 id="core-concepts">Core Concepts</h2>
+<h3 id="single-entry-point">Single entry point</h3>
+<p>The gateway provides a stable front door for clients, even if many services sit behind it.</p>
+<h3 id="routing-and-aggregation">Routing and aggregation</h3>
+<p>A gateway can route to the correct backend service and, when useful, combine multiple backend responses into one client-facing payload.</p>
+<h3 id="authentication-and-policy">Authentication and policy</h3>
+<p>Auth validation, quotas, schema checks, and basic request filtering often belong at the edge.</p>
+<h3 id="gateway-vs-bff">Gateway vs BFF</h3>
+<p>A Backend-for-Frontend tailors responses for a specific client type, while a more general gateway often serves many clients.</p>
+<h2 id="key-terminology">Key Terminology</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>API Gateway</td>
+<td>An edge service that fronts backend services and manages external request handling.</td>
+</tr>
+<tr>
+<td>BFF</td>
+<td>Backend for Frontend; a backend tailored to one client experience such as web or mobile.</td>
+</tr>
+<tr>
+<td>Rate Limiting</td>
+<td>Restricting how frequently a caller can send requests.</td>
+</tr>
+<tr>
+<td>Aggregation</td>
+<td>Combining data from multiple backend services into one response.</td>
+</tr>
+<tr>
+<td>Authentication</td>
+<td>Verifying the identity of a caller or token.</td>
+</tr>
+<tr>
+<td>Authorization</td>
+<td>Checking what the caller is allowed to do.</td>
+</tr>
+<tr>
+<td>Versioning</td>
+<td>Managing backward-compatible or intentionally changed API contracts over time.</td>
+</tr>
+<tr>
+<td>Edge Policy</td>
+<td>Cross-cutting control applied at the system entry point.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="detailed-explanation">Detailed Explanation</h2>
+<h3 id="the-edge-should-reflect-user-flows-not-internal-structure">The edge should reflect user flows, not internal structure</h3>
+<p>A client wants to load a screen or complete a user action, not call six internal services in the correct order. A well-designed gateway shapes APIs around those user flows while keeping internal services free to evolve independently.</p>
+<h3 id="centralization-is-useful-but-dangerous">Centralization is useful but dangerous</h3>
+<p>Auth checks, request validation, quotas, traffic shaping, and response transformation are all natural gateway responsibilities. But when teams keep adding business rules and orchestration logic there, the gateway becomes a bottleneck both technically and organizationally.</p>
+<h3 id="aggregation-trades-client-simplicity-for-backend-complexity">Aggregation trades client simplicity for backend complexity</h3>
+<p>Combining multiple service responses can reduce round trips for mobile and browser clients, but it can also increase fan-out latency and make the gateway sensitive to every backend slowdown. Architects need to decide which aggregations are worth the extra edge complexity.</p>
+<h3 id="different-clients-may-need-different-gateways">Different clients may need different gateways</h3>
+<p>Web, mobile, partner, and internal clients often need different shapes of data or different policies. This is where BFF patterns or layered gateway approaches become useful.</p>
+<h3 id="a-gateway-does-not-fix-poor-service-boundaries">A gateway does not fix poor service boundaries</h3>
+<p>If the internal services are tightly coupled, chatty, or inconsistent, the gateway may hide some pain from clients but it does not remove the architectural problem. The backend still needs coherent domain boundaries and contracts.</p>
+<h2 id="diagram-flow-representation">Diagram / Flow Representation</h2>
+<h3 id="gateway-at-the-edge">Gateway at the Edge</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/15-api-gateway-pattern-diagram-01.svg" alt="Diagram 1 for API Gateway Pattern" loading="lazy"></figure>
+<h3 id="bff-variation">BFF Variation</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/15-api-gateway-pattern-diagram-02.svg" alt="Diagram 2 for API Gateway Pattern" loading="lazy"></figure>
+<h2 id="real-world-examples">Real-World Examples</h2>
+<ul>
+<li>Amazon-like mobile experiences benefit from aggregation because extra round trips are painful on mobile networks.</li>
+<li>Google-style public APIs often require strong auth, quota control, and contract stability at the edge.</li>
+<li>Netflix-like device ecosystems often tailor payloads differently for TV, mobile, and browser clients.</li>
+<li>Internal partner or third-party APIs often need tighter filtering and versioning than internal service-to-service APIs.</li>
+</ul>
+<h2 id="case-study">Case Study</h2>
+<h3 id="mobile-backend-design-with-an-api-gateway">Mobile backend design with an API gateway</h3>
+<p>Mobile clients are a strong gateway case because network quality varies, round trips are expensive, and security concerns are high.</p>
+<h3 id="requirements">Requirements</h3>
+<ul>
+<li>Mobile clients need screen-oriented APIs rather than many fine-grained service calls.</li>
+<li>Auth and rate limits must be enforced consistently.</li>
+<li>Internal services should remain hidden behind a stable contract.</li>
+<li>The edge should help reduce round trips and payload waste.</li>
+<li>The system should support versioning and safe evolution for many client app versions in the wild.</li>
+</ul>
+<h3 id="design-evolution">Design Evolution</h3>
+<ul>
+<li>A basic gateway starts by routing requests and validating auth tokens.</li>
+<li>As client needs diversify, selected aggregation endpoints are added for major user journeys.</li>
+<li>As web and mobile needs diverge further, separate BFFs may replace a one-size-fits-all gateway contract.</li>
+<li>As scale and partner usage grow, rate limits, schema governance, and edge observability become more sophisticated.</li>
+</ul>
+<h3 id="scaling-challenges">Scaling Challenges</h3>
+<ul>
+<li>Too much aggregation can make the gateway itself a latency hotspot.</li>
+<li>A single global gateway path can become risky if every client depends on it for all traffic.</li>
+<li>Backward compatibility becomes harder as more client versions remain active simultaneously.</li>
+<li>Centralized logic can slow teams down if every product change must pass through one overloaded edge team.</li>
+</ul>
+<h3 id="final-architecture">Final Architecture</h3>
+<ul>
+<li>A stable edge layer enforcing auth, quotas, and routing.</li>
+<li>Client-aware aggregated endpoints for high-value journeys.</li>
+<li>Clean separation between edge policy and backend business ownership.</li>
+<li>Versioning and observability at the API boundary.</li>
+<li>Potential BFF split when client needs become sufficiently different.</li>
+</ul>
+<h2 id="architects-mindset">Architect's Mindset</h2>
+<ul>
+<li>Design external contracts around user journeys, not internal service names.</li>
+<li>Keep the gateway thin enough to avoid becoming a new monolith at the edge.</li>
+<li>Use the gateway to centralize policy, not to absorb all business logic.</li>
+<li>Prefer BFFs when client experiences differ meaningfully.</li>
+<li>Treat the gateway as critical infrastructure with strong observability and reliability expectations.</li>
+</ul>
+<h2 id="common-mistakes">Common Mistakes</h2>
+<ul>
+<li>Turning the gateway into a giant orchestration and business-rules layer.</li>
+<li>Mirroring internal services one-to-one so clients still feel internal complexity.</li>
+<li>Ignoring fan-out latency when adding more aggregation.</li>
+<li>Centralizing too much ownership in one team around the gateway.</li>
+<li>Treating versioning as an afterthought.</li>
+</ul>
+<h2 id="interview-angle">Interview Angle</h2>
+<ul>
+<li>Interviewers often ask about gateways when a design includes many backend services or mobile clients.</li>
+<li>Strong answers discuss routing, auth, rate limiting, aggregation, and the risk of overloading the edge.</li>
+<li>Candidates stand out when they distinguish between a generic gateway and a BFF.</li>
+<li>A weak answer says “put an API gateway in front” without explaining why the client needs it.</li>
+</ul>
+<h2 id="quick-recap">Quick Recap</h2>
+<ul>
+<li>An API gateway provides a cleaner external contract than the raw internal topology.</li>
+<li>It centralizes routing, policy, auth, and sometimes response aggregation.</li>
+<li>Gateways help clients but can become bottlenecks if overloaded with business logic.</li>
+<li>BFF patterns are useful when client needs differ significantly.</li>
+<li>The gateway should simplify the edge, not mask poor backend design forever.</li>
+</ul>
+<h2 id="practice-questions">Practice Questions</h2>
+<ol>
+<li>When is an API gateway useful?</li>
+<li>What concerns belong naturally at the edge?</li>
+<li>Why can aggregation help mobile clients?</li>
+<li>What makes a BFF different from a general gateway?</li>
+<li>How can a gateway become a bottleneck?</li>
+<li>What observability would you add at the API boundary?</li>
+<li>Why should internal service boundaries remain meaningful even when a gateway exists?</li>
+<li>How would you handle versioning for long-lived client apps?</li>
+<li>When would you split one gateway into multiple BFFs?</li>
+<li>How would you explain gateway trade-offs to a frontend team?</li>
+</ol>
+<h2 id="further-exploration">Further Exploration</h2>
+<ul>
+<li>Connect this chapter with security and authentication later in the book.</li>
+<li>Study GraphQL, BFF patterns, and traffic-shaping policies in more depth.</li>
+<li>Design one screen of a mobile app and decide what the edge contract should look like.</li>
+</ul>
+<h2 id="navigation">Navigation</h2>
+<ul>
+<li>Previous: <a href="14-monolith-vs-microservices.html">Monolith vs Microservices</a></li>
+<li>Next: <a href="16-event-driven-architecture.html">Event-Driven Architecture</a></li>
+</ul>
+        </div>
+
+        <section class="chapter-pagination">
+          <a class="pagination-link pagination-link-prev" href="14-monolith-vs-microservices.html">
+            <span class="pagination-label">Previous chapter</span>
+            <strong>Monolith vs Microservices</strong>
+          </a>
+
+          <a class="pagination-link pagination-link-home" href="../index.html">
+            <span class="pagination-label">Back to home</span>
+            <strong>System Design Mastery</strong>
+          </a>
+
+          <a class="pagination-link pagination-link-next" href="16-event-driven-architecture.html">
+            <span class="pagination-label">Next chapter</span>
+            <strong>Event-Driven Architecture</strong>
+          </a>
+        </section>
+      </article>
+    </main>
+
+    <aside class="toc-column sidebar-right" data-sidebar="right">
+      <div class="toc-card">
+        <div class="sidebar-controls sidebar-controls-right">
+          <div class="sidebar-controls-copy">
+            <p class="eyebrow">On this page</p>
+            <h2>Table of contents</h2>
+          </div>
+          <button
+            class="sidebar-toggle"
+            type="button"
+            data-toggle-sidebar="right"
+            aria-label="Toggle content navigation"
+            aria-expanded="true"
+            title="Toggle content navigation"
+          >
+            <span class="toggle-icon" aria-hidden="true">«</span>
+          </button>
+        </div>
+        <span class="sidebar-mini-label" aria-hidden="true">Contents</span>
+        <div class="sidebar-content toc-panel-body">
+          <div class="toc-content">
+              <div class="toc">
+<ul>
+<li><a href="#part-context">Part Context</a></li>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#why-this-matters-in-real-systems">Why This Matters in Real Systems</a></li>
+<li><a href="#core-concepts">Core Concepts</a><ul>
+<li><a href="#single-entry-point">Single entry point</a></li>
+<li><a href="#routing-and-aggregation">Routing and aggregation</a></li>
+<li><a href="#authentication-and-policy">Authentication and policy</a></li>
+<li><a href="#gateway-vs-bff">Gateway vs BFF</a></li>
+</ul>
+</li>
+<li><a href="#key-terminology">Key Terminology</a></li>
+<li><a href="#detailed-explanation">Detailed Explanation</a><ul>
+<li><a href="#the-edge-should-reflect-user-flows-not-internal-structure">The edge should reflect user flows, not internal structure</a></li>
+<li><a href="#centralization-is-useful-but-dangerous">Centralization is useful but dangerous</a></li>
+<li><a href="#aggregation-trades-client-simplicity-for-backend-complexity">Aggregation trades client simplicity for backend complexity</a></li>
+<li><a href="#different-clients-may-need-different-gateways">Different clients may need different gateways</a></li>
+<li><a href="#a-gateway-does-not-fix-poor-service-boundaries">A gateway does not fix poor service boundaries</a></li>
+</ul>
+</li>
+<li><a href="#diagram-flow-representation">Diagram / Flow Representation</a><ul>
+<li><a href="#gateway-at-the-edge">Gateway at the Edge</a></li>
+<li><a href="#bff-variation">BFF Variation</a></li>
+</ul>
+</li>
+<li><a href="#real-world-examples">Real-World Examples</a></li>
+<li><a href="#case-study">Case Study</a><ul>
+<li><a href="#mobile-backend-design-with-an-api-gateway">Mobile backend design with an API gateway</a></li>
+<li><a href="#requirements">Requirements</a></li>
+<li><a href="#design-evolution">Design Evolution</a></li>
+<li><a href="#scaling-challenges">Scaling Challenges</a></li>
+<li><a href="#final-architecture">Final Architecture</a></li>
+</ul>
+</li>
+<li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#common-mistakes">Common Mistakes</a></li>
+<li><a href="#interview-angle">Interview Angle</a></li>
+<li><a href="#quick-recap">Quick Recap</a></li>
+<li><a href="#practice-questions">Practice Questions</a></li>
+<li><a href="#further-exploration">Further Exploration</a></li>
+<li><a href="#navigation">Navigation</a></li>
+</ul>
+</div>
+
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>Source of truth: Markdown chapters in <code>system-design-mastery/</code>.</p>
+      <p>Static output: generated for lightweight hosting on GitHub Pages, Netlify, or Vercel.</p>
+    </div>
+  </footer>
+</body>
+</html>

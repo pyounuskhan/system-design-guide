@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chapter 10 · Scalability · System Design Mastery</title>
+  <meta name="description" content="Scalability is the ability of a system to handle growth without unacceptable degradation in latency, reliability, correctness, or cost. Growth can mean more requests, more data, more users, more geographic spread, or more product complexity. Architects care about scalability because systems almost never fail when they are small and lightly used. They fail when growth exposes assumptions that were never made explicit.">
+  <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script defer src="../assets/js/app.js"></script>
+</head>
+<body class="page-chapter part-3">
+  <div class="progress-bar" aria-hidden="true"><span></span></div>
+  <button class="sidebar-backdrop" type="button" aria-label="Close sidebars" data-overlay-close></button>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="nav-toggle" type="button" aria-label="Open chapter navigation" data-nav-toggle>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <a class="brand" href="../index.html">
+        <span class="brand-mark">SD</span>
+        <span class="brand-text">
+          <strong>System Design Mastery</strong>
+          <small>Interactive learning site</small>
+        </span>
+      </a>
+      <nav class="header-nav">
+        <a href="../index.html">Home</a>
+        <a href="../index.html#roadmap">Roadmap</a>
+        <a href="../index.html#chapter-directory">All chapters</a>
+      </nav>
+      <div class="header-tools">
+        <button class="toc-toggle" type="button" aria-label="Open content navigation" data-toc-toggle>
+          <span>Contents</span>
+        </button>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+          <span data-theme-label>Dark mode</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="sidebar sidebar-left" id="site-sidebar" data-sidebar="left">
+      <div class="sidebar-inner">
+        <div class="sidebar-controls">
+          <div class="sidebar-controls-copy sidebar-header">
+            <p class="eyebrow">System Design Mastery</p>
+            <h2>Chapter navigator</h2>
+            <p>Follow the curriculum in order or jump across parts when you need to revisit a concept.</p>
+          </div>
+          <button
+            class="sidebar-toggle"
+            type="button"
+            data-toggle-sidebar="left"
+            aria-label="Toggle chapter navigation"
+            aria-expanded="true"
+            title="Toggle chapter navigation"
+          >
+            <span class="toggle-icon" aria-hidden="true">«</span>
+          </button>
+        </div>
+        <span class="sidebar-mini-label" aria-hidden="true">Chapters</span>
+
+        <div class="sidebar-content">
+          <label class="search-field search-field-sidebar">
+            <span>Jump to chapter</span>
+            <input
+              type="search"
+              placeholder="Filter by title or part"
+              data-filter-input
+              data-filter-target="#site-sidebar"
+            >
+          </label>
+
+          <nav class="sidebar-nav" aria-label="Chapter navigation">
+            <section class="nav-part part-0" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 0</p>
+                <h3>Design Foundations</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="design principles"
+                  data-part="design foundations"
+                >
+                  <a href="F01-design-principles.html">
+                    <span class="nav-chapter-number">01</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Design Principles</strong>
+                      <small>43 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="design patterns (gof + practical)"
+                  data-part="design foundations"
+                >
+                  <a href="F02-design-patterns.html">
+                    <span class="nav-chapter-number">02</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Design Patterns (GoF + Practical)</strong>
+                      <small>47 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="system architecture styles"
+                  data-part="design foundations"
+                >
+                  <a href="F03-system-architecture-styles.html">
+                    <span class="nav-chapter-number">03</span>
+                    <span class="nav-chapter-copy">
+                      <strong>System Architecture Styles</strong>
+                      <small>65 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="microservices &amp; distributed patterns"
+                  data-part="design foundations"
+                >
+                  <a href="F04-microservices-distributed-patterns.html">
+                    <span class="nav-chapter-number">04</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Microservices &amp; Distributed Patterns</strong>
+                      <small>46 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="scalability &amp; performance"
+                  data-part="design foundations"
+                >
+                  <a href="F05-scalability-performance.html">
+                    <span class="nav-chapter-number">05</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Scalability &amp; Performance</strong>
+                      <small>62 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="data &amp; storage design"
+                  data-part="design foundations"
+                >
+                  <a href="F06-data-storage-design.html">
+                    <span class="nav-chapter-number">06</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Data &amp; Storage Design</strong>
+                      <small>58 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="distributed system fundamentals"
+                  data-part="design foundations"
+                >
+                  <a href="F07-distributed-system-fundamentals.html">
+                    <span class="nav-chapter-number">07</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Distributed System Fundamentals</strong>
+                      <small>79 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="networking fundamentals"
+                  data-part="design foundations"
+                >
+                  <a href="F08-networking-fundamentals.html">
+                    <span class="nav-chapter-number">08</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Networking Fundamentals</strong>
+                      <small>66 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security design"
+                  data-part="design foundations"
+                >
+                  <a href="F09-security-design.html">
+                    <span class="nav-chapter-number">09</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security Design</strong>
+                      <small>73 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="observability &amp; operations"
+                  data-part="design foundations"
+                >
+                  <a href="F10-observability-operations.html">
+                    <span class="nav-chapter-number">10</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Observability &amp; Operations</strong>
+                      <small>58 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="deployment &amp; devops"
+                  data-part="design foundations"
+                >
+                  <a href="F11-deployment-devops.html">
+                    <span class="nav-chapter-number">11</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Deployment &amp; DevOps</strong>
+                      <small>56 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="system design interview thinking"
+                  data-part="design foundations"
+                >
+                  <a href="F12-system-design-interview-thinking.html">
+                    <span class="nav-chapter-number">12</span>
+                    <span class="nav-chapter-copy">
+                      <strong>System Design Interview Thinking</strong>
+                      <small>62 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-1" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 1</p>
+                <h3>Foundations</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="what is system design?"
+                  data-part="foundations"
+                >
+                  <a href="01-what-is-system-design.html">
+                    <span class="nav-chapter-number">01</span>
+                    <span class="nav-chapter-copy">
+                      <strong>What is System Design?</strong>
+                      <small>9 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="types of requirements"
+                  data-part="foundations"
+                >
+                  <a href="02-types-of-requirements.html">
+                    <span class="nav-chapter-number">02</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Types of Requirements</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="estimation &amp; capacity planning"
+                  data-part="foundations"
+                >
+                  <a href="03-estimation-capacity-planning.html">
+                    <span class="nav-chapter-number">03</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Estimation &amp; Capacity Planning</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-2" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 2</p>
+                <h3>Core Building Blocks</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="networking fundamentals"
+                  data-part="core building blocks"
+                >
+                  <a href="04-networking-fundamentals.html">
+                    <span class="nav-chapter-number">04</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Networking Fundamentals</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="databases deep dive"
+                  data-part="core building blocks"
+                >
+                  <a href="05-databases-deep-dive.html">
+                    <span class="nav-chapter-number">05</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Databases Deep Dive</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="caching systems"
+                  data-part="core building blocks"
+                >
+                  <a href="06-caching-systems.html">
+                    <span class="nav-chapter-number">06</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Caching Systems</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="load balancing"
+                  data-part="core building blocks"
+                >
+                  <a href="07-load-balancing.html">
+                    <span class="nav-chapter-number">07</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Load Balancing</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="message queues &amp; event systems"
+                  data-part="core building blocks"
+                >
+                  <a href="08-message-queues-event-systems.html">
+                    <span class="nav-chapter-number">08</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Message Queues &amp; Event Systems</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="storage systems"
+                  data-part="core building blocks"
+                >
+                  <a href="09-storage-systems.html">
+                    <span class="nav-chapter-number">09</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Storage Systems</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-3" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 3</p>
+                <h3>Distributed Systems</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item is-active"
+                  data-filter-item
+                  data-title="scalability"
+                  data-part="distributed systems"
+                >
+                  <a href="10-scalability.html">
+                    <span class="nav-chapter-number">10</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Scalability</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="consistency &amp; cap theorem"
+                  data-part="distributed systems"
+                >
+                  <a href="11-consistency-cap-theorem.html">
+                    <span class="nav-chapter-number">11</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Consistency &amp; CAP Theorem</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="fault tolerance &amp; resilience"
+                  data-part="distributed systems"
+                >
+                  <a href="12-fault-tolerance-resilience.html">
+                    <span class="nav-chapter-number">12</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Fault Tolerance &amp; Resilience</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="distributed transactions"
+                  data-part="distributed systems"
+                >
+                  <a href="13-distributed-transactions.html">
+                    <span class="nav-chapter-number">13</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Distributed Transactions</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-4" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 4</p>
+                <h3>Architectural Patterns</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="monolith vs microservices"
+                  data-part="architectural patterns"
+                >
+                  <a href="14-monolith-vs-microservices.html">
+                    <span class="nav-chapter-number">14</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Monolith vs Microservices</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="api gateway pattern"
+                  data-part="architectural patterns"
+                >
+                  <a href="15-api-gateway-pattern.html">
+                    <span class="nav-chapter-number">15</span>
+                    <span class="nav-chapter-copy">
+                      <strong>API Gateway Pattern</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="event-driven architecture"
+                  data-part="architectural patterns"
+                >
+                  <a href="16-event-driven-architecture.html">
+                    <span class="nav-chapter-number">16</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Event-Driven Architecture</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cqrs pattern"
+                  data-part="architectural patterns"
+                >
+                  <a href="17-cqrs-pattern.html">
+                    <span class="nav-chapter-number">17</span>
+                    <span class="nav-chapter-copy">
+                      <strong>CQRS Pattern</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-5" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 5</p>
+                <h3>Real-World Examples</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="e-commerce &amp; marketplaces"
+                  data-part="real-world examples"
+                >
+                  <a href="18-ecommerce-marketplaces.html">
+                    <span class="nav-chapter-number">18</span>
+                    <span class="nav-chapter-copy">
+                      <strong>E-Commerce &amp; Marketplaces</strong>
+                      <small>65 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="fintech &amp; payments"
+                  data-part="real-world examples"
+                >
+                  <a href="19-fintech-payments.html">
+                    <span class="nav-chapter-number">19</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Fintech &amp; Payments</strong>
+                      <small>75 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="social media &amp; content platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="20-social-media-content-platforms.html">
+                    <span class="nav-chapter-number">20</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Social Media &amp; Content Platforms</strong>
+                      <small>29 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="video &amp; streaming platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="21-video-streaming-platforms.html">
+                    <span class="nav-chapter-number">21</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Video &amp; Streaming Platforms</strong>
+                      <small>68 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="communication systems"
+                  data-part="real-world examples"
+                >
+                  <a href="22-communication-systems.html">
+                    <span class="nav-chapter-number">22</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Communication Systems</strong>
+                      <small>49 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="on-demand services"
+                  data-part="real-world examples"
+                >
+                  <a href="23-on-demand-services.html">
+                    <span class="nav-chapter-number">23</span>
+                    <span class="nav-chapter-copy">
+                      <strong>On-Demand Services</strong>
+                      <small>36 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="analytics &amp; data platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="24-analytics-data-platforms.html">
+                    <span class="nav-chapter-number">24</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Analytics &amp; Data Platforms</strong>
+                      <small>43 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="search &amp; discovery"
+                  data-part="real-world examples"
+                >
+                  <a href="25-search-discovery.html">
+                    <span class="nav-chapter-number">25</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Search &amp; Discovery</strong>
+                      <small>38 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cloud &amp; infrastructure systems"
+                  data-part="real-world examples"
+                >
+                  <a href="26-cloud-infrastructure-systems.html">
+                    <span class="nav-chapter-number">26</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cloud &amp; Infrastructure Systems</strong>
+                      <small>37 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="machine learning &amp; ai systems"
+                  data-part="real-world examples"
+                >
+                  <a href="27-machine-learning-ai-systems.html">
+                    <span class="nav-chapter-number">27</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Machine Learning &amp; AI Systems</strong>
+                      <small>21 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security systems"
+                  data-part="real-world examples"
+                >
+                  <a href="28-security-systems.html">
+                    <span class="nav-chapter-number">28</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security Systems</strong>
+                      <small>38 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="content &amp; knowledge systems"
+                  data-part="real-world examples"
+                >
+                  <a href="29-content-knowledge-systems.html">
+                    <span class="nav-chapter-number">29</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Content &amp; Knowledge Systems</strong>
+                      <small>47 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="gaming systems"
+                  data-part="real-world examples"
+                >
+                  <a href="30-gaming-systems.html">
+                    <span class="nav-chapter-number">30</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Gaming Systems</strong>
+                      <small>27 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="healthcare systems"
+                  data-part="real-world examples"
+                >
+                  <a href="31-healthcare-systems.html">
+                    <span class="nav-chapter-number">31</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Healthcare Systems</strong>
+                      <small>28 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="edtech systems"
+                  data-part="real-world examples"
+                >
+                  <a href="32-edtech-systems.html">
+                    <span class="nav-chapter-number">32</span>
+                    <span class="nav-chapter-copy">
+                      <strong>EdTech Systems</strong>
+                      <small>33 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="enterprise systems"
+                  data-part="real-world examples"
+                >
+                  <a href="33-enterprise-systems.html">
+                    <span class="nav-chapter-number">33</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Enterprise Systems</strong>
+                      <small>56 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="iot &amp; real-time systems"
+                  data-part="real-world examples"
+                >
+                  <a href="34-iot-real-time-systems.html">
+                    <span class="nav-chapter-number">34</span>
+                    <span class="nav-chapter-copy">
+                      <strong>IoT &amp; Real-Time Systems</strong>
+                      <small>44 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="adtech systems"
+                  data-part="real-world examples"
+                >
+                  <a href="35-adtech-systems.html">
+                    <span class="nav-chapter-number">35</span>
+                    <span class="nav-chapter-copy">
+                      <strong>AdTech Systems</strong>
+                      <small>76 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="blockchain &amp; distributed systems"
+                  data-part="real-world examples"
+                >
+                  <a href="36-blockchain-distributed-systems.html">
+                    <span class="nav-chapter-number">36</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Blockchain &amp; Distributed Systems</strong>
+                      <small>82 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="travel &amp; booking systems"
+                  data-part="real-world examples"
+                >
+                  <a href="37-travel-booking-systems.html">
+                    <span class="nav-chapter-number">37</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Travel &amp; Booking Systems</strong>
+                      <small>48 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cross-cutting infrastructure systems"
+                  data-part="real-world examples"
+                >
+                  <a href="38-cross-cutting-systems.html">
+                    <span class="nav-chapter-number">38</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cross-Cutting Infrastructure Systems</strong>
+                      <small>36 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="defi lending platform"
+                  data-part="real-world examples"
+                >
+                  <a href="39-defi-lending-platform.html">
+                    <span class="nav-chapter-number">39</span>
+                    <span class="nav-chapter-copy">
+                      <strong>DeFi Lending Platform</strong>
+                      <small>33 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="nft marketplace"
+                  data-part="real-world examples"
+                >
+                  <a href="40-nft-marketplace.html">
+                    <span class="nav-chapter-number">40</span>
+                    <span class="nav-chapter-copy">
+                      <strong>NFT Marketplace</strong>
+                      <small>17 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cross-border payments &amp; remittance"
+                  data-part="real-world examples"
+                >
+                  <a href="41-cross-border-payments.html">
+                    <span class="nav-chapter-number">41</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cross-Border Payments &amp; Remittance</strong>
+                      <small>15 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="blockchain-based voting system"
+                  data-part="real-world examples"
+                >
+                  <a href="42-blockchain-voting-system.html">
+                    <span class="nav-chapter-number">42</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Blockchain-Based Voting System</strong>
+                      <small>12 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="healthcare data sharing platform"
+                  data-part="real-world examples"
+                >
+                  <a href="43-healthcare-data-sharing.html">
+                    <span class="nav-chapter-number">43</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Healthcare Data Sharing Platform</strong>
+                      <small>48 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-6" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 6</p>
+                <h3>Advanced Architecture</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="observability"
+                  data-part="advanced architecture"
+                >
+                  <a href="38-observability.html">
+                    <span class="nav-chapter-number">38</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Observability</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="kubernetes &amp; devops"
+                  data-part="advanced architecture"
+                >
+                  <a href="39-kubernetes-devops.html">
+                    <span class="nav-chapter-number">39</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Kubernetes &amp; DevOps</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security &amp; authentication"
+                  data-part="advanced architecture"
+                >
+                  <a href="40-security-authentication.html">
+                    <span class="nav-chapter-number">40</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security &amp; Authentication</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cost optimization"
+                  data-part="advanced architecture"
+                >
+                  <a href="41-cost-optimization.html">
+                    <span class="nav-chapter-number">41</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cost Optimization</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="ai in system design"
+                  data-part="advanced architecture"
+                >
+                  <a href="42-ai-in-system-design.html">
+                    <span class="nav-chapter-number">42</span>
+                    <span class="nav-chapter-copy">
+                      <strong>AI in System Design</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+          </nav>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content-column">
+      <div class="breadcrumbs">
+        <a href="../index.html">Home</a>
+        <span>/</span>
+        <a href="../index.html#part-3">Distributed Systems</a>
+        <span>/</span>
+        <span>Chapter 10</span>
+      </div>
+
+      <article class="chapter-article">
+        <header class="chapter-hero part-3">
+          <div class="chapter-hero-top">
+            <span class="chapter-kicker">Chapter 10 of 60</span>
+            <span class="part-badge">Distributed Systems</span>
+          </div>
+          <h1>Scalability</h1>
+          <p class="chapter-lead">Scalability is the ability of a system to handle growth without unacceptable degradation in latency, reliability, correctness, or cost. Growth can mean more requests, more data, more users, more geographic spread, or more product complexity. Architects care about scalability because systems almost never fail when they are small and lightly used. They fail when growth exposes assumptions that were never made explicit.</p>
+          <div class="chapter-meta-strip">
+            <div class="summary-pill">
+              <span class="summary-label">Reading time</span>
+              <strong>7 min read</strong>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-label">Focus</span>
+              <strong>Focus on the hard parts of scale: consistency, partition tolerance, resilience, and the behavior of systems under failure.</strong>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-label">Study cue</span>
+              <strong>Read, sketch the system, compare trade-offs, revisit the case study</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="chapter-body article-body">
+          <h2 id="part-context">Part Context</h2>
+<p><strong>Part:</strong> Part 3 - Distributed Systems Concepts<br>
+<strong>Position:</strong> Chapter 10 of 42<br>
+<strong>Why this part exists:</strong> This section explains the trade-offs that appear once systems scale across machines, replicas, regions, and failure domains.<br>
+<strong>This chapter builds toward:</strong> reasoning about growth, elasticity, bottlenecks, and the system changes required as demand increases</p>
+<h2 id="overview">Overview</h2>
+<p>Scalability is the ability of a system to handle growth without unacceptable degradation in latency, reliability, correctness, or cost. Growth can mean more requests, more data, more users, more geographic spread, or more product complexity. Architects care about scalability because systems almost never fail when they are small and lightly used. They fail when growth exposes assumptions that were never made explicit.</p>
+<p>This chapter explains how systems scale vertically, horizontally, and elastically, and why the real question is not “can it scale?” but “what will become the bottleneck first, and what design changes will that force?”</p>
+<h2 id="why-this-matters-in-real-systems">Why This Matters in Real Systems</h2>
+<ul>
+<li>Scalability determines whether a product can survive growth without repeated architectural emergencies.</li>
+<li>Different layers of a system scale in different ways; understanding those differences prevents naive designs.</li>
+<li>Scalability decisions affect cost, operational complexity, and resilience at the same time.</li>
+<li>Interviewers use scalability questions to see whether candidates can reason beyond the happy path of a small system.</li>
+</ul>
+<h2 id="core-concepts">Core Concepts</h2>
+<h3 id="vertical-scaling">Vertical scaling</h3>
+<p>Scaling up means giving one machine more CPU, memory, storage, or network capacity. It is often simple at first but has hard limits and can create expensive single points of failure.</p>
+<h3 id="horizontal-scaling">Horizontal scaling</h3>
+<p>Scaling out means adding more machines or instances and distributing work across them. It often improves both capacity and fault isolation but requires statelessness, partitioning, or coordination mechanisms.</p>
+<h3 id="elasticity-and-auto-scaling">Elasticity and auto scaling</h3>
+<p>Elasticity is the ability to adjust capacity with demand. Auto scaling helps align cost with real load, but only when the scaling signals and warm-up behavior are well understood.</p>
+<h3 id="bottleneck-driven-design">Bottleneck-driven design</h3>
+<p>Scalability is rarely uniform across the system. The web tier, cache tier, database, queue consumers, and storage layers all hit limits differently.</p>
+<h2 id="key-terminology">Key Terminology</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vertical Scaling</td>
+<td>Increasing the resources of one machine or node.</td>
+</tr>
+<tr>
+<td>Horizontal Scaling</td>
+<td>Adding more machines or instances to share the workload.</td>
+</tr>
+<tr>
+<td>Elasticity</td>
+<td>The ability to add or remove capacity dynamically as load changes.</td>
+</tr>
+<tr>
+<td>Bottleneck</td>
+<td>The most limiting component in the current system path.</td>
+</tr>
+<tr>
+<td>Headroom</td>
+<td>Reserved excess capacity used to handle spikes or partial failures.</td>
+</tr>
+<tr>
+<td>Hotspot</td>
+<td>A skewed concentration of traffic or data that overloads one component or partition.</td>
+</tr>
+<tr>
+<td>Autoscaler</td>
+<td>A mechanism that changes capacity automatically based on observed conditions.</td>
+</tr>
+<tr>
+<td>Throughput</td>
+<td>The total amount of work the system can complete in a period of time.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="detailed-explanation">Detailed Explanation</h2>
+<h3 id="scaling-is-never-one-dimensional">Scaling is never one-dimensional</h3>
+<p>A system may scale well in request count but poorly in storage growth, or scale in reads but not writes. That is why architects look for the current bottleneck instead of asking whether the system is “scalable” in a vague sense. The answer depends on workload shape.</p>
+<h3 id="vertical-scaling-buys-time-not-infinity">Vertical scaling buys time, not infinity</h3>
+<p>Adding a larger machine is often the fastest way to survive early growth. It can be the correct decision when the workload is still modest. But there are physical, financial, and operational limits. One very large machine is often expensive, harder to replace, and still a single failure domain.</p>
+<h3 id="horizontal-scaling-needs-architectural-support">Horizontal scaling needs architectural support</h3>
+<p>Adding more application instances works only if requests can be served by any healthy instance. That usually means stateless services, shared session state, externalized caches, and data partitioning or shared storage behind the instances.</p>
+<h3 id="elasticity-is-a-control-problem">Elasticity is a control problem</h3>
+<p>Autoscaling sounds simple, but bad scaling signals can cause oscillation, delayed response, or runaway cost. A queue-backed worker system may need scaling based on lag, not CPU. A web tier may need to account for warm-up time, connection priming, or cache fill behavior.</p>
+<h3 id="scalability-and-resilience-interact">Scalability and resilience interact</h3>
+<p>A horizontally scaled system often tolerates instance loss better than a vertically scaled singleton, but it also introduces more partial failures, more coordination, and more moving parts to observe. The gain in capacity comes with operational complexity.</p>
+<h2 id="diagram-flow-representation">Diagram / Flow Representation</h2>
+<h3 id="vertical-vs-horizontal-scaling">Vertical vs Horizontal Scaling</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/10-scalability-diagram-01.svg" alt="Diagram 1 for Scalability" loading="lazy"></figure>
+<h3 id="bottleneck-view">Bottleneck View</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/10-scalability-diagram-02.svg" alt="Diagram 2 for Scalability" loading="lazy"></figure>
+<h2 id="real-world-examples">Real-World Examples</h2>
+<ul>
+<li>Amazon during Black Friday scales web and API tiers horizontally because demand spikes quickly and failure isolation matters.</li>
+<li>Google search serving benefits from enormous horizontal distribution because global scale and resilience are core requirements.</li>
+<li>Netflix autoscaling behavior depends on service type; stateless serving layers scale differently from encoding pipelines.</li>
+<li>An internal analytics tool may use vertical scaling for a long time because the cheaper architecture is still sufficient.</li>
+</ul>
+<h2 id="case-study">Case Study</h2>
+<h3 id="black-friday-traffic-on-an-e-commerce-platform">Black Friday traffic on an e-commerce platform</h3>
+<p>Black Friday is a classic scalability case because the challenge is not only total traffic, but highly concentrated peak traffic combined with high business stakes.</p>
+<h3 id="requirements">Requirements</h3>
+<ul>
+<li>Serve a dramatically higher request volume than normal without collapsing user experience.</li>
+<li>Keep browse, cart, and checkout paths available under heavy load.</li>
+<li>Protect stateful systems such as inventory and order databases from read storms.</li>
+<li>Scale cost-effectively rather than paying Black Friday capacity costs year-round.</li>
+<li>Fail gracefully if some services or zones degrade.</li>
+</ul>
+<h3 id="design-evolution">Design Evolution</h3>
+<ul>
+<li>A smaller version may rely on vertical growth and a modest cluster of web instances.</li>
+<li>As seasonal peaks become larger, the system adds stronger caching and horizontally scaled stateless application tiers.</li>
+<li>As deployment and traffic risk increase, autoscaling and queue-backed side-effect workflows become more important.</li>
+<li>As the platform matures, capacity planning and failure drills become part of the architecture, not just part of operations.</li>
+</ul>
+<h3 id="scaling-challenges">Scaling Challenges</h3>
+<ul>
+<li>The database may become the first bottleneck if product and catalog reads are not heavily cached.</li>
+<li>Autoscaling may react too slowly if warm-up time is ignored.</li>
+<li>Traffic is not evenly distributed; a few popular products or campaigns can create hotspots.</li>
+<li>Degraded dependencies can cause retry storms that make scaling harder rather than easier.</li>
+</ul>
+<h3 id="final-architecture">Final Architecture</h3>
+<ul>
+<li>Horizontally scaled stateless web and API tiers behind load balancers.</li>
+<li>Aggressive caching and CDN use for product and asset reads.</li>
+<li>Protected stateful systems with queue-backed asynchronous side effects.</li>
+<li>Capacity plans with headroom and tested autoscaling rules.</li>
+<li>Observability focused on bottleneck layers, not only aggregate traffic.</li>
+</ul>
+<h2 id="architects-mindset">Architect's Mindset</h2>
+<ul>
+<li>Ask what grows fastest: requests, writes, data volume, fan-out, or coordination cost.</li>
+<li>Treat the bottleneck as the real design driver, not the easiest component to scale.</li>
+<li>Scale stateful systems more carefully than stateless compute.</li>
+<li>Use elasticity to match cost to demand, but do not mistake automation for architectural correctness.</li>
+<li>Plan for partial failure while scaling, not only for happy-path growth.</li>
+</ul>
+<h2 id="common-mistakes">Common Mistakes</h2>
+<ul>
+<li>Calling a system scalable because only the web tier can scale while the real bottleneck cannot.</li>
+<li>Using average traffic instead of peak traffic to justify capacity.</li>
+<li>Assuming horizontal scaling is easy even when sessions, state, or partitions are poorly designed.</li>
+<li>Relying on autoscaling without understanding warm-up delay or signal quality.</li>
+<li>Ignoring skew and hotspots in otherwise large-scale systems.</li>
+</ul>
+<h2 id="interview-angle">Interview Angle</h2>
+<ul>
+<li>Scalability is a staple interview theme because it forces candidates to reason about growth rather than only design the first version.</li>
+<li>Strong answers identify the likely bottleneck, discuss vertical vs horizontal trade-offs, and explain how the design evolves over time.</li>
+<li>Interviewers often probe what changes at 10x or 100x traffic because that reveals whether the candidate understands architectural pressure points.</li>
+<li>A weak answer says “add more servers” without addressing state, caches, databases, or failure behavior.</li>
+</ul>
+<h2 id="quick-recap">Quick Recap</h2>
+<ul>
+<li>Scalability is the ability to absorb growth without unacceptable degradation.</li>
+<li>Vertical scaling buys simplicity early but has hard limits.</li>
+<li>Horizontal scaling improves capacity and resilience but demands cleaner architecture.</li>
+<li>Elasticity helps align cost with demand but depends on good signals and warm-up planning.</li>
+<li>Real scalability work begins by finding the bottleneck.</li>
+</ul>
+<h2 id="practice-questions">Practice Questions</h2>
+<ol>
+<li>What is the difference between vertical and horizontal scaling?</li>
+<li>Why can the web tier scale while the database remains the real bottleneck?</li>
+<li>What signals should drive autoscaling for an API tier versus a worker tier?</li>
+<li>How would Black Friday traffic change your architecture priorities?</li>
+<li>Why is statelessness so helpful for horizontal scaling?</li>
+<li>What kinds of hotspots can appear even in a large cluster?</li>
+<li>How would you explain scalability trade-offs to a finance stakeholder concerned about cloud cost?</li>
+<li>Why is headroom important even when autoscaling exists?</li>
+<li>How does scalability interact with fault tolerance?</li>
+<li>What part of a design is often hardest to scale and why?</li>
+</ol>
+<h2 id="further-exploration">Further Exploration</h2>
+<ul>
+<li>Carry this bottleneck mindset into the next chapters on consistency and fault tolerance.</li>
+<li>Study partitioning, autoscaler behavior, and hotspot mitigation in more depth.</li>
+<li>Practice taking one existing system and describing how it changes at 10x scale.</li>
+</ul>
+<h2 id="navigation">Navigation</h2>
+<ul>
+<li>Previous: <a href="09-storage-systems.html">Storage Systems</a></li>
+<li>Next: <a href="11-consistency-cap-theorem.html">Consistency &amp; CAP Theorem</a></li>
+</ul>
+        </div>
+
+        <section class="chapter-pagination">
+          <a class="pagination-link pagination-link-prev" href="F10-observability-operations.html">
+            <span class="pagination-label">Previous chapter</span>
+            <strong>Observability &amp; Operations</strong>
+          </a>
+
+          <a class="pagination-link pagination-link-home" href="../index.html">
+            <span class="pagination-label">Back to home</span>
+            <strong>System Design Mastery</strong>
+          </a>
+
+          <a class="pagination-link pagination-link-next" href="F11-deployment-devops.html">
+            <span class="pagination-label">Next chapter</span>
+            <strong>Deployment &amp; DevOps</strong>
+          </a>
+        </section>
+      </article>
+    </main>
+
+    <aside class="toc-column sidebar-right" data-sidebar="right">
+      <div class="toc-card">
+        <div class="sidebar-controls sidebar-controls-right">
+          <div class="sidebar-controls-copy">
+            <p class="eyebrow">On this page</p>
+            <h2>Table of contents</h2>
+          </div>
+          <button
+            class="sidebar-toggle"
+            type="button"
+            data-toggle-sidebar="right"
+            aria-label="Toggle content navigation"
+            aria-expanded="true"
+            title="Toggle content navigation"
+          >
+            <span class="toggle-icon" aria-hidden="true">«</span>
+          </button>
+        </div>
+        <span class="sidebar-mini-label" aria-hidden="true">Contents</span>
+        <div class="sidebar-content toc-panel-body">
+          <div class="toc-content">
+              <div class="toc">
+<ul>
+<li><a href="#part-context">Part Context</a></li>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#why-this-matters-in-real-systems">Why This Matters in Real Systems</a></li>
+<li><a href="#core-concepts">Core Concepts</a><ul>
+<li><a href="#vertical-scaling">Vertical scaling</a></li>
+<li><a href="#horizontal-scaling">Horizontal scaling</a></li>
+<li><a href="#elasticity-and-auto-scaling">Elasticity and auto scaling</a></li>
+<li><a href="#bottleneck-driven-design">Bottleneck-driven design</a></li>
+</ul>
+</li>
+<li><a href="#key-terminology">Key Terminology</a></li>
+<li><a href="#detailed-explanation">Detailed Explanation</a><ul>
+<li><a href="#scaling-is-never-one-dimensional">Scaling is never one-dimensional</a></li>
+<li><a href="#vertical-scaling-buys-time-not-infinity">Vertical scaling buys time, not infinity</a></li>
+<li><a href="#horizontal-scaling-needs-architectural-support">Horizontal scaling needs architectural support</a></li>
+<li><a href="#elasticity-is-a-control-problem">Elasticity is a control problem</a></li>
+<li><a href="#scalability-and-resilience-interact">Scalability and resilience interact</a></li>
+</ul>
+</li>
+<li><a href="#diagram-flow-representation">Diagram / Flow Representation</a><ul>
+<li><a href="#vertical-vs-horizontal-scaling">Vertical vs Horizontal Scaling</a></li>
+<li><a href="#bottleneck-view">Bottleneck View</a></li>
+</ul>
+</li>
+<li><a href="#real-world-examples">Real-World Examples</a></li>
+<li><a href="#case-study">Case Study</a><ul>
+<li><a href="#black-friday-traffic-on-an-e-commerce-platform">Black Friday traffic on an e-commerce platform</a></li>
+<li><a href="#requirements">Requirements</a></li>
+<li><a href="#design-evolution">Design Evolution</a></li>
+<li><a href="#scaling-challenges">Scaling Challenges</a></li>
+<li><a href="#final-architecture">Final Architecture</a></li>
+</ul>
+</li>
+<li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#common-mistakes">Common Mistakes</a></li>
+<li><a href="#interview-angle">Interview Angle</a></li>
+<li><a href="#quick-recap">Quick Recap</a></li>
+<li><a href="#practice-questions">Practice Questions</a></li>
+<li><a href="#further-exploration">Further Exploration</a></li>
+<li><a href="#navigation">Navigation</a></li>
+</ul>
+</div>
+
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>Source of truth: Markdown chapters in <code>system-design-mastery/</code>.</p>
+      <p>Static output: generated for lightweight hosting on GitHub Pages, Netlify, or Vercel.</p>
+    </div>
+  </footer>
+</body>
+</html>

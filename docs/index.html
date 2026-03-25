@@ -1,0 +1,1190 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System Design Mastery</title>
+  <meta name="description" content="A structured roadmap that takes software engineers from beginner system design knowledge to advanced systems architect thinking.">
+  <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <script defer src="assets/js/app.js"></script>
+</head>
+<body class="page-home">
+  <div class="progress-bar" aria-hidden="true"><span></span></div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">SD</span>
+        <span class="brand-text">
+          <strong>System Design Mastery</strong>
+          <small>Static learning site</small>
+        </span>
+      </a>
+      <nav class="header-nav">
+        <a href="#roadmap">Roadmap</a>
+        <a href="#chapter-directory">Chapters</a>
+        <a href="#study-method">Study Method</a>
+      </nav>
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+        <span data-theme-label>Dark mode</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-section">
+      <div class="hero-copy">
+        <p class="eyebrow">A structured roadmap for serious system design learning</p>
+        <h1>System Design Mastery</h1>
+        <p class="hero-lead">
+          Learn system design from first principles to architect-level reasoning with a guided sequence
+          of chapters, case studies, diagrams, real-world trade-offs, and interview-focused thinking.
+        </p>
+        <p class="hero-support">
+          This site is built from the repository’s Markdown source and organized like a modern technical
+          book: start from fundamentals, move through building blocks and distributed systems, and end
+          with production architecture, platform operations, and AI-era design.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="chapters/F01-design-principles.html">Start with Chapter 1</a>
+          <a class="button button-secondary" href="#chapter-directory">Browse the full curriculum</a>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <div class="hero-stat-grid">
+          <article class="stat-card">
+            <strong>60</strong>
+            <span>Detailed chapters</span>
+          </article>
+          <article class="stat-card">
+            <strong>6</strong>
+            <span>Learning parts</span>
+          </article>
+          <article class="stat-card">
+            <strong>Beginner</strong>
+            <span>To advanced progression</span>
+          </article>
+          <article class="stat-card">
+            <strong>Architect</strong>
+            <span>Trade-off driven thinking</span>
+          </article>
+        </div>
+      </aside>
+    </section>
+
+    <section class="content-section" id="audience">
+      <div class="section-heading">
+        <p class="eyebrow">Who this is for</p>
+        <h2>Designed for engineers who want to think in systems</h2>
+      </div>
+      <div class="card-grid card-grid-two">
+        <article class="info-card">
+          <h3>Software developers</h3>
+          <p>Engineers who want to move beyond feature implementation into workload thinking, scale, and system behavior.</p>
+        </article>
+        <article class="info-card">
+          <h3>Backend engineers</h3>
+          <p>Developers who want deeper intuition for data flow, reliability, consistency, and architecture trade-offs.</p>
+        </article>
+        <article class="info-card">
+          <h3>Frontend and full-stack engineers</h3>
+          <p>Builders who need to understand the systems their products depend on, especially under growth and failure.</p>
+        </article>
+        <article class="info-card">
+          <h3>Interview preparation learners</h3>
+          <p>Candidates preparing for structured system design interviews at product companies or platform teams.</p>
+        </article>
+        <article class="info-card">
+          <h3>Future architects</h3>
+          <p>Engineers growing into technical leadership roles where system boundaries, trade-offs, and long-term design matter.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" id="roadmap">
+      <div class="section-heading">
+        <p class="eyebrow">Learning journey</p>
+        <h2>A step-by-step path from beginner to systems architect</h2>
+      </div>
+      <div class="roadmap-grid">
+        <article class="roadmap-card part-0">
+          <div class="roadmap-meta">Part 0</div>
+          <h3>Design Foundations</h3>
+          <p>Master the conceptual backbone: design principles, patterns, architecture styles, microservices, scalability, data design, distributed systems, networking, security, observability, deployment, and interview thinking.</p>
+          <div class="roadmap-footer">
+            <span>12 chapters</span>
+            <a href="#part-0">Open part</a>
+          </div>
+        </article>
+        <article class="roadmap-card part-1">
+          <div class="roadmap-meta">Part 1</div>
+          <h3>Foundations</h3>
+          <p>Build the mental model: what system design is, how requirements work, and how to estimate the shape of a system before implementation.</p>
+          <div class="roadmap-footer">
+            <span>3 chapters</span>
+            <a href="#part-1">Open part</a>
+          </div>
+        </article>
+        <article class="roadmap-card part-2">
+          <div class="roadmap-meta">Part 2</div>
+          <h3>Core Building Blocks</h3>
+          <p>Learn the components that appear repeatedly in production systems: networking, databases, caching, queues, load balancing, and storage.</p>
+          <div class="roadmap-footer">
+            <span>6 chapters</span>
+            <a href="#part-2">Open part</a>
+          </div>
+        </article>
+        <article class="roadmap-card part-3">
+          <div class="roadmap-meta">Part 3</div>
+          <h3>Distributed Systems</h3>
+          <p>Focus on the hard parts of scale: consistency, partition tolerance, resilience, and the behavior of systems under failure.</p>
+          <div class="roadmap-footer">
+            <span>4 chapters</span>
+            <a href="#part-3">Open part</a>
+          </div>
+        </article>
+        <article class="roadmap-card part-4">
+          <div class="roadmap-meta">Part 4</div>
+          <h3>Architectural Patterns</h3>
+          <p>Compare common architecture choices and learn when patterns like microservices, event-driven systems, and CQRS actually help.</p>
+          <div class="roadmap-footer">
+            <span>4 chapters</span>
+            <a href="#part-4">Open part</a>
+          </div>
+        </article>
+        <article class="roadmap-card part-5">
+          <div class="roadmap-meta">Part 5</div>
+          <h3>Real-World Examples</h3>
+          <p>Use a domain-driven atlas of real-world systems across commerce, fintech, social, infrastructure, healthcare, gaming, adtech, and travel to compare architectures in context.</p>
+          <div class="roadmap-footer">
+            <span>26 chapters</span>
+            <a href="#part-5">Open part</a>
+          </div>
+        </article>
+        <article class="roadmap-card part-6">
+          <div class="roadmap-meta">Part 6</div>
+          <h3>Advanced Architecture</h3>
+          <p>Move into production-grade thinking: observability, platform operations, security, cost, and AI-native system design.</p>
+          <div class="roadmap-footer">
+            <span>5 chapters</span>
+            <a href="#part-6">Open part</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" id="why-learn">
+      <div class="section-heading">
+        <p class="eyebrow">Why learn this</p>
+        <h2>Build the judgment required for real architecture work</h2>
+      </div>
+      <div class="card-grid card-grid-two">
+        <article class="info-card">
+          <h3>Architectural thinking</h3>
+          <p>Learn how to reason about systems as evolving business assets with real constraints, not isolated coding problems.</p>
+        </article>
+        <article class="info-card">
+          <h3>Interview relevance</h3>
+          <p>Practice the chapter sequence that mirrors how strong interview answers move from requirements to bottlenecks and trade-offs.</p>
+        </article>
+        <article class="info-card">
+          <h3>Real-world scale</h3>
+          <p>Connect theory to the components and patterns used in production systems: caches, queues, distributed workflows, and observability.</p>
+        </article>
+        <article class="info-card">
+          <h3>Trade-off clarity</h3>
+          <p>See why system design is never only about speed or scale. It is about balancing correctness, cost, resilience, and team complexity.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section chapter-directory" id="chapter-directory">
+      <div class="section-heading">
+        <p class="eyebrow">Chapter directory</p>
+        <h2>Read the book in order or jump to a specific topic</h2>
+      </div>
+      <div class="directory-toolbar">
+        <label class="search-field">
+          <span>Filter chapters</span>
+          <input
+            type="search"
+            placeholder="Search by chapter title or part"
+            data-filter-input
+            data-filter-target="#chapter-directory"
+          >
+        </label>
+      </div>
+
+      <section class="directory-part part-0" id="part-0" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 0</p>
+            <h3>Design Foundations</h3>
+          </div>
+          <p>Master the conceptual backbone: design principles, patterns, architecture styles, microservices, scalability, data design, distributed systems, networking, security, observability, deployment, and interview thinking.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/F01-design-principles.html"
+            data-filter-item
+            data-title="design principles"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 01</span>
+              <span class="chapter-reading">43 min</span>
+            </div>
+            <h4>Design Principles</h4>
+            <p>Design principles are the load-bearing walls of software engineering. Individual technologies come and go — a team may switch from PostgreSQL to CockroachDB, from REST to gRPC, from EC2 to Kubernetes — but the principles that determine whether a system is maintainable, scalable, and resilient remain constant across decades and technology stacks.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F02-design-patterns.html"
+            data-filter-item
+            data-title="design patterns (gof + practical)"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 02</span>
+              <span class="chapter-reading">47 min</span>
+            </div>
+            <h4>Design Patterns (GoF + Practical)</h4>
+            <p>Design patterns are not copy-paste templates. They are named solutions to recurring design problems that communicate intent, reduce cognitive load, and prevent reinvention. The original 23 patterns catalogued by Gamma, Helm, Johnson, and Vlissides (the &#34;Gang of Four&#34;) in 1994 remain foundational, but modern backend systems have evolved additional patterns that address concerns like dependency management, data access abstraction, middleware composition, and service layering.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F03-system-architecture-styles.html"
+            data-filter-item
+            data-title="system architecture styles"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 03</span>
+              <span class="chapter-reading">65 min</span>
+            </div>
+            <h4>System Architecture Styles</h4>
+            <p>Every system, whether consciously or not, embodies an architecture style. A startup shipping its first feature in a single Express.js application is building a monolith. A team that splits that application into twelve independently deployable services has adopted microservices. A team that routes every state change through an append-only log is practicing event-driven architecture. The style you choose determines how your system scales, how your teams coordinate, how failures propagate, and how expensive change becomes over time.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F04-microservices-distributed-patterns.html"
+            data-filter-item
+            data-title="microservices &amp; distributed patterns"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 04</span>
+              <span class="chapter-reading">46 min</span>
+            </div>
+            <h4>Microservices &amp; Distributed Patterns</h4>
+            <p>Microservices architecture decomposes a system into independently deployable services, each owning a bounded context. This decomposition brings enormous benefits — independent scaling, technology heterogeneity, team autonomy, fault isolation — but it also introduces an entirely new class of problems: network unreliability, partial failures, data consistency across service boundaries, distributed tracing, and operational complexity that can overwhelm teams unprepared for it.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F05-scalability-performance.html"
+            data-filter-item
+            data-title="scalability &amp; performance"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 05</span>
+              <span class="chapter-reading">62 min</span>
+            </div>
+            <h4>Scalability &amp; Performance</h4>
+            <p>Scalability is the property of a system to handle a growing amount of work by adding resources. Performance is the measure of how well a system executes a given workload — typically expressed as latency, throughput, or utilization. These two concepts are deeply intertwined but distinct: a system can be performant at small scale but fail to scale, and a system can scale to millions of users while delivering mediocre latency.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F06-data-storage-design.html"
+            data-filter-item
+            data-title="data &amp; storage design"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 06</span>
+              <span class="chapter-reading">58 min</span>
+            </div>
+            <h4>Data &amp; Storage Design</h4>
+            <p>Every software system is, at its core, a machine for storing, transforming, and retrieving data. The choice of data store shapes every layer above it: API design, service boundaries, consistency guarantees, deployment topology, and operational runbooks. A poor storage choice made in month one can become a multi-quarter migration project in year three.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F07-distributed-system-fundamentals.html"
+            data-filter-item
+            data-title="distributed system fundamentals"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 07</span>
+              <span class="chapter-reading">79 min</span>
+            </div>
+            <h4>Distributed System Fundamentals</h4>
+            <p>A distributed system is a collection of independent computers that appears to its users as a single coherent system. This deceptively simple definition conceals decades of research, scores of impossibility results, and an enormous design space that every practicing engineer must navigate.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F08-networking-fundamentals.html"
+            data-filter-item
+            data-title="networking fundamentals"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 08</span>
+              <span class="chapter-reading">66 min</span>
+            </div>
+            <h4>Networking Fundamentals</h4>
+            <p>Every distributed system is, at its core, a collection of processes communicating over a network. The network is simultaneously the enabler and the bottleneck — it provides connectivity but introduces latency, packet loss, reordering, partitions, and security vulnerabilities. Engineers who understand networking deeply can make better architectural decisions, debug production issues faster, and design systems that are resilient to the failure modes that networks inevitably introduce.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F09-security-design.html"
+            data-filter-item
+            data-title="security design"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 09</span>
+              <span class="chapter-reading">73 min</span>
+            </div>
+            <h4>Security Design</h4>
+            <p>Every system design conversation eventually reaches the same question: &#34;How do you secure this?&#34; The answer is never a single technology or a checkbox exercise. Security design is the discipline of making principled decisions about identity, access, confidentiality, integrity, and availability — decisions that compound across every service boundary, data store, network hop, and user interaction in a distributed system.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F10-observability-operations.html"
+            data-filter-item
+            data-title="observability &amp; operations"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 10</span>
+              <span class="chapter-reading">58 min</span>
+            </div>
+            <h4>Observability &amp; Operations</h4>
+            <p>A system that cannot be observed cannot be understood. A system that cannot be understood cannot be operated safely. Observability and operations are not afterthoughts bolted onto a finished product — they are first-class architectural concerns that shape how software is built, deployed, debugged, and evolved under real-world conditions.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F11-deployment-devops.html"
+            data-filter-item
+            data-title="deployment &amp; devops"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 11</span>
+              <span class="chapter-reading">56 min</span>
+            </div>
+            <h4>Deployment &amp; DevOps</h4>
+            <p>Software that never reaches production delivers zero value. Deployment and DevOps represent the engineering discipline that transforms source code into running, observable, reliable production systems — and keeps them that way through continuous change. While application architecture gets the spotlight in design discussions, the deployment pipeline, release strategy, container orchestration, and operational tooling determine whether that architecture actually works under real-world conditions.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/F12-system-design-interview-thinking.html"
+            data-filter-item
+            data-title="system design interview thinking"
+            data-part="design foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 12</span>
+              <span class="chapter-reading">62 min</span>
+            </div>
+            <h4>System Design Interview Thinking</h4>
+            <p>System design interviews are not trivia contests. They do not reward candidates who memorize architectures and recite them. They reward candidates who can think clearly under ambiguity, decompose a vague problem into tractable subproblems, make defensible decisions, and articulate why they chose one path over another.</p>
+          </a>
+        </div>
+      </section>
+      <section class="directory-part part-1" id="part-1" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 1</p>
+            <h3>Foundations</h3>
+          </div>
+          <p>Build the mental model: what system design is, how requirements work, and how to estimate the shape of a system before implementation.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/01-what-is-system-design.html"
+            data-filter-item
+            data-title="what is system design?"
+            data-part="foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 01</span>
+              <span class="chapter-reading">9 min</span>
+            </div>
+            <h4>What is System Design?</h4>
+            <p>System design is the practice of deciding how software, data, infrastructure, and operational processes should work together to solve a business problem. It sits between raw product ideas and implementation details. A good design is concrete enough that engineers can build it, but broad enough that it accounts for scale, reliability, growth, and change.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/02-types-of-requirements.html"
+            data-filter-item
+            data-title="types of requirements"
+            data-part="foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 02</span>
+              <span class="chapter-reading">8 min</span>
+            </div>
+            <h4>Types of Requirements</h4>
+            <p>Requirements are the input to design. Before choosing a database, a queue, or a service boundary, you need to know what the system must do and what qualities it must preserve while doing it. In practice, bad requirements lead to bad architecture faster than bad technology choices do.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/03-estimation-capacity-planning.html"
+            data-filter-item
+            data-title="estimation &amp; capacity planning"
+            data-part="foundations"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 03</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Estimation &amp; Capacity Planning</h4>
+            <p>System design becomes real when numbers enter the conversation. Capacity planning is the process of translating user behavior and product requirements into rough but useful estimates for throughput, storage, bandwidth, and compute. The goal is not mathematical perfection. The goal is architectural realism.</p>
+          </a>
+        </div>
+      </section>
+      <section class="directory-part part-2" id="part-2" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 2</p>
+            <h3>Core Building Blocks</h3>
+          </div>
+          <p>Learn the components that appear repeatedly in production systems: networking, databases, caching, queues, load balancing, and storage.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/04-networking-fundamentals.html"
+            data-filter-item
+            data-title="networking fundamentals"
+            data-part="core building blocks"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 04</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Networking Fundamentals</h4>
+            <p>Every distributed system is ultimately a networking problem disguised as an application problem. A request does not teleport from a user to a server. It moves through DNS, TCP or QUIC handshakes, TLS negotiation, proxies, routers, load balancers, and service-to-service calls. Each step adds latency, creates failure modes, and influences architecture decisions.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/05-databases-deep-dive.html"
+            data-filter-item
+            data-title="databases deep dive"
+            data-part="core building blocks"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 05</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Databases Deep Dive</h4>
+            <p>Databases are not just persistence layers. They shape the correctness, performance, scalability, and cost of the entire system. A weak data model can quietly punish a product for years, while a strong one creates clarity around ownership, consistency, and growth.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/06-caching-systems.html"
+            data-filter-item
+            data-title="caching systems"
+            data-part="core building blocks"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 06</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Caching Systems</h4>
+            <p>Caching is one of the highest-leverage tools in system design. It works because many systems repeat expensive reads, computations, and content delivery patterns. By storing useful results closer to the caller, a cache can reduce latency dramatically and protect downstream systems from overload.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/07-load-balancing.html"
+            data-filter-item
+            data-title="load balancing"
+            data-part="core building blocks"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 07</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Load Balancing</h4>
+            <p>Load balancing is the discipline of distributing incoming requests across multiple backend instances so that no single machine becomes the chokepoint. In practice, load balancers do more than split traffic. They also decide who is healthy, where TLS terminates, which version receives traffic, and how quickly failures are isolated.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/08-message-queues-event-systems.html"
+            data-filter-item
+            data-title="message queues &amp; event systems"
+            data-part="core building blocks"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 08</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>Message Queues &amp; Event Systems</h4>
+            <p>Synchronous APIs are useful, but they are not enough for all workloads. Many production systems need buffering, background processing, fan-out, retries, and a way for different parts of the system to move at different speeds. Message queues and event systems make that possible.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/09-storage-systems.html"
+            data-filter-item
+            data-title="storage systems"
+            data-part="core building blocks"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 09</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>Storage Systems</h4>
+            <p>Storage is not one thing. Databases, filesystems, block volumes, object stores, archival tiers, and CDNs all exist because different kinds of data want different handling. System designers need to match storage technology to access pattern, durability requirement, cost sensitivity, and operational model.</p>
+          </a>
+        </div>
+      </section>
+      <section class="directory-part part-3" id="part-3" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 3</p>
+            <h3>Distributed Systems</h3>
+          </div>
+          <p>Focus on the hard parts of scale: consistency, partition tolerance, resilience, and the behavior of systems under failure.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/10-scalability.html"
+            data-filter-item
+            data-title="scalability"
+            data-part="distributed systems"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 10</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Scalability</h4>
+            <p>Scalability is the ability of a system to handle growth without unacceptable degradation in latency, reliability, correctness, or cost. Growth can mean more requests, more data, more users, more geographic spread, or more product complexity. Architects care about scalability because systems almost never fail when they are small and lightly used. They fail when growth exposes assumptions that were never made explicit.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/11-consistency-cap-theorem.html"
+            data-filter-item
+            data-title="consistency &amp; cap theorem"
+            data-part="distributed systems"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 11</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Consistency &amp; CAP Theorem</h4>
+            <p>Once data is copied across nodes, racks, or regions, you no longer get a single obvious truth for free. Consistency is the set of guarantees about how quickly different readers see the same value after writes occur. In distributed systems, this becomes a business decision as much as a technical one.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/12-fault-tolerance-resilience.html"
+            data-filter-item
+            data-title="fault tolerance &amp; resilience"
+            data-part="distributed systems"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 12</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>Fault Tolerance &amp; Resilience</h4>
+            <p>Distributed systems fail in uneven and surprising ways. A service can be up but slow. A database can accept reads but not writes. A dependency can fail for one region or one tenant while appearing healthy elsewhere. Resilience is the ability to continue delivering acceptable behavior despite those partial failures.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/13-distributed-transactions.html"
+            data-filter-item
+            data-title="distributed transactions"
+            data-part="distributed systems"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 13</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Distributed Transactions</h4>
+            <p>A local database transaction is relatively simple: either the grouped operations commit or they do not. Distributed transactions are difficult because the business workflow spans multiple services, databases, or external systems that do not share one atomic commit boundary.</p>
+          </a>
+        </div>
+      </section>
+      <section class="directory-part part-4" id="part-4" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 4</p>
+            <h3>Architectural Patterns</h3>
+          </div>
+          <p>Compare common architecture choices and learn when patterns like microservices, event-driven systems, and CQRS actually help.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/14-monolith-vs-microservices.html"
+            data-filter-item
+            data-title="monolith vs microservices"
+            data-part="architectural patterns"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 14</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>Monolith vs Microservices</h4>
+            <p>Monoliths and microservices are not opposing ideologies. They are architectural responses to different levels of system complexity, organizational scale, and operational maturity. A monolith can be elegant, fast to deliver, and operationally efficient. A microservice architecture can unlock team autonomy and independent scaling, but only when the organization is ready to absorb the extra complexity.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/15-api-gateway-pattern.html"
+            data-filter-item
+            data-title="api gateway pattern"
+            data-part="architectural patterns"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 15</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>API Gateway Pattern</h4>
+            <p>As systems grow into multiple services, clients should not need to understand every internal service boundary. The API gateway pattern introduces a stable edge that handles routing, authentication, rate limits, and sometimes response composition so clients interact with a cleaner interface than the internal architecture might expose directly.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/16-event-driven-architecture.html"
+            data-filter-item
+            data-title="event-driven architecture"
+            data-part="architectural patterns"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 16</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>Event-Driven Architecture</h4>
+            <p>Event-driven architecture organizes systems around facts that something has happened. Instead of one service directly calling every downstream system, it emits an event such as OrderPlaced or VideoUploaded, and other services react when that event matters to them. This creates time-based decoupling and opens the door to streaming, projections, and asynchronous product evolution.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/17-cqrs-pattern.html"
+            data-filter-item
+            data-title="cqrs pattern"
+            data-part="architectural patterns"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 17</span>
+              <span class="chapter-reading">6 min</span>
+            </div>
+            <h4>CQRS Pattern</h4>
+            <p>CQRS, or Command Query Responsibility Segregation, separates the write side of a system from the read side when those two sides have meaningfully different needs. The command side focuses on correctness, validation, and durable state changes. The query side focuses on serving the exact shapes of data that clients need quickly and efficiently.</p>
+          </a>
+        </div>
+      </section>
+      <section class="directory-part part-5" id="part-5" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 5</p>
+            <h3>Real-World Examples</h3>
+          </div>
+          <p>Use a domain-driven atlas of real-world systems across commerce, fintech, social, infrastructure, healthcare, gaming, adtech, and travel to compare architectures in context.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/18-ecommerce-marketplaces.html"
+            data-filter-item
+            data-title="e-commerce &amp; marketplaces"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 18</span>
+              <span class="chapter-reading">65 min</span>
+            </div>
+            <h4>E-Commerce &amp; Marketplaces</h4>
+            <p>E-commerce systems appear simple from the shopper&#39;s perspective — browse, add to cart, pay, receive goods. Behind that surface lies one of the most architecturally demanding domains in software: a dense web of correctness constraints, latency-sensitive read paths, inventory contention, distributed payment orchestration, fraud detection, multi-seller isolation, and post-order state machines that run for days or weeks.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/19-fintech-payments.html"
+            data-filter-item
+            data-title="fintech &amp; payments"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 19</span>
+              <span class="chapter-reading">75 min</span>
+            </div>
+            <h4>Fintech &amp; Payments</h4>
+            <p>Fintech systems fail differently from media or social systems: a timeout can become money loss, a race condition can become double-spend, and a logging gap can become a regulatory violation. Architecture choices in this domain must balance customer-facing latency with financial correctness, legal obligations, and operational auditability.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/20-social-media-content-platforms.html"
+            data-filter-item
+            data-title="social media &amp; content platforms"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 20</span>
+              <span class="chapter-reading">29 min</span>
+            </div>
+            <h4>Social Media &amp; Content Platforms</h4>
+            <p>Social media platforms are among the most architecturally demanding systems in existence. They combine graph data at billion-node scale, real-time feed generation with ML ranking, media processing pipelines handling petabytes per day, notification fanout to hundreds of millions of devices, and content moderation systems that must make safety decisions in milliseconds.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/21-video-streaming-platforms.html"
+            data-filter-item
+            data-title="video &amp; streaming platforms"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 21</span>
+              <span class="chapter-reading">68 min</span>
+            </div>
+            <h4>Video &amp; Streaming Platforms</h4>
+            <p>Video platforms join heavyweight media pipelines with latency-sensitive delivery and ML-driven discovery surfaces. A single 10-minute 4K video upload triggers gigabytes of storage writes, hours of CPU-intensive transcoding, dozens of output variants, CDN propagation to 200+ edge locations, and real-time recommendation scoring — all before a single viewer presses play.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/22-communication-systems.html"
+            data-filter-item
+            data-title="communication systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 22</span>
+              <span class="chapter-reading">49 min</span>
+            </div>
+            <h4>Communication Systems</h4>
+            <p>Communication systems form the connective tissue of the modern internet. Every major platform — social networks, marketplaces, enterprise tools, gaming — relies on real-time messaging, notifications, and presence infrastructure. The architecture spans persistent connections at massive scale, message ordering guarantees, offline synchronization, and multi-channel delivery.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/23-on-demand-services.html"
+            data-filter-item
+            data-title="on-demand services"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 23</span>
+              <span class="chapter-reading">36 min</span>
+            </div>
+            <h4>On-Demand Services</h4>
+            <p>On-demand services connect consumers with real-time supply — whether it&#39;s a ride, a meal, or a package. The defining architectural challenge is matching supply and demand in real-time under geographic and temporal constraints. A driver 2 kilometers away is useful; one 20 kilometers away is not. A restaurant that can prepare food in 15 minutes matters; one that takes 60 minutes doesn&#39;t.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/24-analytics-data-platforms.html"
+            data-filter-item
+            data-title="analytics &amp; data platforms"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 24</span>
+              <span class="chapter-reading">43 min</span>
+            </div>
+            <h4>Analytics &amp; Data Platforms</h4>
+            <p>Analytics and data platforms are the nervous system of every modern tech company. Every product decision — what features to build, which experiments to run, where to invest — is informed by data pipelines that collect, process, store, and serve billions of events per day. Without reliable analytics, teams fly blind.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/25-search-discovery.html"
+            data-filter-item
+            data-title="search &amp; discovery"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 25</span>
+              <span class="chapter-reading">38 min</span>
+            </div>
+            <h4>Search &amp; Discovery</h4>
+            <p>Search is how users find what they need across billions of documents, products, places, and entities. A great search system returns the right result in the top 3 positions within 200ms. A bad one buries what the user wants on page 5 — or returns nothing at all.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/26-cloud-infrastructure-systems.html"
+            data-filter-item
+            data-title="cloud &amp; infrastructure systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 26</span>
+              <span class="chapter-reading">37 min</span>
+            </div>
+            <h4>Cloud &amp; Infrastructure Systems</h4>
+            <p>Cloud and infrastructure systems are the platform layer that every application runs on. When an engineer says &#34;deploy to production,&#34; these are the systems that make it happen: load balancers routing traffic, API gateways enforcing policies, Kubernetes scheduling containers, object storage serving files, DNS resolving domains, and CDNs caching content at the edge.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/27-machine-learning-ai-systems.html"
+            data-filter-item
+            data-title="machine learning &amp; ai systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 27</span>
+              <span class="chapter-reading">21 min</span>
+            </div>
+            <h4>Machine Learning &amp; AI Systems</h4>
+            <p>Machine Learning systems are the engines behind recommendations, fraud detection, search ranking, personalization, autonomous vehicles, and generative AI. The engineering challenge is not just building models — it&#39;s building the infrastructure to train, serve, monitor, and iterate on models at production scale.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/28-security-systems.html"
+            data-filter-item
+            data-title="security systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 28</span>
+              <span class="chapter-reading">38 min</span>
+            </div>
+            <h4>Security Systems</h4>
+            <p>Security systems protect platforms from unauthorized access, data breaches, abuse, and denial-of-service attacks. Every other system in this curriculum depends on security infrastructure — authentication gates every API call, authorization controls every data access, rate limiting protects every endpoint, and fraud detection guards every financial transaction.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/29-content-knowledge-systems.html"
+            data-filter-item
+            data-title="content &amp; knowledge systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 29</span>
+              <span class="chapter-reading">47 min</span>
+            </div>
+            <h4>Content &amp; Knowledge Systems</h4>
+            <p>Knowledge systems mix content modeling, collaboration, publishing workflows, search, and access control. Their architecture often shifts from simple CMS patterns to versioned collaborative editing and permissions-heavy serving.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/30-gaming-systems.html"
+            data-filter-item
+            data-title="gaming systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 30</span>
+              <span class="chapter-reading">27 min</span>
+            </div>
+            <h4>Gaming Systems</h4>
+            <p>Gaming backends combine low-latency state sync, fairness controls, matchmaking, and cheat resistance. Their architecture varies sharply by game genre, but the core system boundaries repeat across many multiplayer products.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/31-healthcare-systems.html"
+            data-filter-item
+            data-title="healthcare systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 31</span>
+              <span class="chapter-reading">28 min</span>
+            </div>
+            <h4>Healthcare Systems</h4>
+            <p>Healthcare systems carry regulated data, durable clinical records, and auditability requirements that frequently outweigh raw throughput concerns. They also integrate with external providers, imaging systems, and appointment workflows.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/32-edtech-systems.html"
+            data-filter-item
+            data-title="edtech systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 32</span>
+              <span class="chapter-reading">33 min</span>
+            </div>
+            <h4>EdTech Systems</h4>
+            <p>Education platforms combine content delivery, progress tracking, assessments, personalization, and certification workflows. They often span consumer and institutional buyers, which changes the architecture around tenancy and reporting.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/33-enterprise-systems.html"
+            data-filter-item
+            data-title="enterprise systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 33</span>
+              <span class="chapter-reading">56 min</span>
+            </div>
+            <h4>Enterprise Systems</h4>
+            <p>Enterprise systems are workflow-dense, configuration-heavy, and integration-driven. Their architecture is shaped by tenancy, audit, authorization, reporting, and change management more than pure consumer latency goals.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/34-iot-real-time-systems.html"
+            data-filter-item
+            data-title="iot &amp; real-time systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 34</span>
+              <span class="chapter-reading">44 min</span>
+            </div>
+            <h4>IoT &amp; Real-Time Systems</h4>
+            <p>IoT systems collect device telemetry, distribute commands, and operate over unreliable networks with constrained clients. Their architecture must handle device identity, bursts, ordering gaps, and long-lived fleet operations.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/35-adtech-systems.html"
+            data-filter-item
+            data-title="adtech systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 35</span>
+              <span class="chapter-reading">76 min</span>
+            </div>
+            <h4>AdTech Systems</h4>
+            <p>AdTech systems make ranking and decisioning choices under strict latency budgets while handling auctions, attribution, fraud, and campaign accounting. They are event-heavy and abuse-prone by default.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/36-blockchain-distributed-systems.html"
+            data-filter-item
+            data-title="blockchain &amp; distributed systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 36</span>
+              <span class="chapter-reading">82 min</span>
+            </div>
+            <h4>Blockchain &amp; Distributed Systems</h4>
+            <p>Blockchain systems look like a niche topic until you decompose them as real production systems. Then the shape becomes familiar: API gateways, workflow orchestration, risk controls, asynchronous event processing, read models, search, caches, analytics, operator tooling, and deployment isolation. The difference is that the authoritative state transition happens on a protocol you do not fully control.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/37-travel-booking-systems.html"
+            data-filter-item
+            data-title="travel &amp; booking systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 37</span>
+              <span class="chapter-reading">48 min</span>
+            </div>
+            <h4>Travel &amp; Booking Systems</h4>
+            <p>Travel and booking systems combine search, inventory, pricing, reservations, and itinerary workflows. They are correctness-sensitive because inventory is scarce, but they also require fast reads and multi-step user experiences.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/38-cross-cutting-systems.html"
+            data-filter-item
+            data-title="cross-cutting infrastructure systems"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 38</span>
+              <span class="chapter-reading">36 min</span>
+            </div>
+            <h4>Cross-Cutting Infrastructure Systems</h4>
+            <p>Cross-cutting infrastructure systems are the invisible backbone of every production application. No matter what domain you operate in — e-commerce, fintech, social media, gaming, or healthcare — you need caching, messaging, rate limiting, feature flags, logging, alerting, and configuration management. These systems don&#39;t deliver user-facing features directly, but without them, every user-facing feature degrades, breaks, or becomes unobservable.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/39-defi-lending-platform.html"
+            data-filter-item
+            data-title="defi lending platform"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 39</span>
+              <span class="chapter-reading">33 min</span>
+            </div>
+            <h4>DeFi Lending Platform</h4>
+            <p>A DeFi (Decentralized Finance) lending platform enables permissionless borrowing and lending of crypto assets without intermediaries. Users deposit assets into liquidity pools to earn interest, while borrowers take overcollateralized loans from these pools. The protocol autonomously manages interest rates, collateral requirements, and liquidations through smart contracts deployed on blockchain networks.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/40-nft-marketplace.html"
+            data-filter-item
+            data-title="nft marketplace"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 40</span>
+              <span class="chapter-reading">17 min</span>
+            </div>
+            <h4>NFT Marketplace</h4>
+            <p>An NFT Marketplace is a platform enabling users to create (mint), list, buy, sell, and auction non-fungible tokens. Unlike traditional e-commerce, the core transaction layer lives on-chain (Ethereum, Polygon, Solana, etc.), while the marketplace provides discovery, metadata enrichment, order matching, and user experience layers off-chain. The system must bridge Web2 user expectations (instant search, rich media, real-time feeds) with Web3 realities (block confirmation times, gas fees, chain reorganizations, wallet-based authentication).</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/41-cross-border-payments.html"
+            data-filter-item
+            data-title="cross-border payments &amp; remittance"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 41</span>
+              <span class="chapter-reading">15 min</span>
+            </div>
+            <h4>Cross-Border Payments &amp; Remittance</h4>
+            <p>Cross-border payments represent one of the most complex distributed systems in financial technology. Every year, trillions of dollars flow across international boundaries — remittances from migrant workers, B2B trade payments, e-commerce settlements, and treasury operations. Despite the scale, the infrastructure remains fragmented, slow, expensive, and opaque.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/42-blockchain-voting-system.html"
+            data-filter-item
+            data-title="blockchain-based voting system"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 42</span>
+              <span class="chapter-reading">12 min</span>
+            </div>
+            <h4>Blockchain-Based Voting System</h4>
+            <p>A blockchain-based voting system is one of the most challenging distributed systems to design. It must simultaneously satisfy properties that often conflict: transparency (anyone can verify the result) and privacy (no one can learn how an individual voted), accessibility (every eligible voter can cast a ballot) and security (no unauthorized votes are counted), liveness (the system must work during the election window) and safety (no incorrect tallying can occur).</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/43-healthcare-data-sharing.html"
+            data-filter-item
+            data-title="healthcare data sharing platform"
+            data-part="real-world examples"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 43</span>
+              <span class="chapter-reading">48 min</span>
+            </div>
+            <h4>Healthcare Data Sharing Platform</h4>
+            <p>Healthcare data sharing is one of the most consequential challenges in technology and society. Patient medical records are fragmented across hospitals, clinics, labs, pharmacies, insurers, and research institutions. This fragmentation leads to duplicated tests, delayed diagnoses, medication errors, and billions of dollars in waste. Simultaneously, strict privacy regulations such as HIPAA in the United States and GDPR in Europe create complex compliance landscapes that traditional centralized systems struggle to navigate.</p>
+          </a>
+        </div>
+      </section>
+      <section class="directory-part part-6" id="part-6" data-filter-group>
+        <div class="directory-part-header">
+          <div>
+            <p class="eyebrow">Part 6</p>
+            <h3>Advanced Architecture</h3>
+          </div>
+          <p>Move into production-grade thinking: observability, platform operations, security, cost, and AI-native system design.</p>
+        </div>
+        <div class="chapter-card-grid">
+          <a
+            class="chapter-card"
+            href="chapters/38-observability.html"
+            data-filter-item
+            data-title="observability"
+            data-part="advanced architecture"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 38</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Observability</h4>
+            <p>Observability is the discipline of understanding what a system is doing from the signals it emits. In small applications, developers can often inspect logs manually or reason from direct familiarity. In distributed systems, that intuition breaks down quickly. One request may cross many services, queues, databases, and caches before the user sees a result.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/39-kubernetes-devops.html"
+            data-filter-item
+            data-title="kubernetes &amp; devops"
+            data-part="advanced architecture"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 39</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Kubernetes &amp; DevOps</h4>
+            <p>Kubernetes and modern DevOps practices sit at the boundary between application architecture and platform operations. They determine how services are packaged, deployed, discovered, scaled, configured, rolled back, and observed. For many teams, architecture decisions only become real when they survive these delivery mechanics.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/40-security-authentication.html"
+            data-filter-item
+            data-title="security &amp; authentication"
+            data-part="advanced architecture"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 40</span>
+              <span class="chapter-reading">7 min</span>
+            </div>
+            <h4>Security &amp; Authentication</h4>
+            <p>Security and authentication are foundational system-design concerns because every architecture choice changes the attack surface. Authentication answers “who is this principal?” Authorization answers “what may they do?” Secure system design must also consider transport security, secret management, abuse prevention, and how trust is established between services.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/41-cost-optimization.html"
+            data-filter-item
+            data-title="cost optimization"
+            data-part="advanced architecture"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 41</span>
+              <span class="chapter-reading">8 min</span>
+            </div>
+            <h4>Cost Optimization</h4>
+            <p>Cost optimization is not about making every system cheap. It is about making cost proportional to value and aligned with business requirements. A system that is too expensive for its traffic profile is poorly designed, but a system that is cheap because it fails reliability or latency goals is also poorly designed. The architect’s job is to find the right efficiency point.</p>
+          </a>
+          <a
+            class="chapter-card"
+            href="chapters/42-ai-in-system-design.html"
+            data-filter-item
+            data-title="ai in system design"
+            data-part="advanced architecture"
+          >
+            <div class="chapter-card-top">
+              <span class="chapter-kicker">Chapter 42</span>
+              <span class="chapter-reading">8 min</span>
+            </div>
+            <h4>AI in System Design</h4>
+            <p>AI now influences system design in two important ways. First, architects use AI tools to accelerate analysis, documentation, and design exploration. Second, many products now include AI components directly: retrieval-augmented generation, copilots, recommendation systems, classification pipelines, and agent-style workflows. Both uses require disciplined system thinking.</p>
+          </a>
+        </div>
+      </section>
+    </section>
+
+    <section class="content-section" id="study-method">
+      <div class="section-heading">
+        <p class="eyebrow">Suggested study method</p>
+        <h2>Use the site like an interactive book, not just a reference</h2>
+      </div>
+      <div class="study-grid">
+        <article class="study-step">
+          <span class="step-number">1</span>
+          <div>
+            <h3>Read the chapter actively</h3>
+            <p>Move in order when possible so each topic inherits the vocabulary and trade-off language from earlier chapters.</p>
+          </div>
+        </article>
+        <article class="study-step">
+          <span class="step-number">2</span>
+          <div>
+            <h3>Summarize in your own words</h3>
+            <p>Reduce each chapter to a short explanation you could give to a teammate or interviewer without reading from notes.</p>
+          </div>
+        </article>
+        <article class="study-step">
+          <span class="step-number">3</span>
+          <div>
+            <h3>Draw the architecture</h3>
+            <p>Translate the chapter into boxes, flows, boundaries, and data paths. System design becomes durable when you can sketch it.</p>
+          </div>
+        </article>
+        <article class="study-step">
+          <span class="step-number">4</span>
+          <div>
+            <h3>Review trade-offs</h3>
+            <p>Ask what gets better, what gets worse, and what assumptions make the architecture correct for a given workload.</p>
+          </div>
+        </article>
+        <article class="study-step">
+          <span class="step-number">5</span>
+          <div>
+            <h3>Revisit the case study</h3>
+            <p>Use the case study and practice questions to pressure-test whether you can adapt the design under changed requirements.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>System Design Mastery is a static learning site generated from the Markdown source in the repository.</p>
+      <p>Read in order for the strongest beginner-to-architect progression.</p>
+    </div>
+  </footer>
+</body>
+</html>

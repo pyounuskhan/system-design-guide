@@ -1,0 +1,4202 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chapter 4 · Microservices &amp; Distributed Patterns · System Design Mastery</title>
+  <meta name="description" content="Microservices architecture decomposes a system into independently deployable services, each owning a bounded context. This decomposition brings enormous benefits — independent scaling, technology heterogeneity, team autonomy, fault isolation — but it also introduces an entirely new class of problems: network unreliability, partial failures, data consistency across service boundaries, distributed tracing, and operational complexity that can overwhelm teams unprepared for it.">
+  <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script defer src="../assets/js/app.js"></script>
+</head>
+<body class="page-chapter part-0">
+  <div class="progress-bar" aria-hidden="true"><span></span></div>
+  <button class="sidebar-backdrop" type="button" aria-label="Close sidebars" data-overlay-close></button>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <button class="nav-toggle" type="button" aria-label="Open chapter navigation" data-nav-toggle>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <a class="brand" href="../index.html">
+        <span class="brand-mark">SD</span>
+        <span class="brand-text">
+          <strong>System Design Mastery</strong>
+          <small>Interactive learning site</small>
+        </span>
+      </a>
+      <nav class="header-nav">
+        <a href="../index.html">Home</a>
+        <a href="../index.html#roadmap">Roadmap</a>
+        <a href="../index.html#chapter-directory">All chapters</a>
+      </nav>
+      <div class="header-tools">
+        <button class="toc-toggle" type="button" aria-label="Open content navigation" data-toc-toggle>
+          <span>Contents</span>
+        </button>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Toggle dark mode">
+          <span data-theme-label>Dark mode</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="page-shell">
+    <aside class="sidebar sidebar-left" id="site-sidebar" data-sidebar="left">
+      <div class="sidebar-inner">
+        <div class="sidebar-controls">
+          <div class="sidebar-controls-copy sidebar-header">
+            <p class="eyebrow">System Design Mastery</p>
+            <h2>Chapter navigator</h2>
+            <p>Follow the curriculum in order or jump across parts when you need to revisit a concept.</p>
+          </div>
+          <button
+            class="sidebar-toggle"
+            type="button"
+            data-toggle-sidebar="left"
+            aria-label="Toggle chapter navigation"
+            aria-expanded="true"
+            title="Toggle chapter navigation"
+          >
+            <span class="toggle-icon" aria-hidden="true">«</span>
+          </button>
+        </div>
+        <span class="sidebar-mini-label" aria-hidden="true">Chapters</span>
+
+        <div class="sidebar-content">
+          <label class="search-field search-field-sidebar">
+            <span>Jump to chapter</span>
+            <input
+              type="search"
+              placeholder="Filter by title or part"
+              data-filter-input
+              data-filter-target="#site-sidebar"
+            >
+          </label>
+
+          <nav class="sidebar-nav" aria-label="Chapter navigation">
+            <section class="nav-part part-0" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 0</p>
+                <h3>Design Foundations</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="design principles"
+                  data-part="design foundations"
+                >
+                  <a href="F01-design-principles.html">
+                    <span class="nav-chapter-number">01</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Design Principles</strong>
+                      <small>43 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="design patterns (gof + practical)"
+                  data-part="design foundations"
+                >
+                  <a href="F02-design-patterns.html">
+                    <span class="nav-chapter-number">02</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Design Patterns (GoF + Practical)</strong>
+                      <small>47 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="system architecture styles"
+                  data-part="design foundations"
+                >
+                  <a href="F03-system-architecture-styles.html">
+                    <span class="nav-chapter-number">03</span>
+                    <span class="nav-chapter-copy">
+                      <strong>System Architecture Styles</strong>
+                      <small>65 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item is-active"
+                  data-filter-item
+                  data-title="microservices &amp; distributed patterns"
+                  data-part="design foundations"
+                >
+                  <a href="F04-microservices-distributed-patterns.html">
+                    <span class="nav-chapter-number">04</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Microservices &amp; Distributed Patterns</strong>
+                      <small>46 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="scalability &amp; performance"
+                  data-part="design foundations"
+                >
+                  <a href="F05-scalability-performance.html">
+                    <span class="nav-chapter-number">05</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Scalability &amp; Performance</strong>
+                      <small>62 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="data &amp; storage design"
+                  data-part="design foundations"
+                >
+                  <a href="F06-data-storage-design.html">
+                    <span class="nav-chapter-number">06</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Data &amp; Storage Design</strong>
+                      <small>58 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="distributed system fundamentals"
+                  data-part="design foundations"
+                >
+                  <a href="F07-distributed-system-fundamentals.html">
+                    <span class="nav-chapter-number">07</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Distributed System Fundamentals</strong>
+                      <small>79 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="networking fundamentals"
+                  data-part="design foundations"
+                >
+                  <a href="F08-networking-fundamentals.html">
+                    <span class="nav-chapter-number">08</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Networking Fundamentals</strong>
+                      <small>66 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security design"
+                  data-part="design foundations"
+                >
+                  <a href="F09-security-design.html">
+                    <span class="nav-chapter-number">09</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security Design</strong>
+                      <small>73 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="observability &amp; operations"
+                  data-part="design foundations"
+                >
+                  <a href="F10-observability-operations.html">
+                    <span class="nav-chapter-number">10</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Observability &amp; Operations</strong>
+                      <small>58 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="deployment &amp; devops"
+                  data-part="design foundations"
+                >
+                  <a href="F11-deployment-devops.html">
+                    <span class="nav-chapter-number">11</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Deployment &amp; DevOps</strong>
+                      <small>56 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="system design interview thinking"
+                  data-part="design foundations"
+                >
+                  <a href="F12-system-design-interview-thinking.html">
+                    <span class="nav-chapter-number">12</span>
+                    <span class="nav-chapter-copy">
+                      <strong>System Design Interview Thinking</strong>
+                      <small>62 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-1" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 1</p>
+                <h3>Foundations</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="what is system design?"
+                  data-part="foundations"
+                >
+                  <a href="01-what-is-system-design.html">
+                    <span class="nav-chapter-number">01</span>
+                    <span class="nav-chapter-copy">
+                      <strong>What is System Design?</strong>
+                      <small>9 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="types of requirements"
+                  data-part="foundations"
+                >
+                  <a href="02-types-of-requirements.html">
+                    <span class="nav-chapter-number">02</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Types of Requirements</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="estimation &amp; capacity planning"
+                  data-part="foundations"
+                >
+                  <a href="03-estimation-capacity-planning.html">
+                    <span class="nav-chapter-number">03</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Estimation &amp; Capacity Planning</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-2" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 2</p>
+                <h3>Core Building Blocks</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="networking fundamentals"
+                  data-part="core building blocks"
+                >
+                  <a href="04-networking-fundamentals.html">
+                    <span class="nav-chapter-number">04</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Networking Fundamentals</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="databases deep dive"
+                  data-part="core building blocks"
+                >
+                  <a href="05-databases-deep-dive.html">
+                    <span class="nav-chapter-number">05</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Databases Deep Dive</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="caching systems"
+                  data-part="core building blocks"
+                >
+                  <a href="06-caching-systems.html">
+                    <span class="nav-chapter-number">06</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Caching Systems</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="load balancing"
+                  data-part="core building blocks"
+                >
+                  <a href="07-load-balancing.html">
+                    <span class="nav-chapter-number">07</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Load Balancing</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="message queues &amp; event systems"
+                  data-part="core building blocks"
+                >
+                  <a href="08-message-queues-event-systems.html">
+                    <span class="nav-chapter-number">08</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Message Queues &amp; Event Systems</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="storage systems"
+                  data-part="core building blocks"
+                >
+                  <a href="09-storage-systems.html">
+                    <span class="nav-chapter-number">09</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Storage Systems</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-3" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 3</p>
+                <h3>Distributed Systems</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="scalability"
+                  data-part="distributed systems"
+                >
+                  <a href="10-scalability.html">
+                    <span class="nav-chapter-number">10</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Scalability</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="consistency &amp; cap theorem"
+                  data-part="distributed systems"
+                >
+                  <a href="11-consistency-cap-theorem.html">
+                    <span class="nav-chapter-number">11</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Consistency &amp; CAP Theorem</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="fault tolerance &amp; resilience"
+                  data-part="distributed systems"
+                >
+                  <a href="12-fault-tolerance-resilience.html">
+                    <span class="nav-chapter-number">12</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Fault Tolerance &amp; Resilience</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="distributed transactions"
+                  data-part="distributed systems"
+                >
+                  <a href="13-distributed-transactions.html">
+                    <span class="nav-chapter-number">13</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Distributed Transactions</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-4" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 4</p>
+                <h3>Architectural Patterns</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="monolith vs microservices"
+                  data-part="architectural patterns"
+                >
+                  <a href="14-monolith-vs-microservices.html">
+                    <span class="nav-chapter-number">14</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Monolith vs Microservices</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="api gateway pattern"
+                  data-part="architectural patterns"
+                >
+                  <a href="15-api-gateway-pattern.html">
+                    <span class="nav-chapter-number">15</span>
+                    <span class="nav-chapter-copy">
+                      <strong>API Gateway Pattern</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="event-driven architecture"
+                  data-part="architectural patterns"
+                >
+                  <a href="16-event-driven-architecture.html">
+                    <span class="nav-chapter-number">16</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Event-Driven Architecture</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cqrs pattern"
+                  data-part="architectural patterns"
+                >
+                  <a href="17-cqrs-pattern.html">
+                    <span class="nav-chapter-number">17</span>
+                    <span class="nav-chapter-copy">
+                      <strong>CQRS Pattern</strong>
+                      <small>6 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-5" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 5</p>
+                <h3>Real-World Examples</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="e-commerce &amp; marketplaces"
+                  data-part="real-world examples"
+                >
+                  <a href="18-ecommerce-marketplaces.html">
+                    <span class="nav-chapter-number">18</span>
+                    <span class="nav-chapter-copy">
+                      <strong>E-Commerce &amp; Marketplaces</strong>
+                      <small>65 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="fintech &amp; payments"
+                  data-part="real-world examples"
+                >
+                  <a href="19-fintech-payments.html">
+                    <span class="nav-chapter-number">19</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Fintech &amp; Payments</strong>
+                      <small>75 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="social media &amp; content platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="20-social-media-content-platforms.html">
+                    <span class="nav-chapter-number">20</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Social Media &amp; Content Platforms</strong>
+                      <small>29 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="video &amp; streaming platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="21-video-streaming-platforms.html">
+                    <span class="nav-chapter-number">21</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Video &amp; Streaming Platforms</strong>
+                      <small>68 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="communication systems"
+                  data-part="real-world examples"
+                >
+                  <a href="22-communication-systems.html">
+                    <span class="nav-chapter-number">22</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Communication Systems</strong>
+                      <small>49 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="on-demand services"
+                  data-part="real-world examples"
+                >
+                  <a href="23-on-demand-services.html">
+                    <span class="nav-chapter-number">23</span>
+                    <span class="nav-chapter-copy">
+                      <strong>On-Demand Services</strong>
+                      <small>36 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="analytics &amp; data platforms"
+                  data-part="real-world examples"
+                >
+                  <a href="24-analytics-data-platforms.html">
+                    <span class="nav-chapter-number">24</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Analytics &amp; Data Platforms</strong>
+                      <small>43 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="search &amp; discovery"
+                  data-part="real-world examples"
+                >
+                  <a href="25-search-discovery.html">
+                    <span class="nav-chapter-number">25</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Search &amp; Discovery</strong>
+                      <small>38 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cloud &amp; infrastructure systems"
+                  data-part="real-world examples"
+                >
+                  <a href="26-cloud-infrastructure-systems.html">
+                    <span class="nav-chapter-number">26</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cloud &amp; Infrastructure Systems</strong>
+                      <small>37 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="machine learning &amp; ai systems"
+                  data-part="real-world examples"
+                >
+                  <a href="27-machine-learning-ai-systems.html">
+                    <span class="nav-chapter-number">27</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Machine Learning &amp; AI Systems</strong>
+                      <small>21 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security systems"
+                  data-part="real-world examples"
+                >
+                  <a href="28-security-systems.html">
+                    <span class="nav-chapter-number">28</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security Systems</strong>
+                      <small>38 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="content &amp; knowledge systems"
+                  data-part="real-world examples"
+                >
+                  <a href="29-content-knowledge-systems.html">
+                    <span class="nav-chapter-number">29</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Content &amp; Knowledge Systems</strong>
+                      <small>47 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="gaming systems"
+                  data-part="real-world examples"
+                >
+                  <a href="30-gaming-systems.html">
+                    <span class="nav-chapter-number">30</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Gaming Systems</strong>
+                      <small>27 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="healthcare systems"
+                  data-part="real-world examples"
+                >
+                  <a href="31-healthcare-systems.html">
+                    <span class="nav-chapter-number">31</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Healthcare Systems</strong>
+                      <small>28 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="edtech systems"
+                  data-part="real-world examples"
+                >
+                  <a href="32-edtech-systems.html">
+                    <span class="nav-chapter-number">32</span>
+                    <span class="nav-chapter-copy">
+                      <strong>EdTech Systems</strong>
+                      <small>33 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="enterprise systems"
+                  data-part="real-world examples"
+                >
+                  <a href="33-enterprise-systems.html">
+                    <span class="nav-chapter-number">33</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Enterprise Systems</strong>
+                      <small>56 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="iot &amp; real-time systems"
+                  data-part="real-world examples"
+                >
+                  <a href="34-iot-real-time-systems.html">
+                    <span class="nav-chapter-number">34</span>
+                    <span class="nav-chapter-copy">
+                      <strong>IoT &amp; Real-Time Systems</strong>
+                      <small>44 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="adtech systems"
+                  data-part="real-world examples"
+                >
+                  <a href="35-adtech-systems.html">
+                    <span class="nav-chapter-number">35</span>
+                    <span class="nav-chapter-copy">
+                      <strong>AdTech Systems</strong>
+                      <small>76 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="blockchain &amp; distributed systems"
+                  data-part="real-world examples"
+                >
+                  <a href="36-blockchain-distributed-systems.html">
+                    <span class="nav-chapter-number">36</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Blockchain &amp; Distributed Systems</strong>
+                      <small>82 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="travel &amp; booking systems"
+                  data-part="real-world examples"
+                >
+                  <a href="37-travel-booking-systems.html">
+                    <span class="nav-chapter-number">37</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Travel &amp; Booking Systems</strong>
+                      <small>48 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cross-cutting infrastructure systems"
+                  data-part="real-world examples"
+                >
+                  <a href="38-cross-cutting-systems.html">
+                    <span class="nav-chapter-number">38</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cross-Cutting Infrastructure Systems</strong>
+                      <small>36 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="defi lending platform"
+                  data-part="real-world examples"
+                >
+                  <a href="39-defi-lending-platform.html">
+                    <span class="nav-chapter-number">39</span>
+                    <span class="nav-chapter-copy">
+                      <strong>DeFi Lending Platform</strong>
+                      <small>33 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="nft marketplace"
+                  data-part="real-world examples"
+                >
+                  <a href="40-nft-marketplace.html">
+                    <span class="nav-chapter-number">40</span>
+                    <span class="nav-chapter-copy">
+                      <strong>NFT Marketplace</strong>
+                      <small>17 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cross-border payments &amp; remittance"
+                  data-part="real-world examples"
+                >
+                  <a href="41-cross-border-payments.html">
+                    <span class="nav-chapter-number">41</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cross-Border Payments &amp; Remittance</strong>
+                      <small>15 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="blockchain-based voting system"
+                  data-part="real-world examples"
+                >
+                  <a href="42-blockchain-voting-system.html">
+                    <span class="nav-chapter-number">42</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Blockchain-Based Voting System</strong>
+                      <small>12 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="healthcare data sharing platform"
+                  data-part="real-world examples"
+                >
+                  <a href="43-healthcare-data-sharing.html">
+                    <span class="nav-chapter-number">43</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Healthcare Data Sharing Platform</strong>
+                      <small>48 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+            <section class="nav-part part-6" data-filter-group>
+              <div class="nav-part-header">
+                <p class="nav-part-kicker">Part 6</p>
+                <h3>Advanced Architecture</h3>
+              </div>
+              <ul class="nav-chapter-list">
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="observability"
+                  data-part="advanced architecture"
+                >
+                  <a href="38-observability.html">
+                    <span class="nav-chapter-number">38</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Observability</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="kubernetes &amp; devops"
+                  data-part="advanced architecture"
+                >
+                  <a href="39-kubernetes-devops.html">
+                    <span class="nav-chapter-number">39</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Kubernetes &amp; DevOps</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="security &amp; authentication"
+                  data-part="advanced architecture"
+                >
+                  <a href="40-security-authentication.html">
+                    <span class="nav-chapter-number">40</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Security &amp; Authentication</strong>
+                      <small>7 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="cost optimization"
+                  data-part="advanced architecture"
+                >
+                  <a href="41-cost-optimization.html">
+                    <span class="nav-chapter-number">41</span>
+                    <span class="nav-chapter-copy">
+                      <strong>Cost Optimization</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+                <li
+                  class="nav-chapter-item "
+                  data-filter-item
+                  data-title="ai in system design"
+                  data-part="advanced architecture"
+                >
+                  <a href="42-ai-in-system-design.html">
+                    <span class="nav-chapter-number">42</span>
+                    <span class="nav-chapter-copy">
+                      <strong>AI in System Design</strong>
+                      <small>8 min read</small>
+                    </span>
+                  </a>
+                </li>
+              </ul>
+            </section>
+          </nav>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content-column">
+      <div class="breadcrumbs">
+        <a href="../index.html">Home</a>
+        <span>/</span>
+        <a href="../index.html#part-0">Design Foundations</a>
+        <span>/</span>
+        <span>Chapter 4</span>
+      </div>
+
+      <article class="chapter-article">
+        <header class="chapter-hero part-0">
+          <div class="chapter-hero-top">
+            <span class="chapter-kicker">Chapter 04 of 60</span>
+            <span class="part-badge">Design Foundations</span>
+          </div>
+          <h1>Microservices &amp; Distributed Patterns</h1>
+          <p class="chapter-lead">Microservices architecture decomposes a system into independently deployable services, each owning a bounded context. This decomposition brings enormous benefits — independent scaling, technology heterogeneity, team autonomy, fault isolation — but it also introduces an entirely new class of problems: network unreliability, partial failures, data consistency across service boundaries, distributed tracing, and operational complexity that can overwhelm teams unprepared for it.</p>
+          <div class="chapter-meta-strip">
+            <div class="summary-pill">
+              <span class="summary-label">Reading time</span>
+              <strong>46 min read</strong>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-label">Focus</span>
+              <strong>Master the conceptual backbone: design principles, patterns, architecture styles, microservices, scalability, data design, distributed systems, networking, security, observability, deployment, and interview thinking.</strong>
+            </div>
+            <div class="summary-pill">
+              <span class="summary-label">Study cue</span>
+              <strong>Read, sketch the system, compare trade-offs, revisit the case study</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="chapter-body article-body">
+          <h2 id="part-context">Part Context</h2>
+<p><strong>Part:</strong> Part 0 — System Design Foundations &amp; Principles
+<strong>Position:</strong> Chapter F04 of F12
+<strong>Why this part exists:</strong> This section builds the foundational mental models every engineer needs before diving into specific system designs. Microservices and distributed patterns form the architectural vocabulary of modern backend systems — understanding them deeply is a prerequisite for designing anything at scale.</p>
+<hr>
+<h2 id="overview">Overview</h2>
+<p>Microservices architecture decomposes a system into independently deployable services, each owning a bounded context. This decomposition brings enormous benefits — independent scaling, technology heterogeneity, team autonomy, fault isolation — but it also introduces an entirely new class of problems: network unreliability, partial failures, data consistency across service boundaries, distributed tracing, and operational complexity that can overwhelm teams unprepared for it.</p>
+<p>This chapter provides a comprehensive reference for the <strong>four pillars</strong> of microservices architecture:</p>
+<h3 id="section-1-communication-patterns">Section 1 — Communication Patterns</h3>
+<p>How services talk to each other: synchronous protocols (REST, gRPC, GraphQL), asynchronous messaging (Kafka, RabbitMQ, SQS), publish-subscribe topologies, and event sourcing as a communication paradigm.</p>
+<h3 id="section-2-data-patterns">Section 2 — Data Patterns</h3>
+<p>How services own and share data: database-per-service, the shared database anti-pattern, the saga pattern for distributed transactions, event sourcing for audit-complete state management, and CQRS for separating read and write workloads.</p>
+<h3 id="section-3-resilience-patterns">Section 3 — Resilience Patterns</h3>
+<p>How services survive failure: circuit breakers, retries with backoff, timeout management, bulkhead isolation, and fallback strategies that keep the system functional when components degrade.</p>
+<h3 id="section-4-api-patterns">Section 4 — API Patterns</h3>
+<p>How services expose functionality to clients: API gateways, backend-for-frontend (BFF) layers, and aggregator patterns that compose multiple service calls into cohesive client responses.</p>
+<p>Every pattern is presented with its definition, architecture diagram, real-world example, implementation details, guidance on when to use (and when not to), trade-offs, common mistakes, and interview insights.</p>
+<hr>
+<h2 id="why-these-patterns-matter-in-real-systems">Why These Patterns Matter in Real Systems</h2>
+<ul>
+<li>Every large-scale system (Netflix, Uber, Amazon, Stripe) is built on microservices — understanding the patterns is mandatory for senior engineering roles.</li>
+<li>Distributed systems fail in ways monoliths never do: network partitions, message ordering violations, split-brain scenarios, and cascading failures require specific architectural countermeasures.</li>
+<li>Choosing the wrong communication pattern can add 100ms+ of latency per hop; choosing the wrong data pattern can create data inconsistency that takes months to untangle.</li>
+<li>These patterns appear in <strong>every</strong> system design interview at the staff+ level, either explicitly ("How would you handle a distributed transaction?") or implicitly (the interviewer expects you to apply them without being prompted).</li>
+<li>The patterns interact: a saga pattern requires idempotent operations, which requires careful retry design, which interacts with timeout budgets, which must account for circuit breaker state.</li>
+</ul>
+<hr>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>Before reading this chapter, you should be comfortable with:
+- Basic networking (HTTP, TCP, DNS) — covered in F01.
+- Consistency models (strong, eventual, causal) — covered in F02.
+- CAP theorem and its practical implications — covered in F02.
+- Database fundamentals (ACID, indexing, replication) — covered in F03.</p>
+<hr>
+<h1 id="section-1-communication-patterns_1">Section 1: Communication Patterns</h1>
+<p>Communication is the connective tissue of a microservices architecture. Every business operation that spans more than one service requires a communication decision: synchronous or asynchronous? Point-to-point or broadcast? Request-response or fire-and-forget? The choice determines latency, coupling, failure modes, and operational complexity.</p>
+<p>This section covers the four major communication paradigms and the protocols within each.</p>
+<hr>
+<h2 id="11-synchronous-communication">1.1 Synchronous Communication</h2>
+<p>In synchronous communication, the caller sends a request and <strong>blocks</strong> (or awaits) until the callee responds. This is the most natural pattern for engineers coming from monolithic systems, but it introduces tight temporal coupling — if the callee is slow or down, the caller is directly affected.</p>
+<hr>
+<h3 id="111-rest-representational-state-transfer">1.1.1 REST (Representational State Transfer)</h3>
+<p><strong>Definition:</strong>
+REST is an architectural style for designing networked applications. It uses HTTP methods (GET, POST, PUT, DELETE, PATCH) to perform CRUD operations on resources identified by URIs. RESTful APIs are stateless, cacheable, and use standard HTTP status codes for response semantics.</p>
+<p><strong>Richardson Maturity Model:</strong></p>
+<p>The Richardson Maturity Model classifies REST APIs into four levels of maturity:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Name</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>The Swamp of POX</td>
+<td>Single URI, single HTTP method (typically POST). RPC-over-HTTP.</td>
+<td><code>POST /api</code> with action in body</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Resources</td>
+<td>Multiple URIs, one per resource type. Still typically uses POST for everything.</td>
+<td><code>POST /orders</code>, <code>POST /users</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>HTTP Verbs</td>
+<td>Uses correct HTTP methods (GET, POST, PUT, DELETE) with proper status codes.</td>
+<td><code>GET /orders/123</code>, <code>DELETE /orders/123</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Hypermedia (HATEOAS)</td>
+<td>Responses include links to related actions and resources. Self-descriptive messages.</td>
+<td>Response includes <code>_links</code> with next actions</td>
+</tr>
+</tbody>
+</table></div>
+<p>Most production APIs operate at Level 2. Level 3 (HATEOAS) is rarely implemented in practice because it adds significant complexity with limited tooling support.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-01.svg" alt="Diagram 1 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-02.svg" alt="Diagram 2 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Real-World Example:</strong>
+Stripe's API is widely regarded as the gold standard for REST API design. It uses Level 2 maturity with consistent resource naming (<code>/v1/charges</code>, <code>/v1/customers</code>), proper HTTP verbs, idempotency keys for safe retries, and cursor-based pagination.</p>
+<p><strong>Implementation Details:</strong></p>
+<pre><code>// Resource Design Principles
+// 1. Nouns, not verbs: /orders not /getOrders
+// 2. Plural resources: /orders not /order
+// 3. Nested resources for relationships: /orders/123/items
+// 4. Query parameters for filtering: /orders?status=pending&amp;limit=20
+
+// Idempotency for safe retries
+POST /orders
+Headers:
+  Idempotency-Key: unique-client-generated-uuid
+  Content-Type: application/json
+Body:
+  { &quot;items&quot;: [...], &quot;customer_id&quot;: &quot;cust_123&quot; }
+
+// Versioning strategies
+// URI versioning:  /v1/orders  (most common)
+// Header versioning: Accept: application/vnd.myapi.v1+json
+// Query param: /orders?version=1
+
+// Pagination
+// Cursor-based (preferred for large datasets):
+GET /orders?cursor=eyJpZCI6MTIzfQ&amp;limit=20
+// Offset-based (simpler, but has consistency issues):
+GET /orders?offset=40&amp;limit=20
+
+// Standard HTTP Status Codes
+// 200 OK — successful GET/PUT/PATCH
+// 201 Created — successful POST
+// 204 No Content — successful DELETE
+// 400 Bad Request — validation error
+// 401 Unauthorized — missing/invalid auth
+// 403 Forbidden — insufficient permissions
+// 404 Not Found — resource doesn't exist
+// 409 Conflict — state conflict (e.g., concurrent update)
+// 429 Too Many Requests — rate limited
+// 500 Internal Server Error — server fault
+// 503 Service Unavailable — temporary overload
+</code></pre>
+<p><strong>When to Use REST:</strong>
+- Public-facing APIs consumed by third-party developers (discoverability, tooling ecosystem).
+- CRUD-heavy domains where resources map cleanly to database entities.
+- Systems where caching is critical (HTTP caching headers, CDN compatibility).
+- When you need broad client compatibility (every language has an HTTP client).</p>
+<p><strong>When NOT to Use REST:</strong>
+- High-throughput internal service-to-service communication (HTTP/1.1 overhead adds up).
+- Streaming or bi-directional communication (REST is request-response only).
+- Operations that don't map to CRUD semantics (e.g., "transfer $100 from A to B").
+- When payload size matters — JSON is verbose compared to binary formats.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Universal tooling and knowledge</td>
+<td>Verbose payloads (JSON)</td>
+</tr>
+<tr>
+<td>HTTP caching support</td>
+<td>No built-in streaming</td>
+</tr>
+<tr>
+<td>Self-documenting with OpenAPI/Swagger</td>
+<td>Over-fetching / under-fetching</td>
+</tr>
+<tr>
+<td>Stateless — easy horizontal scaling</td>
+<td>No compile-time type safety across services</td>
+</tr>
+<tr>
+<td>Browser-compatible</td>
+<td>Multiple round-trips for complex queries</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Using POST for everything (Level 0 maturity) — loses caching, idempotency, and semantic clarity.
+2. Returning 200 OK for errors with error details in the body — breaks standard HTTP client behavior.
+3. Not implementing pagination — returning 50,000 results in a single response.
+4. Exposing database IDs directly — leaks implementation details and creates security risks.
+5. Ignoring HATEOAS completely — at minimum, include <code>self</code> links and pagination cursors.
+6. No idempotency keys on POST/PATCH — makes retries dangerous.
+7. Versioning by adding fields to existing endpoints without bumping version — breaks backward compatibility.</p>
+<p><strong>Interview Insights:</strong>
+- Interviewers expect you to default to REST for external APIs and articulate why.
+- Be ready to explain idempotency: "If a POST /orders request times out, how does the client safely retry?" Answer: idempotency keys.
+- Know the trade-off between URI versioning and header versioning — URI is simpler, header is more "RESTful."
+- If asked about REST vs gRPC, don't just say "gRPC is faster" — explain binary serialization, HTTP/2 multiplexing, and generated client stubs.</p>
+<hr>
+<h3 id="112-grpc-google-remote-procedure-call">1.1.2 gRPC (Google Remote Procedure Call)</h3>
+<p><strong>Definition:</strong>
+gRPC is a high-performance, open-source RPC framework that uses Protocol Buffers (protobuf) for serialization and HTTP/2 for transport. It provides strongly-typed service contracts, bidirectional streaming, and automatic client/server code generation across multiple languages.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-03.svg" alt="Diagram 3 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>gRPC Communication Patterns:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-04.svg" alt="Diagram 4 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Use Case</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unary</td>
+<td>Standard request-response</td>
+<td>Get order details</td>
+</tr>
+<tr>
+<td>Server streaming</td>
+<td>Server sends multiple responses</td>
+<td>Real-time price updates</td>
+</tr>
+<tr>
+<td>Client streaming</td>
+<td>Client sends multiple requests</td>
+<td>Uploading log entries</td>
+</tr>
+<tr>
+<td>Bidirectional streaming</td>
+<td>Both sides send streams</td>
+<td>Chat, live dashboards</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Protobuf Definition Example:</strong></p>
+<pre><code>// order_service.proto
+syntax = &quot;proto3&quot;;
+package commerce;
+
+service OrderService {
+  // Unary
+  rpc GetOrder(GetOrderRequest) returns (OrderResponse);
+  // Server streaming
+  rpc WatchOrderStatus(WatchOrderRequest) returns (stream OrderStatusUpdate);
+  // Client streaming
+  rpc BatchCreateOrders(stream CreateOrderRequest) returns (BatchCreateResponse);
+  // Bidirectional streaming
+  rpc OrderChat(stream ChatMessage) returns (stream ChatMessage);
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message OrderResponse {
+  string order_id = 1;
+  string status = 2;
+  repeated OrderItem items = 3;
+  int64 total_cents = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message OrderItem {
+  string sku = 1;
+  int32 quantity = 2;
+  int64 unit_price_cents = 3;
+}
+</code></pre>
+<p><strong>Interceptors (Middleware):</strong></p>
+<p>gRPC interceptors are the equivalent of HTTP middleware. They wrap every RPC call for cross-cutting concerns:</p>
+<pre><code>// Common interceptor chain
+Client Request
+  → Logging Interceptor (log request metadata)
+    → Auth Interceptor (attach JWT/API key)
+      → Retry Interceptor (retry on transient errors)
+        → Timeout Interceptor (enforce deadline)
+          → Metrics Interceptor (record latency, status)
+            → Network → Server
+
+Server receives request
+  → Auth Interceptor (validate token)
+    → Rate Limit Interceptor (check quota)
+      → Logging Interceptor (log request)
+        → Tracing Interceptor (propagate trace ID)
+          → Business Logic Handler
+</code></pre>
+<p><strong>Real-World Example:</strong>
+Google uses gRPC internally for all service-to-service communication across its infrastructure. Netflix migrated from REST to gRPC for critical internal APIs, achieving a 60% reduction in payload size and significant latency improvements.</p>
+<p><strong>When to Use gRPC:</strong>
+- Internal service-to-service communication where latency matters.
+- Polyglot environments (auto-generated stubs for Go, Java, Python, C++, etc.).
+- Streaming use cases (real-time feeds, event streams, bidirectional communication).
+- When type safety across service boundaries is important.
+- High-throughput scenarios (binary serialization + HTTP/2 multiplexing).</p>
+<p><strong>When NOT to Use gRPC:</strong>
+- Public-facing APIs consumed by browsers (limited browser support without grpc-web proxy).
+- Teams unfamiliar with protobuf (learning curve for schema management).
+- Simple CRUD APIs where REST tooling is sufficient.
+- When human-readable payloads are important for debugging.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5-10x smaller payloads than JSON</td>
+<td>Not human-readable (binary format)</td>
+</tr>
+<tr>
+<td>Strong type safety via protobuf</td>
+<td>Requires proto file management</td>
+</tr>
+<tr>
+<td>HTTP/2 multiplexing (no head-of-line blocking)</td>
+<td>Limited browser support</td>
+</tr>
+<tr>
+<td>Built-in streaming support</td>
+<td>Steeper learning curve</td>
+</tr>
+<tr>
+<td>Auto-generated client libraries</td>
+<td>Harder to debug with curl/Postman</td>
+</tr>
+<tr>
+<td>Deadline propagation built-in</td>
+<td>Proto schema evolution requires care</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Not using deadlines — gRPC calls without deadlines can hang forever, leaking resources.
+2. Ignoring proto schema evolution rules — removing fields or changing field numbers breaks backward compatibility.
+3. Sending large payloads — gRPC has a default 4MB message limit; use streaming for large data.
+4. Not implementing health checks — gRPC has a standard health checking protocol; use it.
+5. Skipping interceptors for observability — without logging/tracing/metrics interceptors, debugging is nearly impossible.</p>
+<p><strong>Interview Insights:</strong>
+- If the system design involves internal microservice communication, suggest gRPC and explain why: type safety, performance, streaming.
+- Know the four communication patterns (unary, server streaming, client streaming, bidirectional) and when each applies.
+- Be ready to discuss proto schema evolution: "What happens when you add a field? Remove one? Change a type?"
+- Mention deadline propagation: "If Service A has a 5s deadline and calls Service B, Service B inherits the remaining deadline."</p>
+<hr>
+<h3 id="113-graphql">1.1.3 GraphQL</h3>
+<p><strong>Definition:</strong>
+GraphQL is a query language for APIs that allows clients to request exactly the data they need. Instead of multiple REST endpoints returning fixed data shapes, a single GraphQL endpoint accepts queries that specify the exact fields, nested relationships, and aggregations required.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-05.svg" alt="Diagram 5 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>The N+1 Problem:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-06.svg" alt="Diagram 6 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Schema Design:</strong></p>
+<pre><code># GraphQL Schema Definition Language (SDL)
+
+type Query {
+  user(id: ID!): User
+  orders(userId: ID!, status: OrderStatus, first: Int, after: String): OrderConnection!
+  product(id: ID!): Product
+  search(query: String!, filters: SearchFilters): SearchResults!
+}
+
+type Mutation {
+  createOrder(input: CreateOrderInput!): CreateOrderPayload!
+  updateOrderStatus(orderId: ID!, status: OrderStatus!): Order!
+  cancelOrder(orderId: ID!, reason: String): CancelOrderPayload!
+}
+
+type Subscription {
+  orderStatusChanged(orderId: ID!): OrderStatusEvent!
+  inventoryUpdated(skuId: ID!): InventoryEvent!
+}
+
+type User {
+  id: ID!
+  email: String!
+  name: String!
+  orders(first: Int, after: String): OrderConnection!
+  addresses: [Address!]!
+  createdAt: DateTime!
+}
+
+type Order {
+  id: ID!
+  status: OrderStatus!
+  items: [OrderItem!]!
+  totalCents: Int!
+  user: User!
+  shippingAddress: Address!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type OrderItem {
+  id: ID!
+  product: Product!
+  quantity: Int!
+  unitPriceCents: Int!
+}
+
+# Relay-style pagination
+type OrderConnection {
+  edges: [OrderEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type OrderEdge {
+  node: Order!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+</code></pre>
+<p><strong>Resolver Implementation Pattern:</strong></p>
+<pre><code>// Resolver map (pseudocode)
+resolvers = {
+  Query: {
+    user: (parent, { id }, context) =&gt; userService.getById(id),
+    orders: (parent, { userId, status, first, after }, context) =&gt;
+      orderService.list({ userId, status, first, after }),
+  },
+
+  User: {
+    // Field-level resolver — only called if client requests 'orders'
+    orders: (user, { first, after }, context) =&gt;
+      // Uses DataLoader to batch across multiple user resolutions
+      context.loaders.ordersByUser.load(user.id),
+  },
+
+  Order: {
+    // Resolves the user field on an order — also batched
+    user: (order, args, context) =&gt;
+      context.loaders.userById.load(order.userId),
+    items: (order, args, context) =&gt;
+      context.loaders.orderItems.load(order.id),
+  },
+
+  OrderItem: {
+    product: (item, args, context) =&gt;
+      context.loaders.productById.load(item.productId),
+  },
+
+  Mutation: {
+    createOrder: (parent, { input }, context) =&gt; {
+      authorize(context.user, 'CREATE_ORDER');
+      return orderService.create(input);
+    },
+  },
+}
+</code></pre>
+<p><strong>Real-World Example:</strong>
+GitHub's API v4 is entirely GraphQL, allowing clients to fetch exactly the repository, issue, pull request, and review data they need in a single request — replacing dozens of REST round-trips. Shopify uses GraphQL for its Storefront API, enabling merchants to build custom storefronts that fetch only the product data their templates require.</p>
+<p><strong>When to Use GraphQL:</strong>
+- Client-driven data requirements (mobile apps with limited bandwidth).
+- Multiple client types (web, mobile, TV) needing different data shapes from the same backend.
+- Aggregation layer over multiple microservices.
+- Rapid frontend development (frontend teams can query what they need without backend changes).</p>
+<p><strong>When NOT to Use GraphQL:</strong>
+- Simple APIs with fixed, predictable query patterns.
+- File upload heavy applications (GraphQL handles files awkwardly).
+- When query complexity control is difficult (malicious nested queries can DDoS your database).
+- Caching-heavy scenarios (REST + HTTP caching is simpler and more effective).
+- Internal service-to-service communication (gRPC is better here).</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No over-fetching or under-fetching</td>
+<td>Query complexity attacks</td>
+</tr>
+<tr>
+<td>Single endpoint simplifies routing</td>
+<td>Caching is harder (no HTTP caching)</td>
+</tr>
+<tr>
+<td>Strong typing via schema</td>
+<td>N+1 problem without DataLoader</td>
+</tr>
+<tr>
+<td>Self-documenting (introspection)</td>
+<td>Error handling is non-standard</td>
+</tr>
+<tr>
+<td>Real-time via subscriptions</td>
+<td>Steeper backend learning curve</td>
+</tr>
+<tr>
+<td>Frontend autonomy</td>
+<td>File uploads require workarounds</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Not implementing DataLoader — the N+1 problem will destroy your database at scale.
+2. No query depth/complexity limits — a deeply nested query can generate thousands of database queries.
+3. Exposing the entire schema without authorization — every field resolver must check permissions.
+4. Not using persisted queries in production — allows arbitrary queries from untrusted clients.
+5. Over-engineering the schema — GraphQL doesn't mean you need one unified graph for everything.</p>
+<p><strong>Interview Insights:</strong>
+- GraphQL is typically proposed as a BFF (Backend-for-Frontend) layer, not for service-to-service communication.
+- Know the N+1 problem cold: describe it, explain DataLoader batching, and estimate the query count with and without it.
+- Be ready to discuss query complexity: "How do you prevent a client from sending a query that joins 10 levels deep?"
+- Mention that GraphQL subscriptions use WebSockets under the hood for real-time features.</p>
+<hr>
+<h3 id="synchronous-communication-comparison-table">Synchronous Communication Comparison Table</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>REST</th>
+<th>gRPC</th>
+<th>GraphQL</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Protocol</strong></td>
+<td>HTTP/1.1 or HTTP/2</td>
+<td>HTTP/2</td>
+<td>HTTP (typically POST)</td>
+</tr>
+<tr>
+<td><strong>Serialization</strong></td>
+<td>JSON (text)</td>
+<td>Protobuf (binary)</td>
+<td>JSON (text)</td>
+</tr>
+<tr>
+<td><strong>Type Safety</strong></td>
+<td>OpenAPI (optional)</td>
+<td>Protobuf (enforced)</td>
+<td>Schema (enforced)</td>
+</tr>
+<tr>
+<td><strong>Streaming</strong></td>
+<td>Not native</td>
+<td>Built-in (4 patterns)</td>
+<td>Subscriptions (WebSocket)</td>
+</tr>
+<tr>
+<td><strong>Browser Support</strong></td>
+<td>Full</td>
+<td>Limited (needs grpc-web)</td>
+<td>Full</td>
+</tr>
+<tr>
+<td><strong>Caching</strong></td>
+<td>HTTP caching, CDN-friendly</td>
+<td>Custom caching needed</td>
+<td>Complex (no HTTP caching)</td>
+</tr>
+<tr>
+<td><strong>Code Generation</strong></td>
+<td>Optional (OpenAPI codegen)</td>
+<td>Built-in (protoc)</td>
+<td>Optional (codegen tools)</td>
+</tr>
+<tr>
+<td><strong>Payload Size</strong></td>
+<td>Large (JSON + headers)</td>
+<td>Small (binary)</td>
+<td>Variable (client-specified)</td>
+</tr>
+<tr>
+<td><strong>Learning Curve</strong></td>
+<td>Low</td>
+<td>Medium</td>
+<td>Medium-High</td>
+</tr>
+<tr>
+<td><strong>Best For</strong></td>
+<td>Public APIs, CRUD</td>
+<td>Internal services, streaming</td>
+<td>Client-facing aggregation</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="12-asynchronous-communication">1.2 Asynchronous Communication</h2>
+<p>Asynchronous communication decouples the sender from the receiver. The sender publishes a message and continues without waiting for a response. This eliminates temporal coupling, enables better fault tolerance, and allows independent scaling of producers and consumers — at the cost of increased complexity, eventual consistency, and harder debugging.</p>
+<hr>
+<h3 id="121-apache-kafka">1.2.1 Apache Kafka</h3>
+<p><strong>Definition:</strong>
+Apache Kafka is a distributed, partitioned, replicated commit log designed for high-throughput, fault-tolerant messaging. Unlike traditional message queues, Kafka retains messages for a configurable duration (days or weeks), allowing consumers to replay events. Kafka's design makes it ideal for event streaming, change data capture, and building event-driven architectures.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-07.svg" alt="Diagram 7 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Core Concepts:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Topic</strong></td>
+<td>A named category/feed of messages. Analogous to a table in a database.</td>
+</tr>
+<tr>
+<td><strong>Partition</strong></td>
+<td>A topic is split into partitions for parallelism. Each partition is an ordered, immutable sequence of messages.</td>
+</tr>
+<tr>
+<td><strong>Offset</strong></td>
+<td>A unique sequential ID for each message within a partition. Consumers track their position via offsets.</td>
+</tr>
+<tr>
+<td><strong>Producer</strong></td>
+<td>Publishes messages to topics. Chooses partition via key hashing or round-robin.</td>
+</tr>
+<tr>
+<td><strong>Consumer Group</strong></td>
+<td>A set of consumers that cooperatively consume a topic. Each partition is assigned to exactly one consumer in the group.</td>
+</tr>
+<tr>
+<td><strong>Replication Factor</strong></td>
+<td>Number of copies of each partition across brokers. RF=3 means data survives 2 broker failures.</td>
+</tr>
+<tr>
+<td><strong>ISR (In-Sync Replicas)</strong></td>
+<td>The set of replicas that are fully caught up with the leader. Only ISR members can be elected leader.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Partitioning and Ordering:</strong></p>
+<pre><code>// Message key determines partition assignment
+// Same key → same partition → guaranteed ordering
+
+Producer sends:
+  { key: &quot;order-123&quot;, value: &quot;CREATED&quot; }  → Partition 2
+  { key: &quot;order-123&quot;, value: &quot;PAID&quot; }     → Partition 2  (same key = same partition)
+  { key: &quot;order-123&quot;, value: &quot;SHIPPED&quot; }  → Partition 2  (ordering guaranteed)
+
+  { key: &quot;order-456&quot;, value: &quot;CREATED&quot; }  → Partition 0  (different key, different partition)
+  { key: &quot;order-456&quot;, value: &quot;PAID&quot; }     → Partition 0  (ordering guaranteed within partition)
+
+// CRITICAL: Ordering is guaranteed ONLY within a single partition
+// Cross-partition ordering is NOT guaranteed
+</code></pre>
+<p><strong>Consumer Group Rebalancing:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-08.svg" alt="Diagram 8 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Delivery Guarantees:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Guarantee</th>
+<th>Configuration</th>
+<th>Trade-off</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>At-most-once</strong></td>
+<td><code>acks=0</code> on producer, auto-commit offsets</td>
+<td>Fast, but messages can be lost</td>
+</tr>
+<tr>
+<td><strong>At-least-once</strong></td>
+<td><code>acks=all</code> on producer, manual offset commit after processing</td>
+<td>Safe, but consumers must be idempotent</td>
+</tr>
+<tr>
+<td><strong>Exactly-once</strong></td>
+<td><code>enable.idempotence=true</code> + transactional API</td>
+<td>Safest, but adds latency and complexity</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Real-World Example:</strong>
+LinkedIn (Kafka's creator) processes over 7 trillion messages per day through Kafka. Uber uses Kafka as the backbone of its event-driven architecture, with thousands of topics handling ride events, driver location updates, pricing calculations, and financial transactions.</p>
+<p><strong>When to Use Kafka:</strong>
+- High-throughput event streaming (100K+ messages/sec per partition).
+- Event sourcing and event-driven architectures.
+- Change data capture (CDC) from databases.
+- Log aggregation and pipeline processing.
+- When message replay capability is needed (consumers can rewind offsets).
+- Decoupling services in a microservices architecture.</p>
+<p><strong>When NOT to Use Kafka:</strong>
+- Simple task queues with limited throughput (RabbitMQ or SQS are simpler).
+- When you need complex routing logic (exchanges, routing keys) — RabbitMQ is better.
+- Extremely low-latency requirements (sub-millisecond) — Kafka adds 2-10ms at minimum.
+- Small teams with limited operational expertise — Kafka is operationally complex.</p>
+<p><strong>Common Mistakes:</strong>
+1. Too few partitions — limits consumer parallelism (you can never reduce partitions, only add).
+2. Too many partitions — increases metadata overhead, rebalance time, and end-to-end latency.
+3. Not setting message keys — round-robin assignment breaks ordering guarantees.
+4. Auto-committing offsets — if processing fails after commit, messages are lost.
+5. Consumer group with more consumers than partitions — excess consumers sit idle.
+6. Not monitoring consumer lag — falling behind silently until data retention expires.
+7. Large messages (&gt;1MB) — Kafka is optimized for small messages; use claim-check pattern for large payloads.</p>
+<p><strong>Interview Insights:</strong>
+- When discussing event-driven systems, Kafka should be your default choice. Explain partitioning, consumer groups, and replication.
+- Know the ordering guarantee: "Kafka guarantees ordering within a partition, not across partitions. Use the entity ID as the message key to ensure all events for one entity land in the same partition."
+- Be ready to discuss consumer lag: "How do you detect that a consumer is falling behind?" Answer: monitor the offset gap between producer and consumer; alert when lag exceeds a threshold.
+- Explain the exactly-once semantics trade-off: "Exactly-once requires idempotent producers and transactional consumers, which adds latency. Most systems use at-least-once with idempotent consumers instead."</p>
+<hr>
+<h3 id="122-rabbitmq">1.2.2 RabbitMQ</h3>
+<p><strong>Definition:</strong>
+RabbitMQ is a traditional message broker implementing the Advanced Message Queuing Protocol (AMQP). Unlike Kafka's log-based model, RabbitMQ uses exchanges, queues, and bindings to route messages. It excels at complex routing patterns, priority queues, and traditional work queue scenarios.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-09.svg" alt="Diagram 9 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Exchange Types:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Exchange Type</th>
+<th>Routing Behavior</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Direct</strong></td>
+<td>Exact match on routing key</td>
+<td>Task routing to specific queues</td>
+</tr>
+<tr>
+<td><strong>Topic</strong></td>
+<td>Pattern match with wildcards (<code>*</code> = one word, <code>#</code> = zero or more)</td>
+<td>Event routing by category (e.g., <code>order.*.us</code>)</td>
+</tr>
+<tr>
+<td><strong>Fanout</strong></td>
+<td>Broadcast to all bound queues</td>
+<td>Notifications, cache invalidation</td>
+</tr>
+<tr>
+<td><strong>Headers</strong></td>
+<td>Match on message headers (not routing key)</td>
+<td>Complex routing based on message metadata</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Message Acknowledgment:</strong></p>
+<pre><code>// Consumer acknowledgment patterns
+
+// 1. Auto-ack (fire and forget — dangerous)
+channel.consume(queue, (msg) =&gt; {
+  process(msg); // If this fails, message is lost
+}, { noAck: true });
+
+// 2. Manual ack (safe — message redelivered on failure)
+channel.consume(queue, (msg) =&gt; {
+  try {
+    process(msg);
+    channel.ack(msg);     // Success: remove from queue
+  } catch (err) {
+    channel.nack(msg, false, true);  // Failure: requeue
+  }
+});
+
+// 3. Dead letter exchange (DLX) — handle poison messages
+// After N redelivery attempts, route to DLQ for investigation
+// Configure via queue arguments:
+//   x-dead-letter-exchange: &quot;dlx&quot;
+//   x-dead-letter-routing-key: &quot;failed.orders&quot;
+//   x-message-ttl: 60000 (expire after 60s)
+</code></pre>
+<p><strong>Real-World Example:</strong>
+Instagram uses RabbitMQ for its notification pipeline, routing different notification types (likes, comments, follows, DMs) to specialized handler queues. The topic exchange enables flexible routing as new notification types are added without modifying existing consumers.</p>
+<p><strong>When to Use RabbitMQ:</strong>
+- Complex routing requirements (topic-based, header-based routing).
+- Traditional work queues with competing consumers.
+- When message acknowledgment and redelivery guarantees are critical.
+- Priority queues (RabbitMQ supports message priority natively).
+- Moderate throughput scenarios (10K-50K messages/sec).
+- When you need dead letter queues and message TTL out of the box.</p>
+<p><strong>When NOT to Use RabbitMQ:</strong>
+- High-throughput event streaming (Kafka handles 10x-100x more throughput).
+- When message replay/rewind is needed (RabbitMQ deletes messages after consumption).
+- Event sourcing architectures (Kafka's log retention is essential).
+- When you need infinite message retention.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rich routing capabilities</td>
+<td>Lower throughput than Kafka</td>
+</tr>
+<tr>
+<td>Built-in DLQ, TTL, priority</td>
+<td>No message replay</td>
+</tr>
+<tr>
+<td>Multiple protocols (AMQP, MQTT, STOMP)</td>
+<td>Messages deleted after consumption</td>
+</tr>
+<tr>
+<td>Easier to operate than Kafka</td>
+<td>Cluster management can be fragile</td>
+</tr>
+<tr>
+<td>Mature ecosystem and tooling</td>
+<td>Memory-based queues can OOM under load</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Not using manual acknowledgments — auto-ack loses messages when consumers crash.
+2. No dead letter queue — poison messages block the queue forever.
+3. Unbounded queues — queue growth without flow control leads to memory exhaustion.
+4. Single node deployment — no fault tolerance; use mirrored/quorum queues.
+5. Not setting prefetch count — one consumer grabs all messages, starving others.</p>
+<hr>
+<h3 id="123-amazon-sqs">1.2.3 Amazon SQS</h3>
+<p><strong>Definition:</strong>
+Amazon Simple Queue Service (SQS) is a fully managed message queuing service that offers two queue types: Standard (best-effort ordering, at-least-once delivery) and FIFO (exactly-once processing, strict ordering). SQS eliminates the operational burden of running a message broker.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-10.svg" alt="Diagram 10 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Standard vs FIFO Queues:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Standard Queue</th>
+<th>FIFO Queue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Throughput</strong></td>
+<td>Nearly unlimited</td>
+<td>300 msg/sec (3,000 with batching)</td>
+</tr>
+<tr>
+<td><strong>Ordering</strong></td>
+<td>Best-effort</td>
+<td>Strict within MessageGroupId</td>
+</tr>
+<tr>
+<td><strong>Delivery</strong></td>
+<td>At-least-once (may duplicate)</td>
+<td>Exactly-once</td>
+</tr>
+<tr>
+<td><strong>Deduplication</strong></td>
+<td>Not supported</td>
+<td>Content-based or MessageDeduplicationId</td>
+</tr>
+<tr>
+<td><strong>Use Case</strong></td>
+<td>High-throughput background jobs</td>
+<td>Financial transactions, order processing</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Visibility Timeout Pattern:</strong></p>
+<pre><code>// SQS visibility timeout prevents duplicate processing
+
+1. Consumer A calls ReceiveMessage → gets Message X
+   Message X becomes &quot;invisible&quot; for visibilityTimeout (default: 30s)
+
+2. Consumer A processes Message X successfully
+   Consumer A calls DeleteMessage(receiptHandle)
+   Message X is permanently removed
+
+3. If Consumer A crashes before DeleteMessage:
+   After visibilityTimeout expires, Message X becomes visible again
+   Consumer B (or A) picks it up and retries
+
+// CRITICAL: Set visibilityTimeout &gt; max processing time
+// If processing takes 60s but timeout is 30s, another consumer
+// will pick up the message while the first is still processing it
+</code></pre>
+<p><strong>When to Use SQS:</strong>
+- You want zero operational overhead (fully managed, no brokers to maintain).
+- Simple producer-consumer patterns without complex routing.
+- AWS-native architectures (integrates with Lambda, SNS, EventBridge).
+- When you need the exact-once delivery of FIFO queues.</p>
+<p><strong>When NOT to Use SQS:</strong>
+- Complex routing patterns (no exchange/topic equivalent — use SNS + SQS).
+- Message replay capability needed (messages deleted after consumption).
+- Cross-cloud or on-premise deployments (AWS lock-in).
+- High-throughput streaming (FIFO limit of 3,000 msg/sec is low for some use cases).</p>
+<hr>
+<h3 id="asynchronous-communication-comparison-table">Asynchronous Communication Comparison Table</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Kafka</th>
+<th>RabbitMQ</th>
+<th>Amazon SQS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Model</strong></td>
+<td>Distributed log</td>
+<td>Message broker</td>
+<td>Managed queue</td>
+</tr>
+<tr>
+<td><strong>Throughput</strong></td>
+<td>Millions/sec</td>
+<td>10K-50K/sec</td>
+<td>Unlimited (Standard) / 3K (FIFO)</td>
+</tr>
+<tr>
+<td><strong>Ordering</strong></td>
+<td>Per-partition</td>
+<td>Per-queue</td>
+<td>Best-effort (Standard) / Per-group (FIFO)</td>
+</tr>
+<tr>
+<td><strong>Replay</strong></td>
+<td>Yes (configurable retention)</td>
+<td>No</td>
+<td>No</td>
+</tr>
+<tr>
+<td><strong>Routing</strong></td>
+<td>Topic-based only</td>
+<td>Exchanges (direct, topic, fanout, headers)</td>
+<td>None (use SNS for fan-out)</td>
+</tr>
+<tr>
+<td><strong>Delivery</strong></td>
+<td>At-least-once / Exactly-once</td>
+<td>At-least-once / At-most-once</td>
+<td>At-least-once (Standard) / Exactly-once (FIFO)</td>
+</tr>
+<tr>
+<td><strong>Operations</strong></td>
+<td>Complex (brokers, ZK/KRaft)</td>
+<td>Moderate (cluster mgmt)</td>
+<td>Zero (fully managed)</td>
+</tr>
+<tr>
+<td><strong>Retention</strong></td>
+<td>Days/weeks (configurable)</td>
+<td>Until consumed</td>
+<td>14 days max</td>
+</tr>
+<tr>
+<td><strong>Best For</strong></td>
+<td>Event streaming, CDC, event sourcing</td>
+<td>Work queues, complex routing</td>
+<td>Simple queues on AWS</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="13-publish-subscribe-pubsub">1.3 Publish-Subscribe (Pub/Sub)</h2>
+<p><strong>Definition:</strong>
+Pub/Sub is a messaging paradigm where publishers emit events without knowledge of subscribers. A message broker or event bus mediates delivery. Subscribers express interest in event types and receive matching events asynchronously. This pattern maximally decouples producers from consumers.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-11.svg" alt="Diagram 11 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<h3 id="fan-out-pattern">Fan-Out Pattern</h3>
+<p>Fan-out delivers a single message to multiple subscribers simultaneously. Every subscriber gets every message published to the topic.</p>
+<pre><code>// Fan-out example: Order Created event
+OrderService publishes: { event: &quot;order.created&quot;, orderId: &quot;123&quot;, userId: &quot;u789&quot; }
+
+Subscribers (all receive the same event):
+  → Notification Service: sends order confirmation email
+  → Analytics Service: records conversion event
+  → Fulfillment Service: initiates picking/packing
+  → Fraud Service: runs post-order fraud check
+  → Loyalty Service: accrues reward points
+
+// Each subscriber processes independently
+// Failure of one subscriber does NOT affect others
+</code></pre>
+<h3 id="topic-based-filtering">Topic-Based Filtering</h3>
+<p>Subscribers filter messages by topic name or topic hierarchy. This is the most common pub/sub pattern.</p>
+<pre><code>// Topic hierarchy example
+events/
+  orders/
+    created    → Fulfillment, Analytics, Notifications
+    cancelled  → Refund, Analytics, Notifications
+    shipped    → Tracking, Analytics, Notifications
+  payments/
+    authorized → Order Service
+    captured   → Settlement, Analytics
+    refunded   → Order Service, Notifications
+  inventory/
+    low-stock  → Procurement, Alerts
+    restocked  → Catalog Service
+</code></pre>
+<h3 id="content-based-filtering">Content-Based Filtering</h3>
+<p>Subscribers filter based on message content/attributes rather than topic name. This provides finer-grained routing without topic explosion.</p>
+<pre><code>// Content-based filtering (e.g., AWS SNS filter policies)
+Topic: &quot;orders&quot;
+
+Subscriber: High-Value-Order-Handler
+  Filter: { &quot;order_total&quot;: [{ &quot;numeric&quot;: [&quot;&gt;=&quot;, 100000] }] }
+  // Only receives orders &gt;= $1,000
+
+Subscriber: International-Order-Handler
+  Filter: { &quot;shipping_country&quot;: [{ &quot;anything-but&quot;: &quot;US&quot; }] }
+  // Receives all non-US orders
+
+Subscriber: Priority-Customer-Handler
+  Filter: { &quot;customer_tier&quot;: [&quot;platinum&quot;, &quot;gold&quot;] }
+  // Only receives orders from premium customers
+</code></pre>
+<p><strong>When to Use Pub/Sub:</strong>
+- One event triggers multiple independent downstream actions (fan-out).
+- You need to add new subscribers without modifying the publisher.
+- Event-driven architectures where services react to state changes.
+- Cross-team boundaries where teams own their own consumers.</p>
+<p><strong>When NOT to Use Pub/Sub:</strong>
+- Request-response patterns where the caller needs a result.
+- Ordered, sequential processing of a workflow (use a queue or orchestrator instead).
+- When delivery guarantees must be exactly-once (most pub/sub is at-least-once).</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Maximum decoupling</td>
+<td>Harder to debug event flows</td>
+</tr>
+<tr>
+<td>Easy to add new subscribers</td>
+<td>Message ordering not guaranteed across subscribers</td>
+</tr>
+<tr>
+<td>Independent scaling per subscriber</td>
+<td>Eventual consistency</td>
+</tr>
+<tr>
+<td>Fault isolation between subscribers</td>
+<td>Duplicate delivery requires idempotent consumers</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="14-event-sourcing-as-a-communication-paradigm">1.4 Event Sourcing (as a Communication Paradigm)</h2>
+<p><strong>Definition:</strong>
+Event sourcing stores every state change as an immutable event in an append-only event store, rather than storing only the current state. The current state is derived by replaying events. Events serve as the system of record and the communication mechanism simultaneously.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-12.svg" alt="Diagram 12 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Event Store Structure:</strong></p>
+<pre><code>// Event Store for Order aggregate
+// Each row is an immutable event
+
+| stream_id   | version | event_type       | data                                          | timestamp           |
+|-------------|---------|------------------|-----------------------------------------------|---------------------|
+| order-123   | 1       | OrderCreated     | { userId: &quot;u1&quot;, items: [...], total: 5999 }   | 2025-01-15T10:00:00 |
+| order-123   | 2       | PaymentAuthorized| { paymentId: &quot;pay_1&quot;, amount: 5999 }          | 2025-01-15T10:00:05 |
+| order-123   | 3       | OrderConfirmed   | { confirmedBy: &quot;system&quot; }                     | 2025-01-15T10:00:06 |
+| order-123   | 4       | ItemShipped      | { trackingId: &quot;TRK001&quot;, carrier: &quot;FedEx&quot; }    | 2025-01-16T14:30:00 |
+| order-123   | 5       | OrderDelivered   | { deliveredAt: &quot;2025-01-18T09:15:00&quot; }        | 2025-01-18T09:15:00 |
+
+// Rebuilding current state:
+// Replay events 1-5 → Order { status: DELIVERED, total: 5999, ... }
+</code></pre>
+<p><strong>Snapshots for Performance:</strong></p>
+<pre><code>// Problem: Replaying 10,000 events to rebuild state is slow
+// Solution: Periodic snapshots
+
+| stream_id | snapshot_version | state                                    | timestamp           |
+|-----------|-----------------|------------------------------------------|---------------------|
+| order-123 | 3               | { status: CONFIRMED, total: 5999, ... }  | 2025-01-15T10:00:06 |
+
+// Rebuild: Load snapshot (version 3), then replay events 4-5
+// Instead of replaying all 5 events, we replay only 2
+// Take snapshots every N events (e.g., every 100)
+</code></pre>
+<p><strong>Event Replay for Projection Rebuilds:</strong></p>
+<pre><code>// Scenario: New &quot;Seller Revenue&quot; read model needs historical data
+// Solution: Replay all events from the beginning
+
+1. Deploy new projection with offset = 0
+2. Projection reads events sequentially from event store
+3. For each event, update the read model
+4. Once caught up to real-time, switch to live processing
+
+// This is why event sourcing enables retroactive features:
+// You have the complete history, not just current state
+</code></pre>
+<p><strong>When to Use Event Sourcing:</strong>
+- Audit-complete domains (finance, healthcare, legal) where the full history of changes matters.
+- Systems where you need to rebuild state at any point in time.
+- Complex domain logic where the sequence of state transitions is important.
+- When retroactive projections/reports are needed.</p>
+<p><strong>When NOT to Use Event Sourcing:</strong>
+- Simple CRUD applications where current state is all you need.
+- Systems where event schema evolution is a major concern.
+- Small teams without experience in event-driven architectures.
+- When storage cost of retaining all events is prohibitive.</p>
+<p><strong>Common Mistakes:</strong>
+1. Treating events as commands — events are facts that happened; commands are requests that may be rejected.
+2. Not versioning events — when event schema changes, old events must still be deserializable.
+3. No snapshots — performance degrades as event count grows per aggregate.
+4. Coupling projection logic to event structure — projections should handle unknown event types gracefully.
+5. Storing derived data in events — events should contain only the minimal data that changed, not computed values.</p>
+<p><strong>Interview Insights:</strong>
+- Event sourcing is often combined with CQRS in system design interviews. Be ready to explain both together.
+- Key selling point: "With event sourcing, we can answer questions we haven't thought of yet by replaying the event log."
+- Know the snapshot optimization: "For hot aggregates with thousands of events, we take periodic snapshots to avoid replaying the full history."</p>
+<hr>
+<h3 id="section-1-architecture-decision-record">Section 1 — Architecture Decision Record</h3>
+<p><strong>ADR-001: Communication Pattern Selection</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Decision Point</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>External client → API</td>
+<td>REST (Level 2)</td>
+<td>Universal tooling, cacheability, developer experience</td>
+</tr>
+<tr>
+<td>Internal service → service (latency-sensitive)</td>
+<td>gRPC</td>
+<td>Binary serialization, type safety, HTTP/2 multiplexing</td>
+</tr>
+<tr>
+<td>Client → aggregation layer</td>
+<td>GraphQL</td>
+<td>Flexible queries, no over-fetching for multiple clients</td>
+</tr>
+<tr>
+<td>Service → service (decoupled)</td>
+<td>Kafka</td>
+<td>High throughput, message replay, event sourcing support</td>
+</tr>
+<tr>
+<td>Task queue (work distribution)</td>
+<td>RabbitMQ or SQS</td>
+<td>Complex routing (RabbitMQ) or zero-ops (SQS)</td>
+</tr>
+<tr>
+<td>One-to-many notifications</td>
+<td>Pub/Sub (SNS/Kafka)</td>
+<td>Fan-out delivery, subscriber independence</td>
+</tr>
+<tr>
+<td>Audit-complete state management</td>
+<td>Event Sourcing</td>
+<td>Full history, replayability, retroactive projections</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h1 id="section-2-data-patterns_1">Section 2: Data Patterns</h1>
+<p>Data management in a microservices architecture is fundamentally different from a monolith. In a monolith, a single database provides ACID transactions, JOIN operations, and referential integrity across all domain entities. When you decompose into microservices, you lose all of these guarantees and must replace them with distributed patterns that are more complex, more fragile, and require more engineering effort — but are essential for independent deployment, scaling, and fault isolation.</p>
+<hr>
+<h2 id="21-database-per-service">2.1 Database Per Service</h2>
+<p><strong>Definition:</strong>
+Each microservice owns its database (or schema), and no other service may access it directly. All inter-service data access happens through the service's API. This is the foundational data pattern of microservices architecture.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-13.svg" alt="Diagram 13 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Schema Ownership Model:</strong></p>
+<pre><code>// Each service owns its schema completely
+
+// Order Service owns:
+//   - orders table
+//   - order_items table
+//   - order_status_history table
+//   Stores: user_id (reference, NOT foreign key to User DB)
+
+// User Service owns:
+//   - users table
+//   - user_addresses table
+//   - user_preferences table
+
+// FORBIDDEN: Order Service reading directly from users table
+// CORRECT: Order Service calls User Service API to get user data
+</code></pre>
+<p><strong>Handling Cross-Service Joins:</strong></p>
+<pre><code>// Problem: &quot;Show order with customer name and product details&quot;
+// In a monolith: SELECT o.*, u.name, p.title FROM orders o
+//                JOIN users u ON o.user_id = u.id
+//                JOIN products p ON oi.product_id = p.id
+
+// In microservices: No cross-service JOINs possible
+
+// Solution 1: API Composition (synchronous)
+orderDetails = orderService.getOrder(orderId)
+user = userService.getUser(orderDetails.userId)
+products = productService.getProducts(orderDetails.productIds)
+return merge(orderDetails, user, products)
+
+// Solution 2: Data Denormalization (eventual consistency)
+// Order Service stores a snapshot of user name and product title
+// at order creation time. Stale but fast.
+orders table:
+  order_id | user_id | user_name_snapshot | items_json | ...
+
+// Solution 3: CQRS Read Model (materialized view)
+// A dedicated read model joins data from multiple event streams
+// Updated asynchronously via events from each service
+order_details_view:
+  order_id | user_name | product_titles | total | status | ...
+</code></pre>
+<p><strong>When to Use Database Per Service:</strong>
+- You need independent deployment and scaling of services.
+- Services have different data storage requirements (SQL for orders, document store for product catalog, time-series for analytics).
+- Teams own their services end-to-end and need schema autonomy.
+- You need fault isolation — one service's database issues should not affect others.</p>
+<p><strong>When NOT to Use Database Per Service:</strong>
+- Small teams (&lt; 5 engineers) where operational overhead of multiple databases is unjustified.
+- Tightly coupled domains where most operations require data from multiple entities.
+- Early-stage products where domain boundaries are still unclear.
+- When strong consistency across entities is a hard requirement.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Independent deployment</td>
+<td>No cross-service JOINs</td>
+</tr>
+<tr>
+<td>Technology heterogeneity</td>
+<td>Distributed transactions are complex</td>
+</tr>
+<tr>
+<td>Fault isolation</td>
+<td>Data duplication and eventual consistency</td>
+</tr>
+<tr>
+<td>Independent scaling</td>
+<td>Reporting across services requires data aggregation</td>
+</tr>
+<tr>
+<td>Schema autonomy</td>
+<td>More databases to operate and monitor</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Sharing a database but calling it "database per service" — if two services read/write the same tables, it's a shared database.
+2. Not denormalizing enough — making synchronous API calls for every read operation creates latency and coupling.
+3. Ignoring referential integrity — foreign key references across services are logical only; there's no enforcement.
+4. Not planning for cross-service queries from the start — reporting needs often drive you back to a shared database.</p>
+<hr>
+<h2 id="22-shared-database-anti-pattern">2.2 Shared Database Anti-Pattern</h2>
+<p><strong>Definition:</strong>
+Multiple microservices share a single database, often reading and writing the same tables. This pattern is called an "anti-pattern" because it negates the core benefits of microservices: independent deployment, fault isolation, and schema autonomy.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-14.svg" alt="Diagram 14 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Why It Fails:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tight coupling</strong></td>
+<td>Schema change in one service's tables can break other services.</td>
+</tr>
+<tr>
+<td><strong>No independent deployment</strong></td>
+<td>Database migration must coordinate across all services.</td>
+</tr>
+<tr>
+<td><strong>No fault isolation</strong></td>
+<td>One service running expensive queries degrades performance for all.</td>
+</tr>
+<tr>
+<td><strong>No technology heterogeneity</strong></td>
+<td>All services are locked into the same database technology.</td>
+</tr>
+<tr>
+<td><strong>Scaling limitations</strong></td>
+<td>Cannot scale one service's data independently.</td>
+</tr>
+<tr>
+<td><strong>Ownership ambiguity</strong></td>
+<td>Who owns the "users" table? Multiple services write to it.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>When It Is Acceptable:</strong>
+Despite being an anti-pattern, a shared database is sometimes the right pragmatic choice:</p>
+<ol>
+<li><strong>Monolith-to-microservices migration</strong>: As a transitional step, services share the database while being extracted. The shared DB is temporary.</li>
+<li><strong>Read-only sharing</strong>: Service A owns the table, Service B has read-only access. Less coupling than read-write sharing.</li>
+<li><strong>Small team with a single product</strong>: If you have 3 engineers and a single product, the operational overhead of multiple databases is not justified.</li>
+<li><strong>Reporting/analytics</strong>: A shared read replica for BI tools is acceptable if it doesn't affect the write path.</li>
+</ol>
+<p><strong>Migration Strategy from Shared DB:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-15.svg" alt="Diagram 15 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Interview Insights:</strong>
+- If you propose a shared database in an interview, acknowledge it as a trade-off and explain your reasoning (e.g., "For an early-stage system with 3 engineers, the operational overhead of separate databases outweighs the benefits").
+- Know the migration path: "We start with a shared database and progressively extract service-specific databases as domain boundaries solidify."</p>
+<hr>
+<h2 id="23-saga-pattern">2.3 Saga Pattern</h2>
+<p><strong>Definition:</strong>
+A saga is a sequence of local transactions across multiple services. Each local transaction updates the service's database and publishes an event (or triggers the next step). If any step fails, compensating transactions undo the preceding changes. Sagas replace distributed ACID transactions (2PC) with eventual consistency and explicit compensation logic.</p>
+<p><strong>Two Saga Coordination Strategies:</strong></p>
+<h3 id="231-choreography-based-saga">2.3.1 Choreography-Based Saga</h3>
+<p>Each service listens for events and decides locally whether to act. There is no central coordinator. Services communicate through events.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-16.svg" alt="Diagram 16 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-17.svg" alt="Diagram 17 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<h3 id="232-orchestration-based-saga">2.3.2 Orchestration-Based Saga</h3>
+<p>A central saga orchestrator coordinates the entire sequence. It sends commands to services and handles responses. The orchestrator contains all the workflow logic.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-18.svg" alt="Diagram 18 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Saga State Machine (Orchestrator):</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-19.svg" alt="Diagram 19 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Compensating Transactions:</strong></p>
+<pre><code>// Each saga step has a forward action and a compensating action
+
+| Step | Forward Action | Compensating Action |
+|------|---------------|-------------------|
+| 1. Create Order | Insert order (PENDING) | Cancel order (CANCELLED) |
+| 2. Authorize Payment | Charge credit card | Reverse authorization |
+| 3. Reserve Inventory | Decrement stock count | Release reserved stock |
+| 4. Create Shipment | Schedule pickup | Cancel shipment |
+
+// Compensating transactions are NOT rollbacks
+// They are new transactions that semantically undo the effect
+// Example: Payment compensation is a refund, not a database rollback
+</code></pre>
+<p><strong>Choreography vs Orchestration Comparison:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Choreography</th>
+<th>Orchestration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Coupling</strong></td>
+<td>Loose (event-driven)</td>
+<td>Tighter (orchestrator knows all steps)</td>
+</tr>
+<tr>
+<td><strong>Complexity</strong></td>
+<td>Distributed across services</td>
+<td>Centralized in orchestrator</td>
+</tr>
+<tr>
+<td><strong>Visibility</strong></td>
+<td>Hard to see full workflow</td>
+<td>Easy to trace entire saga</td>
+</tr>
+<tr>
+<td><strong>Adding steps</strong></td>
+<td>New service subscribes to events</td>
+<td>Modify orchestrator</td>
+</tr>
+<tr>
+<td><strong>Testing</strong></td>
+<td>Integration tests across services</td>
+<td>Unit test the orchestrator</td>
+</tr>
+<tr>
+<td><strong>Failure handling</strong></td>
+<td>Each service handles its own compensation</td>
+<td>Orchestrator manages all compensation</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Simple sagas (2-3 steps)</td>
+<td>Complex sagas (4+ steps)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Real-World Example:</strong>
+Uber uses orchestration-based sagas for ride completion: authorize payment, charge rider, pay driver, update ride status, generate receipt. If any step fails, the orchestrator triggers compensating transactions to reverse the preceding steps.</p>
+<p><strong>When to Use Sagas:</strong>
+- Business operations that span multiple microservices.
+- When distributed ACID transactions (2PC) are too slow or operationally complex.
+- Long-running business processes (minutes, hours, or days).
+- When compensating transactions are semantically meaningful (refund, release, cancel).</p>
+<p><strong>When NOT to Use Sagas:</strong>
+- Operations within a single service (use local ACID transactions).
+- When all-or-nothing atomicity is strictly required (sagas provide eventual consistency, not atomicity).
+- Simple read-only aggregation across services (use API composition instead).</p>
+<p><strong>Common Mistakes:</strong>
+1. Not designing compensating transactions from the start — retrofitting compensation is extremely difficult.
+2. Non-idempotent saga steps — if a step is retried, it must produce the same result.
+3. Missing the "pivot transaction" concept — after the pivot step, compensation is not possible (e.g., package delivered).
+4. No saga timeout — a saga stuck in an intermediate state forever wastes resources.
+5. Choreography for complex workflows — debugging event chains across 6+ services is a nightmare.
+6. Not persisting saga state — if the orchestrator crashes, it must resume from where it left off.</p>
+<p><strong>Interview Insights:</strong>
+- Sagas are the go-to answer for "How do you handle distributed transactions?" in interviews.
+- Always mention the two strategies (choreography and orchestration) and recommend orchestration for complex workflows.
+- Be ready to draw the compensating transaction table for any multi-service operation.
+- Know the saga state machine: "The orchestrator is a state machine that tracks the saga through its stages and handles both success and failure paths."</p>
+<hr>
+<h2 id="24-event-sourcing-data-pattern">2.4 Event Sourcing (Data Pattern)</h2>
+<p><strong>Definition:</strong>
+Event sourcing stores every state change as an immutable event, creating a complete audit trail of how the current state was reached. The current state is derived by replaying events (or loading a snapshot and replaying recent events). This section focuses on the data storage and management aspects of event sourcing.</p>
+<p><strong>Event Store Design:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-20.svg" alt="Diagram 20 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Event Versioning Strategies:</strong></p>
+<pre><code>// Problem: Event schema evolves over time
+// Event: OrderCreated v1 has {items, total}
+// Event: OrderCreated v2 adds {currency, shipping_method}
+
+// Strategy 1: Upcasting (transform old events to new schema on read)
+function upcast(event) {
+  if (event.type === &quot;OrderCreated&quot; &amp;&amp; event.version === 1) {
+    return {
+      ...event,
+      data: {
+        ...event.data,
+        currency: &quot;USD&quot;,           // default value
+        shipping_method: &quot;standard&quot; // default value
+      },
+      version: 2
+    };
+  }
+  return event;
+}
+
+// Strategy 2: Weak Schema (add optional fields, never remove)
+// All consumers must handle missing fields gracefully
+
+// Strategy 3: New Event Type
+// Instead of changing OrderCreated, create OrderCreatedV2
+// Consumers handle both event types
+
+// RECOMMENDED: Use upcasting for minor changes, new event types for major changes
+</code></pre>
+<p><strong>Projection Rebuild Process:</strong></p>
+<pre><code>// Scenario: Bug in projection logic caused incorrect read model
+// Solution: Fix the bug, then rebuild the projection from scratch
+
+Step 1: Stop the projection
+Step 2: Drop the read model table
+Step 3: Reset the projection's checkpoint to 0
+Step 4: Restart the projection
+Step 5: Projection replays ALL events, building correct read model
+Step 6: Once caught up, projection processes live events
+
+// This is the killer feature of event sourcing:
+// Read models are disposable and rebuildable
+
+// For large event stores, parallel replay:
+// - Shard by stream_id
+// - Replay each shard in parallel
+// - Merge into read model
+</code></pre>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Complete audit trail</td>
+<td>Higher storage requirements</td>
+</tr>
+<tr>
+<td>Time-travel debugging</td>
+<td>Event schema evolution is complex</td>
+</tr>
+<tr>
+<td>Rebuildable read models</td>
+<td>Eventually consistent read models</td>
+</tr>
+<tr>
+<td>Retroactive features via replay</td>
+<td>Higher learning curve</td>
+</tr>
+<tr>
+<td>Natural fit for event-driven systems</td>
+<td>Not suitable for all domains</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="25-cqrs-command-query-responsibility-segregation">2.5 CQRS (Command Query Responsibility Segregation)</h2>
+<p><strong>Definition:</strong>
+CQRS separates the read model (queries) from the write model (commands). Instead of a single data model serving both reads and writes, the system maintains optimized models for each. Commands mutate state through the write model; queries read from purpose-built read models updated asynchronously.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-21.svg" alt="Diagram 21 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Separate Read Models (Materialized Views):</strong></p>
+<pre><code>// Write Model (normalized, optimized for consistency)
+orders:     order_id | user_id | status | created_at
+order_items: item_id | order_id | product_id | quantity | unit_price
+products:   product_id | name | category | seller_id
+users:      user_id | name | email
+
+// Read Model 1: Order Dashboard (denormalized for fast queries)
+order_dashboard_view:
+  order_id | user_name | user_email | status |
+  item_count | total_amount | product_names | created_at
+
+// Read Model 2: Seller Analytics (aggregated for reporting)
+seller_daily_stats:
+  seller_id | date | orders_count | revenue | top_product | avg_order_value
+
+// Read Model 3: Search Index (Elasticsearch for full-text search)
+order_search_index:
+  order_id | user_name | product_names | status | amount | date
+  // Supports: full-text search, faceted filtering, sorting
+
+// Each read model is updated asynchronously via projections
+// Each can use a different storage technology
+// Each is optimized for its specific query pattern
+</code></pre>
+<p><strong>CQRS Without Event Sourcing:</strong></p>
+<pre><code>// CQRS does NOT require event sourcing
+// You can use CQRS with a traditional database + change data capture
+
+Write Path:
+  1. Command arrives
+  2. Domain logic validates and processes
+  3. Write to PostgreSQL (traditional UPDATE/INSERT)
+  4. CDC (Debezium) captures the change
+  5. Change event published to Kafka
+
+Read Path:
+  1. Kafka consumer receives change event
+  2. Projection updates the read model (Elasticsearch, Redis, etc.)
+  3. Query API reads from the read model
+</code></pre>
+<p><strong>When to Use CQRS:</strong>
+- Read and write workloads have dramatically different characteristics (1000:1 read-to-write ratio).
+- You need multiple optimized read models for different query patterns.
+- The domain is complex enough that a single model cannot efficiently serve both reads and writes.
+- Used with event sourcing for complete state management.</p>
+<p><strong>When NOT to Use CQRS:</strong>
+- Simple CRUD applications where reads and writes are similar in shape and volume.
+- When eventual consistency between read and write models is not acceptable.
+- Small teams where the additional complexity is not justified.
+- When you don't have different query patterns requiring different optimizations.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Optimized read models per query pattern</td>
+<td>Eventual consistency (read lag)</td>
+</tr>
+<tr>
+<td>Independent scaling of read and write</td>
+<td>More infrastructure to maintain</td>
+</tr>
+<tr>
+<td>Technology flexibility per read model</td>
+<td>Increased system complexity</td>
+</tr>
+<tr>
+<td>Better performance for read-heavy systems</td>
+<td>Data duplication across models</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Applying CQRS everywhere — most services don't need it; use it selectively for complex domains.
+2. Ignoring eventual consistency in the UI — users expect to see their changes immediately.
+3. Not handling projection failures — if a projection crashes, the read model becomes stale.
+4. Over-engineering read models — start with one read model and add more only when needed.
+5. Confusing CQRS with event sourcing — they are complementary but independent patterns.</p>
+<p><strong>Interview Insights:</strong>
+- CQRS is a strong answer for "How do you handle a system with 1000:1 read-to-write ratio?"
+- Explain the eventual consistency trade-off: "The read model may be a few seconds behind the write model. For most UIs, we handle this with optimistic updates on the client."
+- Know when to combine CQRS with event sourcing vs. CQRS with CDC: "Event sourcing gives us full history and replay; CDC is simpler if we only need eventual consistency."</p>
+<hr>
+<h3 id="section-2-architecture-decision-record">Section 2 — Architecture Decision Record</h3>
+<p><strong>ADR-002: Data Pattern Selection</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Decision Point</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Service data ownership</td>
+<td>Database per service</td>
+<td>Independent deployment, fault isolation, team autonomy</td>
+</tr>
+<tr>
+<td>Cross-service data query</td>
+<td>API composition + CQRS read models</td>
+<td>Avoid direct DB access; denormalize for performance</td>
+</tr>
+<tr>
+<td>Multi-service transactions</td>
+<td>Orchestration-based saga</td>
+<td>Visibility, testability, complex compensation logic</td>
+</tr>
+<tr>
+<td>Audit-complete domains</td>
+<td>Event sourcing</td>
+<td>Complete history, replayability, regulatory compliance</td>
+</tr>
+<tr>
+<td>High read-to-write ratio</td>
+<td>CQRS</td>
+<td>Separate optimized read models, independent scaling</td>
+</tr>
+<tr>
+<td>Transitional migration</td>
+<td>Shared database (temporary)</td>
+<td>Pragmatic step during monolith decomposition</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h1 id="section-3-resilience-patterns_1">Section 3: Resilience Patterns</h1>
+<p>In a distributed system, failure is not a possibility — it is a certainty. Networks partition. Services crash. Databases become unreachable. Downstream dependencies slow down. Disk fills up. A resilient system doesn't prevent failures; it survives them gracefully, continues serving traffic at reduced capacity, and recovers automatically.</p>
+<p>This section covers the five foundational resilience patterns that every microservices architecture must implement.</p>
+<hr>
+<h2 id="31-circuit-breaker">3.1 Circuit Breaker</h2>
+<p><strong>Definition:</strong>
+The circuit breaker pattern prevents a service from repeatedly calling a failing downstream dependency. Like an electrical circuit breaker, it "trips" when failures exceed a threshold, short-circuiting subsequent calls and returning an immediate error (or fallback) instead of waiting for a timeout. After a cooldown period, it allows a test request through to check if the dependency has recovered.</p>
+<p><strong>State Machine:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-22.svg" alt="Diagram 22 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Sequence Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-23.svg" alt="Diagram 23 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Configuration Parameters:</strong></p>
+<pre><code>// Circuit breaker configuration (Resilience4j example)
+
+CircuitBreakerConfig:
+  // Failure rate threshold (percentage)
+  failureRateThreshold: 50          // Open circuit if &gt;50% of requests fail
+
+  // Minimum number of calls before evaluating failure rate
+  minimumNumberOfCalls: 10          // Don't trip on first few calls
+
+  // Sliding window type and size
+  slidingWindowType: COUNT_BASED    // or TIME_BASED
+  slidingWindowSize: 20             // Last 20 calls (or 20 seconds)
+
+  // Duration the circuit stays open before trying half-open
+  waitDurationInOpenState: 30s
+
+  // Number of test calls allowed in half-open state
+  permittedNumberOfCallsInHalfOpenState: 3
+
+  // Which exceptions count as failures
+  recordExceptions: [IOException, TimeoutException, ServiceUnavailableException]
+
+  // Which exceptions are ignored (don't count toward threshold)
+  ignoreExceptions: [BusinessValidationException]
+
+  // Slow call handling
+  slowCallDurationThreshold: 2s     // Calls slower than 2s are &quot;slow&quot;
+  slowCallRateThreshold: 80         // Open if &gt;80% of calls are slow
+</code></pre>
+<p><strong>Real-World Example:</strong>
+Netflix's Hystrix (now deprecated, succeeded by Resilience4j) was the pioneering circuit breaker library. Netflix uses circuit breakers on every downstream dependency call. When the recommendation service is slow, the circuit breaker trips, and the homepage falls back to showing trending content instead of personalized recommendations.</p>
+<p><strong>When to Use Circuit Breaker:</strong>
+- Calling external or unreliable downstream services.
+- When a failing dependency can cause cascading failures.
+- When you have a meaningful fallback (cached data, default response, degraded feature).
+- High-throughput systems where waiting for timeouts wastes threads/connections.</p>
+<p><strong>When NOT to Use Circuit Breaker:</strong>
+- Calling a local in-process dependency (no network failure mode).
+- When every call failure must be reported accurately (circuit breaker hides some failures).
+- When there is no meaningful fallback and the failure must propagate to the client.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prevents cascading failures</td>
+<td>Fallback responses may confuse users</td>
+</tr>
+<tr>
+<td>Fail-fast saves resources</td>
+<td>Configuration tuning is tricky</td>
+</tr>
+<tr>
+<td>Automatic recovery detection</td>
+<td>Adds latency for state checking</td>
+</tr>
+<tr>
+<td>Protects downstream from overload</td>
+<td>Can mask real issues if fallback is too seamless</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Setting threshold too low — circuit trips on normal transient errors.
+2. Setting threshold too high — circuit doesn't trip fast enough during real outages.
+3. No fallback implementation — tripping the circuit returns an ugly error instead of a degraded experience.
+4. Not monitoring circuit state — you should alert when any circuit opens.
+5. Sharing a circuit across unrelated calls — one failing endpoint trips the circuit for all endpoints.
+6. Forgetting slow calls — a dependency that responds in 30s instead of 200ms is just as dangerous as one that returns 500.</p>
+<p><strong>Interview Insights:</strong>
+- Circuit breaker is expected knowledge in any system design involving microservices.
+- Draw the three-state diagram (Closed → Open → Half-Open → Closed) without hesitation.
+- Explain the cascading failure scenario: "If Service A calls Service B, and B is slow, A's thread pool fills up waiting for B. Now A can't serve its own clients. The circuit breaker on A's calls to B prevents this."
+- Mention that service meshes (Istio, Linkerd) provide circuit breaking at the infrastructure level, not just application level.</p>
+<hr>
+<h2 id="32-retry-pattern">3.2 Retry Pattern</h2>
+<p><strong>Definition:</strong>
+The retry pattern automatically re-attempts a failed operation, assuming the failure is transient (network glitch, temporary overload). Retries are essential for resilience but must be implemented carefully to avoid amplifying failures.</p>
+<p><strong>Retry Strategies:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-24.svg" alt="Diagram 24 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Why Jitter Matters — The Thundering Herd:</strong></p>
+<pre><code>// Without jitter: All clients retry at the same time
+// T=0: 1000 clients call Service B. Service B is overloaded, all fail.
+// T=1s: 1000 clients retry simultaneously. Service B is still overloaded.
+// T=2s: 1000 clients retry simultaneously. System collapse.
+
+// With jitter: Retries are spread over time
+// T=0: 1000 clients call Service B. Service B is overloaded, all fail.
+// T=0.3s-1.0s: Clients retry at random intervals. ~300 succeed.
+// T=0.8s-2.0s: Remaining clients retry at random intervals. ~400 succeed.
+// T=1.5s-4.0s: Final clients retry. All succeed.
+
+// Jitter formulas:
+// Full jitter:  sleep = random(0, min(cap, base * 2^attempt))
+// Equal jitter: temp = min(cap, base * 2^attempt)
+//               sleep = temp/2 + random(0, temp/2)
+// Decorrelated: sleep = min(cap, random(base, prev_sleep * 3))
+</code></pre>
+<p><strong>Retry Budget:</strong></p>
+<pre><code>// Problem: If 10 services each retry 3 times, a single failure generates
+// 10 * 3 = 30 requests to the failing service, amplifying the problem.
+
+// Solution: Retry budget limits the percentage of retries relative to
+// total traffic
+
+RetryBudget:
+  // Allow retries up to 20% of total request volume
+  retryBudgetPercent: 20
+
+  // Minimum retries per second (ensures low-traffic services can still retry)
+  minRetriesPerSecond: 10
+
+  // Example:
+  //   Sending 100 req/sec → budget allows 20 retries/sec
+  //   Sending 1000 req/sec → budget allows 200 retries/sec
+  //   If 300 requests fail → only 200 are retried, 100 fail immediately
+</code></pre>
+<p><strong>Idempotency Requirement:</strong></p>
+<pre><code>// CRITICAL: Retried operations MUST be idempotent
+// Idempotent: Applying the operation N times has the same effect as applying it once
+
+// SAFE to retry (idempotent):
+//   GET /orders/123         → always returns the same order
+//   PUT /orders/123 {body}  → replaces the entire resource
+//   DELETE /orders/123      → deletes once, subsequent calls return 404
+
+// DANGEROUS to retry (not idempotent by default):
+//   POST /orders            → creates a new order each time!
+//   POST /payments          → charges the credit card each time!
+
+// Making POST idempotent with idempotency keys:
+POST /orders
+Headers:
+  Idempotency-Key: &quot;client-generated-uuid-abc123&quot;
+
+// Server behavior:
+// 1. Check if idempotency key exists in cache/DB
+// 2. If yes, return the cached response (no new order created)
+// 3. If no, process the request, store the result with the key
+// 4. Key expires after 24h
+</code></pre>
+<p><strong>When to Use Retry:</strong>
+- Transient network errors (connection reset, DNS resolution failure).
+- Downstream service returning 503 (Service Unavailable) or 429 (Too Many Requests).
+- Database connection pool exhaustion (temporary).
+- Any operation that is idempotent or can be made idempotent.</p>
+<p><strong>When NOT to Use Retry:</strong>
+- Permanent errors (400 Bad Request, 401 Unauthorized, 404 Not Found) — retrying won't help.
+- Non-idempotent operations without idempotency keys — retrying creates duplicates.
+- When the downstream is known to be down (circuit breaker should handle this).
+- Long-running operations — retrying a 30-second operation doubles the latency.</p>
+<p><strong>Common Mistakes:</strong>
+1. Retrying on all errors — only retry on transient, retriable errors (5xx, timeout, connection error).
+2. No backoff — immediate retries hammer the struggling dependency.
+3. No jitter — all clients retry at the same time (thundering herd).
+4. No max attempts — infinite retries exhaust client resources.
+5. Retrying non-idempotent operations — creates duplicate orders, double charges.
+6. Not using retry budgets — retries amplify load on failing services.</p>
+<p><strong>Interview Insights:</strong>
+- Always pair retries with circuit breakers: "Retries handle transient failures; circuit breakers stop retrying when the dependency is truly down."
+- Know exponential backoff with jitter cold: "Base delay doubles each attempt, and we add random jitter to avoid thundering herd."
+- Mention idempotency: "Retries are only safe if the operation is idempotent. For POST endpoints, we use idempotency keys."</p>
+<hr>
+<h2 id="33-timeout-pattern">3.3 Timeout Pattern</h2>
+<p><strong>Definition:</strong>
+Every remote call must have a timeout. Without timeouts, a slow downstream service ties up threads, connections, and memory indefinitely, eventually bringing down the caller. Timeout management in a microservices architecture involves cascading timeouts, deadline propagation, and timeout budgets.</p>
+<p><strong>Cascading Timeout Problem:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-25.svg" alt="Diagram 25 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Deadline Propagation (Solution):</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-26.svg" alt="Diagram 26 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Timeout Budget Strategy:</strong></p>
+<pre><code>// Total timeout budget: 3 seconds
+
+Service A processing: 200ms budget
+  → Call to Service B: 2500ms budget
+    Service B processing: 200ms budget
+      → Call to Service C: 1800ms budget
+        Service C processing: 200ms budget
+          → Database query: 1400ms budget
+  → Call to Service D (parallel): 2500ms budget
+    Service D processing: 100ms budget
+      → Cache lookup: 50ms budget (fast path)
+
+// Rules:
+// 1. Each service subtracts its own processing time from the remaining budget
+// 2. Downstream calls get the remaining budget, not a new fixed timeout
+// 3. gRPC supports deadline propagation natively via metadata
+// 4. For HTTP/REST, propagate via custom header: X-Request-Deadline
+</code></pre>
+<p><strong>When to Use Timeout:</strong>
+- Every remote call (no exceptions). This is not optional.
+- Database queries, HTTP calls, gRPC calls, message queue operations.</p>
+<p><strong>When NOT to Use Timeout:</strong>
+- There is no scenario where you should omit timeouts on remote calls.
+- Even "fast" local operations benefit from timeouts for defensive programming.</p>
+<p><strong>Common Mistakes:</strong>
+1. No timeout at all — the number one cause of cascading failures.
+2. Timeout too long (30s default) — user has already left by the time you respond.
+3. Timeout too short (100ms) — triggers false failures during normal load spikes.
+4. Same timeout at every level — doesn't account for call chain depth.
+5. Not propagating deadlines — each service sets its own timeout, ignoring the overall budget.
+6. Timeout without retry — if you time out, should you retry? Only if the operation is idempotent and the deadline hasn't been fully consumed.</p>
+<p><strong>Interview Insights:</strong>
+- Mention deadline propagation proactively: "Each service passes the remaining time budget to downstream calls, so the total response time never exceeds the original deadline."
+- gRPC has built-in deadline propagation; REST requires a custom header.
+- Connect timeouts to circuit breakers: "If a service consistently times out, the circuit breaker should trip to fail fast."</p>
+<hr>
+<h2 id="34-bulkhead-pattern">3.4 Bulkhead Pattern</h2>
+<p><strong>Definition:</strong>
+The bulkhead pattern isolates failures by partitioning system resources (threads, connections, memory) into independent pools. Named after ship bulkheads that prevent flooding from spreading, this pattern ensures that a failure in one area doesn't consume all resources and bring down the entire system.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-27.svg" alt="Diagram 27 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-28.svg" alt="Diagram 28 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Bulkhead Types:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Mechanism</th>
+<th>Isolation Level</th>
+<th>Overhead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Thread pool isolation</strong></td>
+<td>Separate thread pool per dependency</td>
+<td>High (OS thread per call)</td>
+<td>High (context switching, memory)</td>
+</tr>
+<tr>
+<td><strong>Semaphore isolation</strong></td>
+<td>Counting semaphore limits concurrent calls</td>
+<td>Medium (no extra threads)</td>
+<td>Low (just a counter)</td>
+</tr>
+<tr>
+<td><strong>Service mesh bulkhead</strong></td>
+<td>Connection pool limits at proxy level</td>
+<td>High (infrastructure-level)</td>
+<td>Low (handled by sidecar)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Thread Pool vs Semaphore:</strong></p>
+<pre><code>// Thread Pool Isolation
+// - Each dependency gets its own thread pool
+// - Caller's thread is freed immediately (submits to dependency's pool)
+// - Supports timeout on the pool (task.get(timeout))
+// - Higher memory overhead (each thread ~1MB stack)
+// - Use for: untrusted or slow dependencies
+
+// Semaphore Isolation
+// - Limits concurrent calls using a semaphore count
+// - Caller's thread executes the call (no extra thread)
+// - Lower overhead
+// - Timeout is less precise (depends on the call itself timing out)
+// - Use for: trusted dependencies where you just want to limit concurrency
+
+// Configuration example (Resilience4j Bulkhead)
+BulkheadConfig:
+  maxConcurrentCalls: 25        // Max 25 simultaneous calls
+  maxWaitDuration: 500ms        // Wait max 500ms for a permit
+
+ThreadPoolBulkheadConfig:
+  maxThreadPoolSize: 20         // Max 20 threads in pool
+  coreThreadPoolSize: 10        // Min 10 threads kept alive
+  queueCapacity: 50             // Queue up to 50 requests
+  keepAliveDuration: 100ms      // Idle thread TTL
+</code></pre>
+<p><strong>Real-World Example:</strong>
+Amazon isolates each downstream service dependency with its own connection pool and thread pool. When the recommendation service is slow, only the threads allocated to recommendation calls are affected. The product detail page still loads quickly using the catalog and pricing thread pools.</p>
+<p><strong>When to Use Bulkhead:</strong>
+- Calling multiple downstream services where one might be slow or unreliable.
+- When failure of one dependency should not affect calls to other dependencies.
+- High-availability systems where partial functionality is better than total outage.</p>
+<p><strong>When NOT to Use Bulkhead:</strong>
+- Single-dependency services (nothing to isolate from).
+- When the overhead of multiple thread pools is too high for the service's resource constraints.
+- Very low-traffic services where resource contention is unlikely.</p>
+<p><strong>Common Mistakes:</strong>
+1. Pool sizes too small — legitimate traffic gets rejected during normal operation.
+2. Pool sizes too large — defeats the purpose; all threads are consumed by the slow dependency.
+3. No monitoring on pool utilization — you don't know when a pool is near exhaustion.
+4. Not combining with circuit breaker — bulkhead limits damage, circuit breaker stops the bleeding.</p>
+<hr>
+<h2 id="35-fallback-pattern">3.5 Fallback Pattern</h2>
+<p><strong>Definition:</strong>
+The fallback pattern provides an alternative response when the primary path fails. Instead of returning an error to the user, the system gracefully degrades by serving cached data, default values, or simplified responses.</p>
+<p><strong>Fallback Strategy Hierarchy:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-29.svg" alt="Diagram 29 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Fallback Strategies:</strong></p>
+<pre><code>// Strategy 1: Cache Fallback
+// Return the last known good response from cache
+function getProductRecommendations(userId) {
+  try {
+    return recommendationService.getPersonalized(userId);
+  } catch (error) {
+    // Serve cached recommendations (may be stale)
+    cached = cache.get(&quot;recommendations:&quot; + userId);
+    if (cached) {
+      return { data: cached, stale: true };
+    }
+    // Fall through to next strategy
+  }
+}
+
+// Strategy 2: Default Response
+// Return a sensible default when no cached data exists
+function getProductRecommendations(userId) {
+  // ... cache fallback above ...
+  // Return trending products as default
+  return { data: getTrendingProducts(), default: true };
+}
+
+// Strategy 3: Feature Flag Degradation
+// Disable non-critical features when dependencies are down
+function getProductPage(productId) {
+  product = catalogService.get(productId);  // Required
+
+  // Non-critical features with fallbacks
+  reviews = featureFlag.isEnabled(&quot;reviews&quot;)
+    ? reviewService.get(productId)
+    : { reviews: [], message: &quot;Reviews temporarily unavailable&quot; };
+
+  recommendations = featureFlag.isEnabled(&quot;recommendations&quot;)
+    ? recommendationService.get(productId)
+    : { items: [] };  // Empty section
+
+  return { product, reviews, recommendations };
+}
+
+// Strategy 4: Graceful Degradation Tiers
+// Tier 1 (normal):    Full page with personalized content, reviews, recommendations
+// Tier 2 (degraded):  Full page with cached content, no personalization
+// Tier 3 (minimal):   Product info only, no dynamic content
+// Tier 4 (static):    Static product page from CDN
+// Tier 5 (error):     User-friendly error page with retry option
+</code></pre>
+<p><strong>Real-World Example:</strong>
+Netflix implements multiple fallback tiers. If the personalization service is down, the homepage shows cached personalized rows. If the cache is empty, it shows trending content. If even that fails, it shows a statically compiled list of popular titles. The user always sees content, even during severe outages.</p>
+<p><strong>When to Use Fallback:</strong>
+- User-facing services where showing something is better than showing an error.
+- When stale data is acceptable (product catalog, recommendations, content feeds).
+- When default responses are meaningful (trending, popular, or empty states).
+- Combined with circuit breakers (fallback is invoked when the circuit is open).</p>
+<p><strong>When NOT to Use Fallback:</strong>
+- Financial transactions — you cannot "fall back" to an approximate payment amount.
+- When stale data is dangerous (real-time inventory, account balance).
+- When the fallback masks a critical failure that should trigger an alert.</p>
+<p><strong>Common Mistakes:</strong>
+1. Fallback that calls another unreliable service — the fallback itself fails.
+2. No indication to the user that data is stale — users make decisions based on outdated information.
+3. Fallback that is never tested — it fails in production when you need it most.
+4. Over-aggressive fallback that hides real issues — the service is broken for days and nobody notices.</p>
+<p><strong>Interview Insights:</strong>
+- Always pair circuit breakers with fallbacks: "When the circuit opens, we serve cached recommendations instead of returning a 500 error."
+- Show you understand the user experience: "The user sees a slightly stale product page instead of an error screen. We add a banner saying 'showing cached results.'"</p>
+<hr>
+<h3 id="resilience-patterns-combined-architecture">Resilience Patterns — Combined Architecture</h3>
+<p>In production, resilience patterns are layered together:</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-30.svg" alt="Diagram 30 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Combined Configuration Example:</strong></p>
+<pre><code>// Production resilience stack for a service call
+
+callWithResilience(paymentService::authorize):
+  timeout: 3s
+  retry:
+    maxAttempts: 3
+    backoff: exponential(base=200ms, max=2s)
+    jitter: full
+    retryOn: [IOException, TimeoutException, 503, 429]
+    doNotRetryOn: [400, 401, 403, 404, 409]
+  circuitBreaker:
+    failureRateThreshold: 50%
+    slidingWindowSize: 20
+    waitDurationInOpenState: 30s
+    fallback: returnCachedAuthorization() or rejectGracefully()
+  bulkhead:
+    maxConcurrentCalls: 25
+    maxWaitDuration: 500ms
+
+// Execution order:
+// 1. Bulkhead: Acquire permit (or reject if pool full)
+// 2. Circuit Breaker: Check state (fast-fail if OPEN)
+// 3. Timeout: Start deadline timer
+// 4. Execute call
+// 5. On failure → Retry (with backoff + jitter)
+// 6. All retries exhausted → Fallback
+</code></pre>
+<h3 id="section-3-architecture-decision-record">Section 3 — Architecture Decision Record</h3>
+<p><strong>ADR-003: Resilience Strategy</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Decision Point</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Downstream call protection</td>
+<td>Circuit breaker (Resilience4j)</td>
+<td>Prevents cascading failure, auto-recovery</td>
+</tr>
+<tr>
+<td>Transient failure handling</td>
+<td>Retry with exponential backoff + jitter</td>
+<td>Handles temporary issues without thundering herd</td>
+</tr>
+<tr>
+<td>Timeout management</td>
+<td>Deadline propagation</td>
+<td>Ensures total latency stays within user-facing SLA</td>
+</tr>
+<tr>
+<td>Resource isolation</td>
+<td>Semaphore bulkhead</td>
+<td>Lightweight isolation for trusted internal services</td>
+</tr>
+<tr>
+<td>Failure UX</td>
+<td>Multi-tier fallback</td>
+<td>Cache → default → degraded → error</td>
+</tr>
+<tr>
+<td>Infrastructure-level resilience</td>
+<td>Service mesh (Istio) circuit breaking</td>
+<td>Handles cross-cutting resilience without code changes</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h3 id="resilience-patterns-comparison-table">Resilience Patterns Comparison Table</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Protects Against</th>
+<th>Mechanism</th>
+<th>Requires</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Circuit Breaker</strong></td>
+<td>Cascading failures, overloading failing services</td>
+<td>State machine (Closed/Open/Half-Open)</td>
+<td>Failure threshold tuning, fallback implementation</td>
+</tr>
+<tr>
+<td><strong>Retry</strong></td>
+<td>Transient failures, network glitches</td>
+<td>Repeated attempts with backoff</td>
+<td>Idempotent operations, backoff strategy</td>
+</tr>
+<tr>
+<td><strong>Timeout</strong></td>
+<td>Slow dependencies, resource leaks</td>
+<td>Deadline-based cancellation</td>
+<td>Timeout budget allocation, deadline propagation</td>
+</tr>
+<tr>
+<td><strong>Bulkhead</strong></td>
+<td>One dependency consuming all resources</td>
+<td>Resource pool isolation</td>
+<td>Pool sizing, monitoring</td>
+</tr>
+<tr>
+<td><strong>Fallback</strong></td>
+<td>Any failure in primary path</td>
+<td>Alternative response strategy</td>
+<td>Cached data, defaults, feature flags</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h1 id="section-4-api-patterns_1">Section 4: API Patterns</h1>
+<p>API patterns define how clients interact with the microservices architecture. While individual services communicate via gRPC, Kafka, or REST, the external-facing API layer must handle cross-cutting concerns: authentication, rate limiting, request routing, response aggregation, and client-specific data shaping. This section covers the three core API patterns.</p>
+<hr>
+<h2 id="41-api-gateway">4.1 API Gateway</h2>
+<p><strong>Definition:</strong>
+An API Gateway is a single entry point for all client requests. It routes requests to the appropriate backend service, handles cross-cutting concerns (authentication, rate limiting, logging), and optionally aggregates responses from multiple services.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-31.svg" alt="Diagram 31 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Gateway Responsibilities:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Implementation</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Routing</strong></td>
+<td>Path-based, header-based, weight-based</td>
+<td><code>/api/v1/orders</code> → Order Service</td>
+</tr>
+<tr>
+<td><strong>Authentication</strong></td>
+<td>JWT validation, OAuth2, API key</td>
+<td>Validate token before forwarding</td>
+</tr>
+<tr>
+<td><strong>Rate Limiting</strong></td>
+<td>Per-user, per-IP, per-API key</td>
+<td>100 req/min for free tier</td>
+</tr>
+<tr>
+<td><strong>Request Aggregation</strong></td>
+<td>Combine multiple backend calls</td>
+<td>Product page = catalog + pricing + reviews</td>
+</tr>
+<tr>
+<td><strong>Response Caching</strong></td>
+<td>Cache GET responses by URL/headers</td>
+<td>Cache product listings for 60s</td>
+</tr>
+<tr>
+<td><strong>Protocol Translation</strong></td>
+<td>REST to gRPC, HTTP to WebSocket</td>
+<td>Client speaks REST, backend speaks gRPC</td>
+</tr>
+<tr>
+<td><strong>Load Balancing</strong></td>
+<td>Round-robin, least-connections, weighted</td>
+<td>Distribute across service instances</td>
+</tr>
+<tr>
+<td><strong>Circuit Breaking</strong></td>
+<td>Gateway-level circuit breaker</td>
+<td>Return 503 when backend is down</td>
+</tr>
+<tr>
+<td><strong>Request/Response Transform</strong></td>
+<td>Header injection, body transformation</td>
+<td>Add <code>X-Request-ID</code>, rename fields</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Rate Limiting Implementation:</strong></p>
+<pre><code>// Token Bucket Algorithm (most common)
+
+Bucket:
+  capacity: 100          // Max tokens
+  refillRate: 10/sec     // 10 tokens added per second
+  currentTokens: 100     // Starts full
+
+handleRequest(request):
+  key = request.apiKey   // or IP, userId, etc.
+  bucket = getBucket(key)
+
+  if bucket.currentTokens &gt;= 1:
+    bucket.currentTokens -= 1
+    forward(request)
+    return 200 OK
+  else:
+    return 429 Too Many Requests
+    Headers:
+      Retry-After: 1          // Seconds until bucket refills
+      X-RateLimit-Limit: 100  // Total limit
+      X-RateLimit-Remaining: 0
+      X-RateLimit-Reset: 1679529600  // Unix timestamp
+
+// Sliding Window Rate Limiting
+// More precise than token bucket for bursty traffic
+// Tracks request count in sliding time windows
+// Implementation: Redis sorted set with timestamp scores
+</code></pre>
+<p><strong>Request Aggregation:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-32.svg" alt="Diagram 32 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Real-World Example:</strong>
+Netflix uses Zuul as its API gateway, handling over 50 billion API requests per day. Zuul performs authentication, routing, load shedding, and request transformation. Amazon API Gateway is a fully managed service that handles authentication, throttling, and caching for serverless architectures.</p>
+<p><strong>When to Use API Gateway:</strong>
+- Any microservices architecture with external clients.
+- When cross-cutting concerns need to be centralized (auth, rate limiting).
+- When clients need aggregated responses from multiple services.
+- To decouple client API from internal service structure.</p>
+<p><strong>When NOT to Use API Gateway:</strong>
+- Simple monolithic applications with a single backend.
+- When the gateway becomes a bottleneck or single point of failure (mitigate with multiple gateway instances).
+- If the gateway team becomes a deployment bottleneck for all backend teams.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Centralized cross-cutting concerns</td>
+<td>Single point of failure (must be HA)</td>
+</tr>
+<tr>
+<td>Client-facing API decoupled from internals</td>
+<td>Added latency (extra network hop)</td>
+</tr>
+<tr>
+<td>Protocol translation</td>
+<td>Can become a development bottleneck</td>
+</tr>
+<tr>
+<td>Response aggregation reduces client round-trips</td>
+<td>Complex configuration management</td>
+</tr>
+<tr>
+<td>Simplified client code</td>
+<td>Risk of becoming a "God gateway" with too much logic</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Putting business logic in the gateway — it should only handle cross-cutting infrastructure concerns.
+2. Single gateway for all clients — leads to different client needs competing for gateway changes.
+3. Not scaling the gateway independently — it handles all traffic and must auto-scale.
+4. Overly aggressive caching — stale data on POST/PUT/DELETE operations.
+5. Not implementing circuit breaking at the gateway — a slow backend takes down all routes.</p>
+<hr>
+<h2 id="42-backend-for-frontend-bff">4.2 Backend-for-Frontend (BFF)</h2>
+<p><strong>Definition:</strong>
+The BFF pattern creates a dedicated backend for each client type (web, mobile, TV, partner API). Each BFF aggregates, transforms, and optimizes the response for its specific client's needs, avoiding the "one-size-fits-all" gateway problem.</p>
+<p><strong>Architecture Diagram:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-33.svg" alt="Diagram 33 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Mobile vs Web BFF Example:</strong></p>
+<pre><code>// Web BFF: GET /web/products/123
+// Returns rich data for desktop experience
+{
+  &quot;product&quot;: {
+    &quot;id&quot;: &quot;123&quot;,
+    &quot;name&quot;: &quot;Wireless Headphones&quot;,
+    &quot;description&quot;: &quot;Full description with HTML formatting...&quot;,
+    &quot;images&quot;: {
+      &quot;hero&quot;: &quot;https://cdn/img/123-hero-1200x800.jpg&quot;,
+      &quot;gallery&quot;: [&quot;https://cdn/img/123-1.jpg&quot;, &quot;...&quot;],
+      &quot;zoom&quot;: &quot;https://cdn/img/123-zoom-3000x2000.jpg&quot;
+    },
+    &quot;specifications&quot;: { /* detailed specs table */ },
+    &quot;reviews&quot;: { /* paginated reviews with full text */ },
+    &quot;relatedProducts&quot;: [ /* 12 related products */ ],
+    &quot;sellerInfo&quot;: { /* full seller profile */ }
+  }
+}
+
+// Mobile BFF: GET /mobile/products/123
+// Returns compact data for mobile experience
+{
+  &quot;product&quot;: {
+    &quot;id&quot;: &quot;123&quot;,
+    &quot;name&quot;: &quot;Wireless Headphones&quot;,
+    &quot;shortDescription&quot;: &quot;Premium wireless headphones...&quot;,
+    &quot;image&quot;: &quot;https://cdn/img/123-mobile-400x400.jpg&quot;,
+    &quot;price&quot;: &quot;$79.99&quot;,
+    &quot;rating&quot;: 4.5,
+    &quot;reviewCount&quot;: 1247,
+    &quot;inStock&quot;: true
+  }
+}
+// Smaller payload, optimized images, fewer fields
+// Mobile BFF does NOT fetch reviews, specifications, or related products
+// These are loaded on-demand via separate mobile API calls
+</code></pre>
+<p><strong>GraphQL as BFF:</strong></p>
+<pre><code>// Instead of separate BFF services, use GraphQL as a universal BFF
+// Clients query exactly what they need
+
+// Web client query (rich):
+query {
+  product(id: &quot;123&quot;) {
+    name
+    description
+    images { hero, gallery, zoom }
+    specifications { key, value }
+    reviews(first: 10) { edges { node { rating, text, author } } }
+    relatedProducts(first: 12) { name, price, image }
+    seller { name, rating, memberSince }
+  }
+}
+
+// Mobile client query (compact):
+query {
+  product(id: &quot;123&quot;) {
+    name
+    shortDescription
+    thumbnailImage
+    price
+    rating
+    reviewCount
+    inStock
+  }
+}
+
+// Same GraphQL schema, different queries per client
+// No need for separate BFF services
+</code></pre>
+<p><strong>When to Use BFF:</strong>
+- Multiple client types with significantly different data needs (web, mobile, TV).
+- When a single API gateway becomes a bottleneck due to conflicting client requirements.
+- Teams are organized by client type (web team, mobile team) and need autonomy.
+- When response payload optimization per client is important (bandwidth constraints on mobile).</p>
+<p><strong>When NOT to Use BFF:</strong>
+- Single client type (just use an API gateway).
+- When client needs are similar enough that a single API serves all.
+- Small team that cannot maintain multiple BFF services.
+- When GraphQL can serve as a universal BFF (clients shape their own queries).</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Client-optimized responses</td>
+<td>Code duplication across BFFs</td>
+</tr>
+<tr>
+<td>Independent deployment per client</td>
+<td>More services to maintain</td>
+</tr>
+<tr>
+<td>Team autonomy (web team owns web BFF)</td>
+<td>Shared logic must be factored into libraries</td>
+</tr>
+<tr>
+<td>Reduced payload size for bandwidth-constrained clients</td>
+<td>BFFs can diverge, causing feature inconsistency</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Too much shared logic across BFFs — extract it into shared libraries or downstream services.
+2. BFF doing business logic — it should only aggregate and transform, not enforce business rules.
+3. One BFF per team instead of per client type — leads to organizational BFFs, not technical ones.
+4. Not considering GraphQL first — it often eliminates the need for separate BFF services.</p>
+<p><strong>Interview Insights:</strong>
+- BFF is the answer when the interviewer says "We have web, mobile, and TV clients with different needs."
+- Compare BFF with GraphQL: "GraphQL can serve as a universal BFF where clients shape their own queries. We'd use separate BFFs only if client-specific orchestration logic is needed."</p>
+<hr>
+<h2 id="43-aggregator-pattern">4.3 Aggregator Pattern</h2>
+<p><strong>Definition:</strong>
+The aggregator pattern composes responses from multiple downstream services into a single response for the client. It is a general pattern that encompasses specific strategies: scatter-gather, chained calls, and service composition.</p>
+<p><strong>Aggregation Strategies:</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-34.svg" alt="Diagram 34 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-35.svg" alt="Diagram 35 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<p><strong>Scatter-Gather Implementation:</strong></p>
+<pre><code>// Scatter-Gather: Product Detail Page Assembly
+
+async function getProductDetailPage(productId) {
+  // Scatter: Launch all calls in parallel
+  const [catalog, pricing, inventory, reviews, recommendations] =
+    await Promise.allSettled([
+      catalogService.get(productId),           // 50ms typical
+      pricingService.get(productId),           // 30ms typical
+      inventoryService.check(productId),       // 20ms typical
+      reviewService.getSummary(productId),     // 80ms typical
+      recommendationService.get(productId),    // 100ms typical
+    ]);
+
+  // Gather: Merge results, handle partial failures
+  return {
+    product: catalog.status === 'fulfilled' ? catalog.value : null,
+    price: pricing.status === 'fulfilled' ? pricing.value : null,
+    availability: inventory.status === 'fulfilled' ? inventory.value : null,
+    reviews: reviews.status === 'fulfilled'
+      ? reviews.value
+      : { rating: null, count: null },  // Fallback for non-critical data
+    recommendations: recommendations.status === 'fulfilled'
+      ? recommendations.value
+      : [],  // Empty fallback
+  };
+
+  // Total latency = max(50, 30, 20, 80, 100) = ~100ms
+  // NOT sum(50+30+20+80+100) = 280ms (sequential would be this)
+}
+</code></pre>
+<p><strong>Chained Calls Implementation:</strong></p>
+<pre><code>// Chained: Order creation pipeline
+// Each step depends on the previous step's result
+
+async function createOrder(request) {
+  // Step 1: Validate user
+  const user = await userService.validate(request.userId);
+  // User data needed for: address validation, credit check
+
+  // Step 2: Check inventory (needs product IDs from request)
+  const availability = await inventoryService.reserve(request.items);
+  // Reservation ID needed for: order creation
+
+  // Step 3: Calculate pricing (needs items + user tier for discounts)
+  const pricing = await pricingService.calculate({
+    items: request.items,
+    userTier: user.tier,
+    promoCode: request.promoCode,
+  });
+
+  // Step 4: Authorize payment (needs pricing total)
+  const payment = await paymentService.authorize({
+    userId: user.id,
+    amount: pricing.total,
+    paymentMethod: request.paymentMethod,
+  });
+
+  // Step 5: Create order (needs everything above)
+  const order = await orderService.create({
+    userId: user.id,
+    items: availability.reservedItems,
+    pricing: pricing,
+    paymentAuth: payment.authorizationId,
+  });
+
+  return order;
+  // Total latency = sum of all sequential calls
+  // Optimization: Parallelize steps 2 and 3 (independent)
+}
+</code></pre>
+<p><strong>When to Use Aggregator:</strong>
+- Client needs data from multiple services in a single response.
+- Building composite APIs (product detail page, user dashboard).
+- When reducing client-side round-trips is important (especially for mobile).</p>
+<p><strong>When NOT to Use Aggregator:</strong>
+- When the client can make parallel calls itself (modern web browsers handle parallel requests well).
+- When aggregation logic is complex enough to warrant a full BFF.
+- When aggregation introduces a single point of failure.</p>
+<p><strong>Trade-offs:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reduced client round-trips</td>
+<td>Added complexity in aggregator</td>
+</tr>
+<tr>
+<td>Consistent data assembly</td>
+<td>Single point of failure</td>
+</tr>
+<tr>
+<td>Parallel execution reduces latency</td>
+<td>Partial failure handling is complex</td>
+</tr>
+<tr>
+<td>Centralized data transformation</td>
+<td>Aggregator can become a bottleneck</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Common Mistakes:</strong>
+1. Sequential calls when parallel is possible — scatter-gather should be the default.
+2. No partial failure handling — if one of five services fails, should the whole response fail?
+3. Aggregator doing business logic — keep it as a thin composition layer.
+4. No timeout budget — if one slow service exhausts the timeout, faster services' results are wasted.</p>
+<hr>
+<h3 id="section-4-architecture-decision-record">Section 4 — Architecture Decision Record</h3>
+<p><strong>ADR-004: API Layer Strategy</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Decision Point</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>External client entry point</td>
+<td>API Gateway (Kong/Envoy)</td>
+<td>Centralized auth, rate limiting, routing</td>
+</tr>
+<tr>
+<td>Client-specific optimization</td>
+<td>BFF for mobile + GraphQL for web</td>
+<td>Mobile needs compact payloads; web benefits from flexible queries</td>
+</tr>
+<tr>
+<td>Service composition</td>
+<td>Scatter-gather in BFF layer</td>
+<td>Parallel execution minimizes latency</td>
+</tr>
+<tr>
+<td>Partner API</td>
+<td>Dedicated partner gateway</td>
+<td>Different rate limits, auth, and SLAs</td>
+</tr>
+<tr>
+<td>Internal API between services</td>
+<td>gRPC with service mesh</td>
+<td>Type safety, performance, infrastructure-level resilience</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="api-patterns-comparison-table">API Patterns Comparison Table</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>API Gateway</th>
+<th>BFF</th>
+<th>Aggregator</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Single entry point, cross-cutting concerns</td>
+<td>Client-specific backend</td>
+<td>Compose multi-service responses</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>All clients</td>
+<td>One client type</td>
+<td>One composite API</td>
+</tr>
+<tr>
+<td><strong>Business Logic</strong></td>
+<td>None (routing/auth only)</td>
+<td>Client-specific orchestration</td>
+<td>Thin composition</td>
+</tr>
+<tr>
+<td><strong>Owned By</strong></td>
+<td>Platform/infra team</td>
+<td>Client team (web, mobile)</td>
+<td>Service team</td>
+</tr>
+<tr>
+<td><strong>Complexity</strong></td>
+<td>Configuration-heavy</td>
+<td>Code-heavy (per client)</td>
+<td>Moderate</td>
+</tr>
+<tr>
+<td><strong>When to Use</strong></td>
+<td>Always (baseline)</td>
+<td>Multiple client types with different needs</td>
+<td>Composite pages/responses</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h1 id="anti-patterns-and-pitfalls">Anti-Patterns and Pitfalls</h1>
+<p>Understanding what NOT to do is as important as knowing the correct patterns. This section catalogues the most common microservices anti-patterns encountered in production systems and interviews.</p>
+<h2 id="the-distributed-monolith">The Distributed Monolith</h2>
+<p><strong>Symptom:</strong> Services are deployed independently but are so tightly coupled that you cannot change one without deploying several others simultaneously.</p>
+<p><strong>Causes:</strong>
+- Shared database (multiple services read/write the same tables)
+- Synchronous call chains (A → B → C → D, all blocking)
+- Shared domain models (services import the same library with entity classes)
+- Lock-step deployments (all services must be at the same version)</p>
+<p><strong>Detection:</strong></p>
+<pre><code>// If your deployment pipeline looks like this, you have a distributed monolith:
+deploy:
+  - deploy service-A  (v2.3)
+  - deploy service-B  (v1.7)  # Must match A's v2.3 interface
+  - deploy service-C  (v3.1)  # Must match B's v1.7 interface
+  - run integration-tests
+  - if any fail, rollback ALL three
+
+// A true microservice deployment:
+deploy service-A v2.3:
+  - service-A is backward compatible with service-B v1.6 AND v1.7
+  - deploy independently
+  - service-A's tests pass in isolation
+</code></pre>
+<p><strong>Fix:</strong>
+- Enforce database-per-service strictly
+- Replace synchronous chains with async events where possible
+- Use API versioning and backward compatibility
+- Each service must be deployable, testable, and rollbackable independently</p>
+<h2 id="nano-services-over-decomposition">Nano-Services (Over-Decomposition)</h2>
+<p><strong>Symptom:</strong> Services are so small that the operational overhead (deployment, monitoring, networking) exceeds the value of decomposition.</p>
+<p><strong>Detection:</strong>
+- Services with fewer than 3 API endpoints
+- Services that always change together
+- 200 services for a team of 10 engineers
+- Most service calls are synchronous chains of 5+ hops</p>
+<p><strong>Fix:</strong>
+- Merge services that always change together back into a single service
+- Apply the "two-pizza team" rule: a service should be owned by a team of 5-8 engineers
+- Each service should own a meaningful bounded context, not a single entity</p>
+<h2 id="chatty-services">Chatty Services</h2>
+<p><strong>Symptom:</strong> Completing a single user request requires dozens of inter-service calls, each adding network latency.</p>
+<pre><code>// Anti-pattern: Chatty order creation
+createOrder():
+  user = userService.getUser(userId)              // 20ms
+  address = userService.getAddress(userId)         // 20ms
+  creditScore = userService.getCreditScore(userId) // 20ms
+  product1 = productService.get(sku1)              // 15ms
+  product2 = productService.get(sku2)              // 15ms
+  product3 = productService.get(sku3)              // 15ms
+  price1 = pricingService.getPrice(sku1)           // 10ms
+  price2 = pricingService.getPrice(sku2)           // 10ms
+  price3 = pricingService.getPrice(sku3)           // 10ms
+  tax = taxService.calculate(items, address)        // 25ms
+  // Total: 10 sequential calls = 160ms minimum
+  // With retries and timeouts: 300ms+
+
+// Fix: Batch APIs and parallel execution
+createOrder():
+  [user, products, prices] = await Promise.all([
+    userService.getUserFull(userId),               // 25ms (includes address, credit)
+    productService.getBatch([sku1, sku2, sku3]),   // 20ms (batch)
+    pricingService.getPriceBatch([sku1, sku2, sku3]), // 15ms (batch)
+  ]);
+  tax = taxService.calculate(items, user.address); // 25ms
+  // Total: 25ms (parallel) + 25ms (sequential) = 50ms
+</code></pre>
+<h2 id="god-service">God Service</h2>
+<p><strong>Symptom:</strong> One service has become the central hub that every other service depends on. It is involved in every transaction and is the single point of failure for the entire system.</p>
+<p><strong>Fix:</strong>
+- Identify which bounded contexts are bundled together
+- Extract bounded contexts into separate services
+- Use events instead of direct calls to reduce coupling</p>
+<hr>
+<h1 id="service-mesh-integration">Service Mesh Integration</h1>
+<p>A service mesh moves cross-cutting concerns (retries, timeouts, circuit breaking, mTLS, observability) out of application code and into infrastructure. This section covers how the patterns in this chapter interact with a service mesh.</p>
+<h2 id="service-mesh-architecture">Service Mesh Architecture</h2>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-36.svg" alt="Diagram 36 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<h2 id="patterns-handled-by-service-mesh-vs-application-code">Patterns Handled by Service Mesh vs Application Code</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Service Mesh</th>
+<th>Application Code</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Retry</strong></td>
+<td>Basic retries on 5xx/connection errors</td>
+<td>Complex retry logic (idempotency keys, retry budgets)</td>
+<td>Mesh for simple, app for complex</td>
+</tr>
+<tr>
+<td><strong>Circuit Breaker</strong></td>
+<td>Connection-level circuit breaking</td>
+<td>Business-logic-aware circuit breaking</td>
+<td>Mesh for infrastructure, app for business</td>
+</tr>
+<tr>
+<td><strong>Timeout</strong></td>
+<td>Connection and request timeouts</td>
+<td>Deadline propagation across call chains</td>
+<td>Both — mesh for outer, app for inner</td>
+</tr>
+<tr>
+<td><strong>Bulkhead</strong></td>
+<td>Connection pool limits per service</td>
+<td>Thread pool isolation, semaphore limits</td>
+<td>Both — different isolation levels</td>
+</tr>
+<tr>
+<td><strong>mTLS</strong></td>
+<td>Automatic certificate rotation and enforcement</td>
+<td>N/A</td>
+<td>Mesh exclusively</td>
+</tr>
+<tr>
+<td><strong>Load Balancing</strong></td>
+<td>Client-side LB with health checking</td>
+<td>N/A</td>
+<td>Mesh exclusively</td>
+</tr>
+<tr>
+<td><strong>Tracing</strong></td>
+<td>Automatic span creation and propagation</td>
+<td>Business context injection (order ID, user ID)</td>
+<td>Both</td>
+</tr>
+<tr>
+<td><strong>Rate Limiting</strong></td>
+<td>Per-service rate limits</td>
+<td>Per-API, per-tenant limits</td>
+<td>Mesh for service-level, app for business-level</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Key Insight:</strong> The service mesh handles infrastructure-level resilience; application code handles business-level resilience. You need both.</p>
+<hr>
+<h1 id="observability-for-distributed-patterns">Observability for Distributed Patterns</h1>
+<p>Distributed systems require distributed observability. Each pattern in this chapter generates signals that must be monitored.</p>
+<h2 id="monitoring-dashboard-template">Monitoring Dashboard Template</h2>
+<pre><code>// Essential metrics for each pattern
+
+// Circuit Breaker Dashboard
+circuit_breaker_state{service=&quot;payment&quot;, dependency=&quot;stripe&quot;} = CLOSED|OPEN|HALF_OPEN
+circuit_breaker_failure_rate{service=&quot;payment&quot;, dependency=&quot;stripe&quot;} = 0.12
+circuit_breaker_calls_total{service=&quot;payment&quot;, state=&quot;rejected&quot;} = 145
+
+// Retry Dashboard
+retry_attempts_total{service=&quot;order&quot;, target=&quot;inventory&quot;} = 3421
+retry_success_on_attempt{service=&quot;order&quot;, attempt=&quot;1&quot;} = 2800
+retry_success_on_attempt{service=&quot;order&quot;, attempt=&quot;2&quot;} = 500
+retry_success_on_attempt{service=&quot;order&quot;, attempt=&quot;3&quot;} = 100
+retry_exhausted_total{service=&quot;order&quot;} = 21
+
+// Kafka Consumer Dashboard
+kafka_consumer_lag{group=&quot;fulfillment&quot;, topic=&quot;orders&quot;} = 1523
+kafka_consumer_messages_per_sec{group=&quot;fulfillment&quot;} = 450
+kafka_consumer_rebalance_count{group=&quot;fulfillment&quot;} = 2
+
+// Saga Dashboard
+saga_in_progress{type=&quot;checkout&quot;} = 45
+saga_completed{type=&quot;checkout&quot;} = 12300
+saga_compensated{type=&quot;checkout&quot;} = 89
+saga_stuck{type=&quot;checkout&quot;, age_minutes=&quot;&gt;5&quot;} = 0  // Alert if &gt; 0
+
+// CQRS Dashboard
+cqrs_read_model_lag_seconds{model=&quot;order_list&quot;} = 0.8
+cqrs_projection_errors{model=&quot;order_list&quot;} = 0
+cqrs_read_model_rebuild_progress{model=&quot;order_list&quot;} = 100%
+</code></pre>
+<h2 id="alert-rules">Alert Rules</h2>
+<pre><code>// Critical alerts
+
+// Circuit breaker opened — a dependency is failing
+ALERT CircuitBreakerOpen
+  WHEN circuit_breaker_state == &quot;OPEN&quot;
+  FOR 1m
+  SEVERITY critical
+  MESSAGE &quot;Circuit breaker for {dependency} is OPEN in {service}&quot;
+
+// Kafka consumer falling behind
+ALERT ConsumerLagHigh
+  WHEN kafka_consumer_lag &gt; 10000
+  FOR 5m
+  SEVERITY warning
+  MESSAGE &quot;Consumer group {group} lag is {lag} on topic {topic}&quot;
+
+// Saga stuck in intermediate state
+ALERT SagaStuck
+  WHEN saga_in_progress AND saga_last_transition_age &gt; 5m
+  SEVERITY critical
+  MESSAGE &quot;Saga {saga_id} stuck in state {state} for {age}&quot;
+
+// CQRS read model stale
+ALERT ReadModelStale
+  WHEN cqrs_read_model_lag_seconds &gt; 30
+  FOR 2m
+  SEVERITY warning
+  MESSAGE &quot;Read model {model} is {lag}s behind write model&quot;
+</code></pre>
+<hr>
+<h1 id="cross-cutting-concerns">Cross-Cutting Concerns</h1>
+<h2 id="distributed-tracing">Distributed Tracing</h2>
+<p>Every request in a microservices architecture touches multiple services. Distributed tracing assigns a unique trace ID to each request and propagates it across service boundaries, creating a call tree that shows latency, errors, and dependencies.</p>
+<pre><code>// Trace propagation via headers
+// OpenTelemetry standard headers:
+traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
+//           version-traceId-spanId-flags
+
+// Each service:
+// 1. Reads traceparent from incoming request
+// 2. Creates a new span (child of incoming span)
+// 3. Propagates traceparent to downstream calls
+// 4. Reports span to tracing backend (Jaeger, Zipkin, Datadog)
+</code></pre>
+<h2 id="service-discovery">Service Discovery</h2>
+<p>Services need to find each other dynamically as instances scale up and down.</p>
+<pre><code>// Client-side discovery (Netflix Eureka model):
+// 1. Service registers itself with discovery server on startup
+// 2. Client queries discovery server for service addresses
+// 3. Client load-balances across returned addresses
+
+// Server-side discovery (Kubernetes model):
+// 1. Service registers via platform (K8s Service object)
+// 2. DNS or load balancer resolves service name to available instances
+// 3. Client calls service name, platform handles routing
+
+// DNS-based (most common in Kubernetes):
+// order-service.production.svc.cluster.local → 10.0.0.15, 10.0.0.16, 10.0.0.17
+</code></pre>
+<hr>
+<h1 id="comprehensive-pattern-interaction-map">Comprehensive Pattern Interaction Map</h1>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-37.svg" alt="Diagram 37 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<hr>
+<h1 id="practice-questions">Practice Questions</h1>
+<h2 id="beginner-level">Beginner Level</h2>
+<p><strong>Q1.</strong> What is the fundamental difference between synchronous and asynchronous communication in microservices? When would you choose one over the other?</p>
+<p><strong>Q2.</strong> Explain the circuit breaker pattern. Draw the three-state diagram and describe the transition conditions.</p>
+<p><strong>Q3.</strong> Why is "database per service" considered the default data pattern in microservices? What problem does it solve that a shared database doesn't?</p>
+<p><strong>Q4.</strong> What is the N+1 query problem in GraphQL, and how does DataLoader solve it?</p>
+<p><strong>Q5.</strong> A service call fails intermittently. Should you add a retry? What conditions must be true before retries are safe?</p>
+<h2 id="intermediate-level">Intermediate Level</h2>
+<p><strong>Q6.</strong> Design a saga for an e-commerce checkout that involves Order Service, Payment Service, Inventory Service, and Shipping Service. Show both the happy path and the compensation path when inventory reservation fails. Would you use choreography or orchestration? Justify your choice.</p>
+<p><strong>Q7.</strong> You are building a product detail page that requires data from five microservices (catalog, pricing, inventory, reviews, recommendations). The page must load in under 200ms. Design the aggregation strategy, including fallback behavior when individual services are slow or down.</p>
+<p><strong>Q8.</strong> Compare Kafka and RabbitMQ for the following use case: An order event must be consumed by the notification service, analytics service, and fulfillment service. Which would you choose and why?</p>
+<p><strong>Q9.</strong> Explain CQRS and when it provides value over a traditional single-model architecture. Design the read models for an e-commerce order system that needs to support: (a) order list by customer, (b) real-time revenue dashboard, and (c) full-text order search.</p>
+<p><strong>Q10.</strong> Your microservices architecture has a cascading timeout problem: Service A → B → C → D, each with a 5-second timeout. Total worst-case latency is 20 seconds. How do you fix this?</p>
+<h2 id="advanced-level">Advanced Level</h2>
+<p><strong>Q11.</strong> Design an event sourcing system for a banking application. Address: event schema evolution (what happens when the "TransferCreated" event adds a new "currency" field?), snapshot strategy, and projection rebuild time for an aggregate with 100,000 events.</p>
+<p><strong>Q12.</strong> You are migrating from a monolith to microservices. The monolith has a single PostgreSQL database with 200 tables. Teams have been identified, but the tables have many cross-cutting foreign keys. Design a migration strategy that maintains data consistency during the transition. Include the role of the shared database anti-pattern as a transitional step.</p>
+<p><strong>Q13.</strong> Design the resilience stack for a payment authorization service. The service calls three downstream providers (Stripe, Adyen, PayPal) and must authorize exactly once, never double-charge, and fail gracefully. Show how circuit breaker, retry, timeout, bulkhead, and fallback patterns interact.</p>
+<p><strong>Q14.</strong> An interviewer asks: "Design a notification system that sends push notifications, emails, and SMS when an order ships. The system must handle 100,000 order shipments per hour and guarantee at-least-once delivery." Walk through the communication pattern choice (Kafka vs RabbitMQ vs SQS), consumer design, idempotency strategy, and dead letter queue handling.</p>
+<p><strong>Q15.</strong> Compare API Gateway + BFF + GraphQL approaches for a company that has a web app, iOS app, Android app, and partner API. The web and mobile apps have very different data needs. The partner API has strict rate limits and different authentication. Design the API layer and justify each decision.</p>
+<p><strong>Q16.</strong> You are designing a real-time inventory system. When a customer adds an item to their cart, inventory must be temporarily reserved. The reservation expires after 15 minutes. Multiple microservices need to be aware of the reservation. Design the data flow using event sourcing, explain the event schema, and describe how you would handle the TTL-based reservation expiry.</p>
+<hr>
+<h1 id="interview-cheat-sheet">Interview Cheat Sheet</h1>
+<h2 id="pattern-selection-quick-reference">Pattern Selection Quick Reference</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Pattern</th>
+<th>Key Phrase to Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"How do services communicate?"</td>
+<td>REST (external), gRPC (internal), Kafka (async)</td>
+<td>"REST for public APIs, gRPC for internal, Kafka for event-driven"</td>
+</tr>
+<tr>
+<td>"How to handle distributed transactions?"</td>
+<td>Saga (orchestration for complex flows)</td>
+<td>"Orchestration-based saga with compensating transactions"</td>
+</tr>
+<tr>
+<td>"What if a service goes down?"</td>
+<td>Circuit breaker + fallback</td>
+<td>"Circuit breaker trips after 50% failure rate; we serve cached data"</td>
+</tr>
+<tr>
+<td>"How to handle high read-to-write ratio?"</td>
+<td>CQRS with optimized read models</td>
+<td>"Separate read models per query pattern, updated via events"</td>
+</tr>
+<tr>
+<td>"Multiple clients with different needs?"</td>
+<td>BFF or GraphQL</td>
+<td>"BFF per client type, or GraphQL as a universal BFF"</td>
+</tr>
+<tr>
+<td>"How to ensure message ordering?"</td>
+<td>Kafka with partition keys</td>
+<td>"Same entity ID as partition key guarantees ordering within partition"</td>
+</tr>
+<tr>
+<td>"How to retry safely?"</td>
+<td>Exponential backoff + jitter + idempotency</td>
+<td>"Exponential backoff with jitter; all operations must be idempotent"</td>
+</tr>
+<tr>
+<td>"How to prevent cascading timeouts?"</td>
+<td>Deadline propagation</td>
+<td>"Each service passes remaining time budget to downstream calls"</td>
+</tr>
+<tr>
+<td>"Need complete audit trail?"</td>
+<td>Event sourcing</td>
+<td>"Every state change stored as immutable event; current state derived from replay"</td>
+</tr>
+<tr>
+<td>"How to aggregate data from multiple services?"</td>
+<td>Scatter-gather aggregator</td>
+<td>"Parallel calls to all services; merge results with partial failure fallback"</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="five-minute-system-design-resilience-template">Five-Minute System Design Resilience Template</h2>
+<p>When asked to design any distributed system, apply this template:</p>
+<pre><code>1. Communication:
+   - External clients → API Gateway → REST/GraphQL
+   - Internal services → gRPC (sync) + Kafka (async)
+
+2. Data:
+   - Database per service
+   - Cross-service queries via CQRS read models
+   - Multi-service transactions via sagas
+
+3. Resilience (apply to EVERY service-to-service call):
+   - Timeout: deadline propagation from client SLA
+   - Retry: exponential backoff + jitter (only for idempotent ops)
+   - Circuit breaker: trip at 50% failure rate over 20 calls
+   - Bulkhead: isolate thread pools per dependency
+   - Fallback: cache → default → degraded → error
+
+4. API Layer:
+   - API Gateway for auth + rate limiting + routing
+   - BFF or GraphQL for client-specific optimization
+   - Scatter-gather for composite responses
+
+5. Observability:
+   - Distributed tracing (trace ID across all hops)
+   - Circuit breaker state monitoring
+   - Consumer lag monitoring (Kafka)
+   - Read model staleness monitoring (CQRS)
+</code></pre>
+<hr>
+<h1 id="detailed-worked-example-e-commerce-order-flow">Detailed Worked Example: E-Commerce Order Flow</h1>
+<p>This section ties all four pattern categories together by walking through a complete order creation flow.</p>
+<h2 id="system-context">System Context</h2>
+<p>A customer places an order on an e-commerce platform. The system must:
+1. Validate the user and shipping address
+2. Reserve inventory for all items
+3. Calculate pricing (including promotions and tax)
+4. Authorize payment
+5. Create the order
+6. Send confirmation notification
+7. Trigger fulfillment</p>
+<h2 id="pattern-application">Pattern Application</h2>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-38.svg" alt="Diagram 38 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<h2 id="failure-scenario-payment-authorization-fails">Failure Scenario: Payment Authorization Fails</h2>
+<pre><code>Saga State Machine:
+  1. UserValidated ✓
+  2. InventoryReserved ✓
+  3. PriceCalculated ✓
+  4. PaymentAuthorized ✗ (declined)
+
+Compensation:
+  3. (No compensation needed — price calculation is stateless)
+  2. ReleaseInventory → Inventory Service releases reserved stock
+  1. (No compensation needed — user validation is read-only)
+
+Result: Order not created. Client receives 402 Payment Required.
+Inventory is released. No orphaned reservations.
+</code></pre>
+<h2 id="failure-scenario-inventory-service-down">Failure Scenario: Inventory Service Down</h2>
+<pre><code>// Circuit breaker on Inventory Service is OPEN
+// Saga cannot proceed without inventory reservation
+
+Options:
+  A. Fail fast → Return &quot;Service temporarily unavailable, try again&quot;
+  B. Fallback → Check cached inventory, create order with &quot;pending verification&quot;
+     (risky: may oversell)
+  C. Queue → Queue the checkout request, process when service recovers
+     (user waits for async confirmation)
+
+// Most e-commerce systems choose Option A for checkout (correctness &gt; availability)
+// But Option B for product display (showing &quot;in stock&quot; based on cache is acceptable)
+</code></pre>
+<h2 id="latency-budget-breakdown">Latency Budget Breakdown</h2>
+<pre><code>Total budget: 3 seconds (mobile user expectation)
+
+Gateway processing:        50ms
+BFF processing:            30ms
+User validation:          100ms (with circuit breaker fast-fail)
+Inventory + Pricing:      200ms (parallel, max of the two)
+Payment authorization:    800ms (external provider, highest variance)
+Order creation:           100ms
+Response serialization:    20ms
+                         ------
+Total:                  ~1300ms typical
+Budget remaining:        1700ms (buffer for retries and variance)
+</code></pre>
+<hr>
+<h1 id="technology-selection-guide">Technology Selection Guide</h1>
+<h2 id="choosing-a-message-broker">Choosing a Message Broker</h2>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-39.svg" alt="Diagram 39 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<h2 id="choosing-a-synchronous-protocol">Choosing a Synchronous Protocol</h2>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-40.svg" alt="Diagram 40 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<h2 id="choosing-a-data-pattern">Choosing a Data Pattern</h2>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F04-microservices-distributed-patterns-diagram-41.svg" alt="Diagram 41 for Microservices &amp; Distributed Patterns" loading="lazy"></figure>
+<hr>
+<h1 id="summary">Summary</h1>
+<p>This chapter covered the four pillars of microservices architecture:</p>
+<p><strong>Communication Patterns</strong> define how services interact. REST serves external APIs with universal tooling. gRPC accelerates internal communication with binary serialization and streaming. GraphQL empowers clients to query exactly what they need. Kafka provides high-throughput event streaming with replay capability. RabbitMQ handles complex message routing. SQS offers zero-ops queuing. Pub/Sub enables fan-out decoupling. Event sourcing turns state changes into an immutable communication stream.</p>
+<p><strong>Data Patterns</strong> govern how services own and share data. Database-per-service enforces independence at the cost of cross-service query complexity. The shared database anti-pattern should be a transitional step, not a permanent architecture. Sagas replace distributed ACID transactions with choreography or orchestration and compensating transactions. Event sourcing stores complete history for audit and replay. CQRS separates read and write models for independent optimization.</p>
+<p><strong>Resilience Patterns</strong> ensure the system survives failure. Circuit breakers prevent cascading failures. Retries with exponential backoff and jitter handle transient issues. Deadline propagation keeps total latency within SLA bounds. Bulkheads isolate resource consumption per dependency. Fallback strategies keep the user experience functional during partial outages.</p>
+<p><strong>API Patterns</strong> shape the client-facing surface. API gateways centralize cross-cutting concerns. BFFs optimize responses per client type. Aggregators compose multi-service responses with parallel execution and partial failure handling.</p>
+<p>These patterns are not academic — they are the vocabulary of production microservices architecture. Every system design interview at the senior level expects fluency in applying them to concrete problems.</p>
+<hr>
+<h2 id="references-and-further-reading">References and Further Reading</h2>
+<ul>
+<li>"Building Microservices" by Sam Newman — comprehensive guide to microservice architecture patterns.</li>
+<li>"Designing Data-Intensive Applications" by Martin Kleppmann — deep coverage of distributed data patterns.</li>
+<li>"Release It!" by Michael Nygard — production resilience patterns including circuit breakers and bulkheads.</li>
+<li>"Enterprise Integration Patterns" by Gregor Hohpe — messaging pattern catalog.</li>
+<li>Netflix Tech Blog — real-world circuit breaker and resilience implementations.</li>
+<li>Kafka documentation — partitioning, consumer groups, and delivery guarantees.</li>
+<li>gRPC documentation — streaming patterns, interceptors, and deadline propagation.</li>
+<li>Microsoft Azure Architecture Center — cloud design patterns reference.</li>
+</ul>
+        </div>
+
+        <section class="chapter-pagination">
+          <a class="pagination-link pagination-link-prev" href="03-estimation-capacity-planning.html">
+            <span class="pagination-label">Previous chapter</span>
+            <strong>Estimation &amp; Capacity Planning</strong>
+          </a>
+
+          <a class="pagination-link pagination-link-home" href="../index.html">
+            <span class="pagination-label">Back to home</span>
+            <strong>System Design Mastery</strong>
+          </a>
+
+          <a class="pagination-link pagination-link-next" href="04-networking-fundamentals.html">
+            <span class="pagination-label">Next chapter</span>
+            <strong>Networking Fundamentals</strong>
+          </a>
+        </section>
+      </article>
+    </main>
+
+    <aside class="toc-column sidebar-right" data-sidebar="right">
+      <div class="toc-card">
+        <div class="sidebar-controls sidebar-controls-right">
+          <div class="sidebar-controls-copy">
+            <p class="eyebrow">On this page</p>
+            <h2>Table of contents</h2>
+          </div>
+          <button
+            class="sidebar-toggle"
+            type="button"
+            data-toggle-sidebar="right"
+            aria-label="Toggle content navigation"
+            aria-expanded="true"
+            title="Toggle content navigation"
+          >
+            <span class="toggle-icon" aria-hidden="true">«</span>
+          </button>
+        </div>
+        <span class="sidebar-mini-label" aria-hidden="true">Contents</span>
+        <div class="sidebar-content toc-panel-body">
+          <div class="toc-content">
+              <div class="toc">
+<ul>
+<li><a href="#part-context">Part Context</a></li>
+<li><a href="#overview">Overview</a><ul>
+<li><a href="#section-1-communication-patterns">Section 1 — Communication Patterns</a></li>
+<li><a href="#section-2-data-patterns">Section 2 — Data Patterns</a></li>
+<li><a href="#section-3-resilience-patterns">Section 3 — Resilience Patterns</a></li>
+<li><a href="#section-4-api-patterns">Section 4 — API Patterns</a></li>
+</ul>
+</li>
+<li><a href="#why-these-patterns-matter-in-real-systems">Why These Patterns Matter in Real Systems</a></li>
+<li><a href="#prerequisites">Prerequisites</a></li>
+<li><a href="#11-synchronous-communication">1.1 Synchronous Communication</a><ul>
+<li><a href="#111-rest-representational-state-transfer">1.1.1 REST (Representational State Transfer)</a></li>
+<li><a href="#112-grpc-google-remote-procedure-call">1.1.2 gRPC (Google Remote Procedure Call)</a></li>
+<li><a href="#113-graphql">1.1.3 GraphQL</a></li>
+<li><a href="#synchronous-communication-comparison-table">Synchronous Communication Comparison Table</a></li>
+</ul>
+</li>
+<li><a href="#12-asynchronous-communication">1.2 Asynchronous Communication</a><ul>
+<li><a href="#121-apache-kafka">1.2.1 Apache Kafka</a></li>
+<li><a href="#122-rabbitmq">1.2.2 RabbitMQ</a></li>
+<li><a href="#123-amazon-sqs">1.2.3 Amazon SQS</a></li>
+<li><a href="#asynchronous-communication-comparison-table">Asynchronous Communication Comparison Table</a></li>
+</ul>
+</li>
+<li><a href="#13-publish-subscribe-pubsub">1.3 Publish-Subscribe (Pub/Sub)</a><ul>
+<li><a href="#fan-out-pattern">Fan-Out Pattern</a></li>
+<li><a href="#topic-based-filtering">Topic-Based Filtering</a></li>
+<li><a href="#content-based-filtering">Content-Based Filtering</a></li>
+</ul>
+</li>
+<li><a href="#14-event-sourcing-as-a-communication-paradigm">1.4 Event Sourcing (as a Communication Paradigm)</a><ul>
+<li><a href="#section-1-architecture-decision-record">Section 1 — Architecture Decision Record</a></li>
+</ul>
+</li>
+<li><a href="#21-database-per-service">2.1 Database Per Service</a></li>
+<li><a href="#22-shared-database-anti-pattern">2.2 Shared Database Anti-Pattern</a></li>
+<li><a href="#23-saga-pattern">2.3 Saga Pattern</a><ul>
+<li><a href="#231-choreography-based-saga">2.3.1 Choreography-Based Saga</a></li>
+<li><a href="#232-orchestration-based-saga">2.3.2 Orchestration-Based Saga</a></li>
+</ul>
+</li>
+<li><a href="#24-event-sourcing-data-pattern">2.4 Event Sourcing (Data Pattern)</a></li>
+<li><a href="#25-cqrs-command-query-responsibility-segregation">2.5 CQRS (Command Query Responsibility Segregation)</a><ul>
+<li><a href="#section-2-architecture-decision-record">Section 2 — Architecture Decision Record</a></li>
+</ul>
+</li>
+<li><a href="#31-circuit-breaker">3.1 Circuit Breaker</a></li>
+<li><a href="#32-retry-pattern">3.2 Retry Pattern</a></li>
+<li><a href="#33-timeout-pattern">3.3 Timeout Pattern</a></li>
+<li><a href="#34-bulkhead-pattern">3.4 Bulkhead Pattern</a></li>
+<li><a href="#35-fallback-pattern">3.5 Fallback Pattern</a><ul>
+<li><a href="#resilience-patterns-combined-architecture">Resilience Patterns — Combined Architecture</a></li>
+<li><a href="#section-3-architecture-decision-record">Section 3 — Architecture Decision Record</a></li>
+<li><a href="#resilience-patterns-comparison-table">Resilience Patterns Comparison Table</a></li>
+</ul>
+</li>
+<li><a href="#41-api-gateway">4.1 API Gateway</a></li>
+<li><a href="#42-backend-for-frontend-bff">4.2 Backend-for-Frontend (BFF)</a></li>
+<li><a href="#43-aggregator-pattern">4.3 Aggregator Pattern</a><ul>
+<li><a href="#section-4-architecture-decision-record">Section 4 — Architecture Decision Record</a></li>
+</ul>
+</li>
+<li><a href="#api-patterns-comparison-table">API Patterns Comparison Table</a></li>
+<li><a href="#the-distributed-monolith">The Distributed Monolith</a></li>
+<li><a href="#nano-services-over-decomposition">Nano-Services (Over-Decomposition)</a></li>
+<li><a href="#chatty-services">Chatty Services</a></li>
+<li><a href="#god-service">God Service</a></li>
+<li><a href="#service-mesh-architecture">Service Mesh Architecture</a></li>
+<li><a href="#patterns-handled-by-service-mesh-vs-application-code">Patterns Handled by Service Mesh vs Application Code</a></li>
+<li><a href="#monitoring-dashboard-template">Monitoring Dashboard Template</a></li>
+<li><a href="#alert-rules">Alert Rules</a></li>
+<li><a href="#distributed-tracing">Distributed Tracing</a></li>
+<li><a href="#service-discovery">Service Discovery</a></li>
+<li><a href="#beginner-level">Beginner Level</a></li>
+<li><a href="#intermediate-level">Intermediate Level</a></li>
+<li><a href="#advanced-level">Advanced Level</a></li>
+<li><a href="#pattern-selection-quick-reference">Pattern Selection Quick Reference</a></li>
+<li><a href="#five-minute-system-design-resilience-template">Five-Minute System Design Resilience Template</a></li>
+<li><a href="#system-context">System Context</a></li>
+<li><a href="#pattern-application">Pattern Application</a></li>
+<li><a href="#failure-scenario-payment-authorization-fails">Failure Scenario: Payment Authorization Fails</a></li>
+<li><a href="#failure-scenario-inventory-service-down">Failure Scenario: Inventory Service Down</a></li>
+<li><a href="#latency-budget-breakdown">Latency Budget Breakdown</a></li>
+<li><a href="#choosing-a-message-broker">Choosing a Message Broker</a></li>
+<li><a href="#choosing-a-synchronous-protocol">Choosing a Synchronous Protocol</a></li>
+<li><a href="#choosing-a-data-pattern">Choosing a Data Pattern</a></li>
+<li><a href="#references-and-further-reading">References and Further Reading</a></li>
+</ul>
+</div>
+
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>Source of truth: Markdown chapters in <code>system-design-mastery/</code>.</p>
+      <p>Static output: generated for lightweight hosting on GitHub Pages, Netlify, or Vercel.</p>
+    </div>
+  </footer>
+</body>
+</html>
