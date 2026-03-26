@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
-**Position:** Chapter 41 of 47
+**Position:** Chapter 41 of 60
 
 ---
 
@@ -4984,4 +4984,4 @@ The platform that wins in cross-border payments combines operational excellence 
 
 ---
 
-*Chapter 41 of 47 — Part 5: Real-World System Design Examples*
+*Chapter 41 of 60 — Part 5: Real-World System Design Examples*

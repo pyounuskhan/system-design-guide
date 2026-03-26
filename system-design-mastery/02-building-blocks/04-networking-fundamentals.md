@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 2 - Core System Building Blocks  
-**Position:** Chapter 4 of 42  
+**Position:** Chapter 4 of 60
 **Why this part exists:** This section moves from framing to mechanics by explaining the infrastructure components that repeatedly appear in real-world systems.  
 **This chapter builds toward:** understanding request paths, latency sources, encryption overhead, and protocol-level trade-offs in distributed systems
 

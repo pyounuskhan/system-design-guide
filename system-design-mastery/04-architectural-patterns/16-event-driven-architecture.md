@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 4 - Architectural Patterns  
-**Position:** Chapter 16 of 42  
+**Position:** Chapter 16 of 60
 **Why this part exists:** This section explains the structural patterns teams use to organize services, APIs, reads, writes, and event flows as systems and organizations grow.  
 **This chapter builds toward:** reactive system design, stream-oriented thinking, and decoupled downstream evolution
 

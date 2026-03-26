@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 40 of 42  
+**Position:** Chapter 40 of 60
 **Why this part exists:** This section adds the production-grade concerns that separate a technically functioning system from a trustworthy one.  
 **This chapter builds toward:** identity flows, authorization design, token strategy, and secure-by-default architectural thinking
 

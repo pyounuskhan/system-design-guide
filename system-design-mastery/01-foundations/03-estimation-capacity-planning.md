@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 1 - Foundations of System Design  
-**Position:** Chapter 3 of 42  
+**Position:** Chapter 3 of 60
 **Why this part exists:** This opening section gives the reader the language, framing, and mental models needed to reason about systems before choosing technologies.  
 **This chapter builds toward:** credible high-level design, bottleneck identification, and interview-ready back-of-the-envelope reasoning
 

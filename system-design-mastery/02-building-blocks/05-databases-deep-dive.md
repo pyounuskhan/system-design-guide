@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 2 - Core System Building Blocks  
-**Position:** Chapter 5 of 42  
+**Position:** Chapter 5 of 60
 **Why this part exists:** This section moves from framing to mechanics by explaining the infrastructure components that repeatedly appear in real-world systems.  
 **This chapter builds toward:** data-modeling decisions, consistency trade-offs, and storage choices that reflect access patterns rather than fashion
 

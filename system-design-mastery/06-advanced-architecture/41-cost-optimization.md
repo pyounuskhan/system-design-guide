@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 41 of 42  
+**Position:** Chapter 41 of 60
 **Why this part exists:** This section teaches the final layer of architect thinking: a system is not fully designed until it is economically sustainable under real load.  
 **This chapter builds toward:** cost-aware architecture, capacity discipline, unit economics, and trade-off evaluation under budget constraints
 
