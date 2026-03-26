@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 3 - Distributed Systems Concepts  
-**Position:** Chapter 10 of 42  
+**Position:** Chapter 10 of 60
 **Why this part exists:** This section explains the trade-offs that appear once systems scale across machines, replicas, regions, and failure domains.  
 **This chapter builds toward:** reasoning about growth, elasticity, bottlenecks, and the system changes required as demand increases
 

@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
-**Position:** Chapter 19 of 42
+**Position:** Chapter 19 of 60
 **Why this part exists:** This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.
 
 ---

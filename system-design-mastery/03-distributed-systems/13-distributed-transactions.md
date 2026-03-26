@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 3 - Distributed Systems Concepts  
-**Position:** Chapter 13 of 42  
+**Position:** Chapter 13 of 60
 **Why this part exists:** This section explains the trade-offs that appear once systems scale across machines, replicas, regions, and failure domains.  
 **This chapter builds toward:** workflow correctness across services, data stores, and failure-prone business processes
 

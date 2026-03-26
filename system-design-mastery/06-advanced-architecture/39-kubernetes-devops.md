@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 39 of 42  
+**Position:** Chapter 39 of 60
 **Why this part exists:** This section focuses on how systems are actually deployed, operated, and evolved after the architecture diagram is approved.  
 **This chapter builds toward:** container orchestration, deployment safety, platform thinking, and operational delivery discipline
 

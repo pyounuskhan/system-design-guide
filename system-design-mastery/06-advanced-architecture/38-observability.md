@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 38 of 42  
+**Position:** Chapter 38 of 60
 **Why this part exists:** This section moves from designing systems that work in theory to operating systems that remain understandable, safe, and economical in production.  
 **This chapter builds toward:** production visibility, telemetry design, SLO thinking, and debuggability at scale
 

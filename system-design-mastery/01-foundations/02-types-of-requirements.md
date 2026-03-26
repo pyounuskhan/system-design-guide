@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 1 - Foundations of System Design  
-**Position:** Chapter 2 of 42  
+**Position:** Chapter 2 of 60
 **Why this part exists:** This opening section gives the reader the language, framing, and mental models needed to reason about systems before choosing technologies.  
 **This chapter builds toward:** capacity planning, component selection, interview framing, and clearer design reviews
 

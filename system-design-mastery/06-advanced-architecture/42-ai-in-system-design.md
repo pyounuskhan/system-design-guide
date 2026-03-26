@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 42 of 42  
+**Position:** Chapter 42 of 60
 **Why this part exists:** This final section expands classical system design into the emerging world of AI-assisted engineering and AI-native product architectures.  
 **This chapter builds toward:** AI-assisted architecture, LLM system design, retrieval pipelines, evaluation loops, and new trade-offs around latency, safety, and cost
 

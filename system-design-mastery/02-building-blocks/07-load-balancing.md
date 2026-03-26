@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 2 - Core System Building Blocks  
-**Position:** Chapter 7 of 42  
+**Position:** Chapter 7 of 60
 **Why this part exists:** This section moves from framing to mechanics by explaining the infrastructure components that repeatedly appear in real-world systems.  
 **This chapter builds toward:** traffic distribution, fault isolation, rollout strategy, and stateless service design
 

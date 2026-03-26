@@ -2,7 +2,7 @@
 
 ## Part Context
 **Part:** Part 4 - Architectural Patterns  
-**Position:** Chapter 17 of 42  
+**Position:** Chapter 17 of 60
 **Why this part exists:** This section explains the structural patterns teams use to organize services, APIs, reads, writes, and event flows as systems and organizations grow.  
 **This chapter builds toward:** separate read-write modeling, projection thinking, and workload-specific optimization
 
