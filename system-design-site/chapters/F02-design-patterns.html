@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>47 min read</small>
+                      <small>64 min read</small>
                     </span>
                   </a>
                 </li>
@@ -998,7 +998,7 @@
           <div class="chapter-meta-strip">
             <div class="summary-pill">
               <span class="summary-label">Reading time</span>
-              <strong>47 min read</strong>
+              <strong>64 min read</strong>
             </div>
             <div class="summary-pill">
               <span class="summary-label">Focus</span>
@@ -1019,7 +1019,7 @@
 <hr>
 <h2 id="overview">Overview</h2>
 <p>Design patterns are not copy-paste templates. They are <strong>named solutions to recurring design problems</strong> that communicate intent, reduce cognitive load, and prevent reinvention. The original 23 patterns catalogued by Gamma, Helm, Johnson, and Vlissides (the "Gang of Four") in 1994 remain foundational, but modern backend systems have evolved additional patterns that address concerns like dependency management, data access abstraction, middleware composition, and service layering.</p>
-<p>This chapter covers <strong>24 patterns</strong> across four sections:</p>
+<p>This chapter covers <strong>24 core patterns</strong> across four foundational sections, plus <strong>resilience patterns</strong> (Section 5), <strong>cloud-native patterns</strong> (Section 6), and a <strong>distributed patterns appendix</strong> (Section 7):</p>
 <h3 id="section-1-creational-patterns">Section 1 — Creational Patterns</h3>
 <p>Patterns that control object creation, ensuring flexibility and decoupling between the code that creates objects and the code that uses them:
 1. <strong>Singleton</strong> — ensuring a class has exactly one instance with a global access point.
@@ -1047,6 +1047,25 @@
 2. <strong>Service Layer Pattern</strong> — encapsulating business logic with clear transaction boundaries.
 3. <strong>Dependency Injection</strong> — supplying dependencies from outside rather than creating them internally.
 4. <strong>Middleware Pattern</strong> — composing cross-cutting concerns as a pipeline of handlers.</p>
+<h3 id="section-5-resilience-patterns">Section 5 — Resilience Patterns</h3>
+<p>Patterns that protect distributed systems from cascading failures and transient errors:
+1. <strong>Circuit Breaker</strong> — stop calling a failing service and allow it to recover.
+2. <strong>Bulkhead</strong> — isolate failure domains with separate resource pools.
+3. <strong>Retry with Exponential Backoff + Jitter</strong> — handle transient errors without thundering herds.
+4. <strong>Timeout + Deadline Propagation</strong> — enforce end-to-end latency budgets across service chains.</p>
+<h3 id="section-6-cloud-native-patterns">Section 6 — Cloud-Native Patterns</h3>
+<p>Patterns born from container orchestration and service mesh architectures:
+1. <strong>Sidecar</strong> — deploy helper containers alongside the main app (Envoy, Fluentd).
+2. <strong>Ambassador</strong> — outbound proxy for legacy services.
+3. <strong>Operator</strong> — Kubernetes custom controllers encoding operational knowledge.
+4. <strong>Init Container</strong> — sequential setup tasks before the main container starts.</p>
+<h3 id="section-7-distributed-patterns-appendix">Section 7 — Distributed Patterns (Appendix)</h3>
+<p>Patterns for distributed transactions, event-driven consistency, and exactly-once processing:
+1. <strong>Transactional Outbox</strong> — atomic DB write + event publish via outbox table.
+2. <strong>Saga</strong> — orchestration and choreography for distributed transactions.
+3. <strong>Change Data Capture (CDC)</strong> — stream database changes via WAL/binlog.
+4. <strong>Idempotent Consumer</strong> — safe duplicate message handling.
+5. <strong>Outbox + CDC Combined</strong> — production-grade guaranteed event publishing.</p>
 <p>Every pattern includes a definition, structural diagram, sequence diagram, real-world application, multi-language code examples, usage guidance, trade-offs, common mistakes, and interview insights.</p>
 <hr>
 <h2 id="why-design-patterns-matter-in-system-design">Why Design Patterns Matter in System Design</h2>
@@ -1334,6 +1353,12 @@ logger.info(&quot;Server started&quot;, { port: 3000 });
 <li><strong>When asked about connection pooling</strong>: Describe a singleton pool manager, then discuss how in Kubernetes each pod gets its own pool instance — the pod is the singleton boundary.</li>
 <li><strong>Red flag if you propose</strong>: A singleton that holds request-scoped state (user session, request context). That is a concurrency disaster.</li>
 </ul>
+<h3 id="system-scale-failure-mode">System-Scale Failure Mode</h3>
+<blockquote>
+<p><strong>When Singleton is missing or misapplied at scale:</strong></p>
+<p>A per-process singleton becomes a <strong>split-brain leader election problem</strong> in distributed systems. If 20 pods each believe they hold the "one true instance" (e.g., a scheduler, cache warmer, or cron trigger), you get duplicate work, data corruption, or resource contention. The fix is to <strong>externalize singleton semantics</strong> using a distributed lock (ZooKeeper, etcd, Redis RedLock) or a leader-election sidecar. Without this, "singleton" is a lie in any horizontally-scaled deployment.</p>
+<p><strong>Real-world incident</strong>: A payment deduplication service used an in-memory singleton to track processed transaction IDs. After scaling to 5 replicas, duplicate charges occurred because each replica maintained its own "singleton" set. The fix required moving deduplication state to Redis with distributed locking.</p>
+</blockquote>
 <hr>
 <h2 id="12-factory-method-pattern">1.2 Factory Method Pattern</h2>
 <h3 id="definition_1">Definition</h3>
@@ -2584,6 +2609,12 @@ class CachingProductProxy(ProductService):
 <li><strong>When designing a caching layer</strong>: "We use a Caching Proxy that sits between the API handler and the database service. It checks Redis first, falls back to the DB, and populates the cache on miss."</li>
 <li><strong>When discussing CDNs</strong>: "A CDN is effectively a global caching proxy — same URL interface, but requests are served from edge caches."</li>
 </ul>
+<h3 id="system-scale-failure-mode_1">System-Scale Failure Mode</h3>
+<blockquote>
+<p><strong>When Proxy is missing or misapplied at scale:</strong></p>
+<p>Without a proxy layer, every client must handle <strong>retry logic, circuit breaking, caching, and auth</strong> independently — leading to inconsistent behavior across clients and cascading failures when a downstream service degrades. In distributed systems, the absence of a proxy (API Gateway, service mesh sidecar) means no single place to enforce rate limits, collect metrics, or perform traffic shaping. The result is "thundering herd" failures where all clients hammer a recovering service simultaneously.</p>
+<p><strong>Real-world incident</strong>: A microservices deployment had 15 services calling a shared user-profile service directly. When the profile service had a slow query, all 15 callers blocked on long timeouts, exhausting their own thread pools and cascading the failure across the entire platform. An API gateway proxy with circuit breaking would have isolated the blast radius.</p>
+</blockquote>
 <hr>
 <h2 id="24-decorator-pattern">2.4 Decorator Pattern</h2>
 <h3 id="definition_8">Definition</h3>
@@ -3110,6 +3141,12 @@ bus.publish(OrderPlacedEvent(
 <li><strong>When designing a notification system</strong>: "We use the Observer pattern internally — when an order event fires, it notifies email, SMS, push, and analytics observers. For cross-service communication, we upgrade to Kafka pub/sub."</li>
 <li><strong>When asked about event-driven architecture</strong>: "Observer is the in-process foundation. At scale, we externalize it into pub/sub with Kafka for durability, ordering, and replay."</li>
 </ul>
+<h3 id="system-scale-failure-mode_2">System-Scale Failure Mode</h3>
+<blockquote>
+<p><strong>When Observer is missing or misapplied at scale:</strong></p>
+<p>An in-process Observer pattern becomes <strong>lost events in distributed systems</strong>. If the process crashes between publishing and observer notification, events are silently dropped with no delivery guarantee. In-memory observer lists do not survive restarts, and synchronous observers can cascade failures (one slow observer blocks the entire notification chain). At scale, this pattern must be replaced with a durable message broker (Kafka, SQS, RabbitMQ) that provides at-least-once delivery, dead-letter queues, and independent consumer scaling.</p>
+<p><strong>Real-world incident</strong>: An order processing service used in-process observers for inventory deduction, email notification, and analytics. When the email observer threw an exception, inventory was already deducted but the analytics observer never fired — creating data inconsistency across three systems with no audit trail.</p>
+</blockquote>
 <hr>
 <h2 id="32-strategy-pattern">3.2 Strategy Pattern</h2>
 <h3 id="definition_11">Definition</h3>
@@ -3267,6 +3304,12 @@ print(f&quot;Strategy: {result.strategy_name}, Total: ${result.total_price}, Dis
 <li><strong>When designing a pricing engine</strong>: "We use Strategy to encapsulate each pricing algorithm. Adding a new customer tier means adding a new strategy class — zero changes to the pricing engine."</li>
 <li><strong>When asked about feature flags</strong>: "Feature-flagged behavior is a Strategy pattern — the flag selects which strategy (algorithm) runs for a given user segment."</li>
 </ul>
+<h3 id="system-scale-failure-mode_3">System-Scale Failure Mode</h3>
+<blockquote>
+<p><strong>When Strategy is missing or misapplied at scale:</strong></p>
+<p>Hardcoded algorithms become <strong>impossible-to-change business logic</strong> buried in deployment pipelines. Without the Strategy pattern, changing a pricing algorithm, fraud-scoring model, or shipping-cost calculator requires a code change, PR review, CI/CD pipeline, and production deploy — a multi-hour process for what should be a runtime configuration change. At scale, this turns into "we cannot update pricing during Black Friday because the deploy takes 45 minutes and the rollback risk is too high."</p>
+<p><strong>Real-world incident</strong>: A marketplace hardcoded its commission calculation in a monolith. When regulators required a fee change in one region within 24 hours, the team discovered the calculation was copy-pasted across 12 services. Strategy pattern with externalized config would have made this a single config update.</p>
+</blockquote>
 <hr>
 <h2 id="33-command-pattern">3.3 Command Pattern</h2>
 <h3 id="definition_12">Definition</h3>
@@ -3794,6 +3837,12 @@ print(f&quot;Status: {response.status}, Body: {response.body}&quot;)
 <li><strong>When designing API middleware</strong>: "Our request pipeline is a Chain of Responsibility — auth, rate limiting, validation, and business logic are independent handlers that can be composed per route."</li>
 <li><strong>When asked about validation</strong>: "We chain validators — each checks one rule and passes to the next. Adding a new validation rule means adding a handler, not modifying existing ones."</li>
 </ul>
+<h3 id="system-scale-failure-mode_4">System-Scale Failure Mode</h3>
+<blockquote>
+<p><strong>When Chain of Responsibility is missing or misapplied at scale:</strong></p>
+<p>Without a composable middleware chain, cross-cutting concerns (auth, rate limiting, logging, validation) become <strong>scattered across every handler</strong> — copy-pasted, inconsistent, and impossible to audit. A forgotten auth check in one endpoint becomes a security vulnerability. A missing rate-limit check becomes an attack vector. At scale with 200+ endpoints, ensuring every route applies the same security policy without a Chain of Responsibility is a governance nightmare.</p>
+<p><strong>Real-world incident</strong>: A SaaS platform with 180 API endpoints had auth logic manually added to each handler. An intern created a new endpoint and forgot the auth middleware. The unauthenticated endpoint was discovered by a security researcher 3 months later. A mandatory middleware chain would have made auth opt-out (explicit skip) rather than opt-in (manual add).</p>
+</blockquote>
 <hr>
 <h1 id="section-4-modern-backend-patterns_1">Section 4: Modern Backend Patterns</h1>
 <p>These patterns have emerged from practical backend development and are not part of the original GoF catalog, but they are equally important — and arguably more commonly discussed in system design interviews.</p>
@@ -4821,6 +4870,298 @@ app.use(async (ctx, _next) =&gt; {
 </tbody>
 </table></div>
 <hr>
+<h1 id="pattern-cloud-primitive-mapping">Pattern → Cloud Primitive Mapping</h1>
+<p>Every GoF and modern pattern has a <strong>cloud-native equivalent</strong> — a managed service or infrastructure primitive that implements the same concept at distributed scale. This mapping helps you translate pattern knowledge into architecture decisions.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Cloud Primitive</th>
+<th>Example Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Observer</strong></td>
+<td>SNS / EventBridge / Pub/Sub / Event Grid</td>
+<td>Order events fan-out to email, inventory, analytics</td>
+</tr>
+<tr>
+<td><strong>Proxy</strong></td>
+<td>API Gateway / ALB / Cloud Armor / Envoy</td>
+<td>Request routing, SSL termination, rate limiting</td>
+</tr>
+<tr>
+<td><strong>Factory</strong></td>
+<td>Lambda / Cloud Functions / Cloud Run</td>
+<td>On-demand resource creation, serverless handlers</td>
+</tr>
+<tr>
+<td><strong>Strategy</strong></td>
+<td>Feature flags (LaunchDarkly) + remote config</td>
+<td>A/B testing pricing algorithms, canary routing</td>
+</tr>
+<tr>
+<td><strong>Chain of Responsibility</strong></td>
+<td>API Gateway middleware chain / Step Functions</td>
+<td>Auth → Rate limit → Validate → Route</td>
+</tr>
+<tr>
+<td><strong>Singleton</strong></td>
+<td>Managed services (RDS, ElastiCache, Cloud SQL)</td>
+<td>One connection pool per managed instance</td>
+</tr>
+<tr>
+<td><strong>Adapter</strong></td>
+<td>Glue / Integration Services / Cloud Data Fusion</td>
+<td>Legacy SOAP → REST API translation</td>
+</tr>
+<tr>
+<td><strong>Facade</strong></td>
+<td>BFF (Backend for Frontend) / GraphQL Gateway</td>
+<td>Unified mobile API over microservices</td>
+</tr>
+<tr>
+<td><strong>Decorator</strong></td>
+<td>Service mesh (Istio/Linkerd) sidecar injection</td>
+<td>mTLS, retry, tracing added transparently</td>
+</tr>
+<tr>
+<td><strong>Composite</strong></td>
+<td>AWS Organizations / GCP Folder hierarchy</td>
+<td>Nested resource groups with inherited policies</td>
+</tr>
+<tr>
+<td><strong>Command</strong></td>
+<td>SQS / Cloud Tasks / Azure Service Bus</td>
+<td>Queued async jobs with retry and DLQ</td>
+</tr>
+<tr>
+<td><strong>State</strong></td>
+<td>Step Functions / Temporal / Durable Functions</td>
+<td>Order workflow: pending → paid → shipped → delivered</td>
+</tr>
+<tr>
+<td><strong>Repository</strong></td>
+<td>DynamoDB / Firestore / Cosmos DB SDK</td>
+<td>Data access abstraction over managed NoSQL</td>
+</tr>
+<tr>
+<td><strong>Service Layer</strong></td>
+<td>ECS Task / Kubernetes Deployment</td>
+<td>Business logic containers with clear boundaries</td>
+</tr>
+<tr>
+<td><strong>Dependency Injection</strong></td>
+<td>Service mesh / sidecar injection / ConfigMaps</td>
+<td>Runtime injection of config and dependencies</td>
+</tr>
+<tr>
+<td><strong>Middleware</strong></td>
+<td>API Gateway policies / Envoy filter chain</td>
+<td>Auth, CORS, logging as composable policies</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="how-to-read-this-table">How to Read This Table</h3>
+<ul>
+<li><strong>Left column</strong> is the in-process pattern you already know.</li>
+<li><strong>Middle column</strong> is the cloud service that implements the same <em>concept</em> at infrastructure scale.</li>
+<li><strong>Right column</strong> shows a concrete scenario where the mapping applies.</li>
+<li>In interviews, say: "At the object level this is the Observer pattern; at infrastructure scale, we implement it with SNS fan-out to SQS queues."</li>
+</ul>
+<hr>
+<h1 id="worked-example-observer-becomes-pubsub">Worked Example: Observer Becomes Pub/Sub</h1>
+<p>This section takes a concrete system — <strong>order processing</strong> — and shows how the same architectural concept evolves from an in-process Observer to a distributed Pub/Sub system.</p>
+<h2 id="step-1-in-process-observer-pattern">Step 1: In-Process Observer Pattern</h2>
+<p>In a monolith, order events are dispatched to observers within the same process:</p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import List
+
+
+@dataclass
+class OrderEvent:
+    order_id: str
+    customer_id: str
+    total: float
+    items: List[str]
+
+
+class OrderObserver(ABC):
+    @abstractmethod
+    def on_order_placed(self, event: OrderEvent) -&gt; None:
+        ...
+
+
+class InventoryObserver(OrderObserver):
+    def on_order_placed(self, event: OrderEvent) -&gt; None:
+        print(f&quot;[Inventory] Reserving stock for order {event.order_id}: {event.items}&quot;)
+        # Deduct inventory in the same database transaction
+
+
+class EmailObserver(OrderObserver):
+    def on_order_placed(self, event: OrderEvent) -&gt; None:
+        print(f&quot;[Email] Sending confirmation to customer {event.customer_id}&quot;)
+        # Call email service synchronously
+
+
+class AnalyticsObserver(OrderObserver):
+    def on_order_placed(self, event: OrderEvent) -&gt; None:
+        print(f&quot;[Analytics] Recording order {event.order_id}, total=${event.total}&quot;)
+        # Write to analytics DB
+
+
+class OrderService:
+    def __init__(self):
+        self._observers: List[OrderObserver] = []
+
+    def register(self, observer: OrderObserver) -&gt; None:
+        self._observers.append(observer)
+
+    def place_order(self, event: OrderEvent) -&gt; None:
+        # Business logic: validate, persist, etc.
+        print(f&quot;Order {event.order_id} placed successfully&quot;)
+        # Notify all observers — synchronous, in-process
+        for observer in self._observers:
+            observer.on_order_placed(event)
+
+
+# Wire up
+service = OrderService()
+service.register(InventoryObserver())
+service.register(EmailObserver())
+service.register(AnalyticsObserver())
+
+# Place an order
+service.place_order(OrderEvent(
+    order_id=&quot;ORD-001&quot;, customer_id=&quot;C-42&quot;, total=99.99, items=[&quot;widget-a&quot;, &quot;widget-b&quot;]
+))
+</code></pre>
+<p><strong>What works</strong>: Simple, fast, no network hops, all in one transaction.</p>
+<p><strong>What breaks at scale</strong>: If <code>EmailObserver</code> throws, <code>AnalyticsObserver</code> never fires. If the process crashes mid-notification, events are lost. If email takes 3 seconds, the entire <code>place_order</code> call takes 3+ seconds.</p>
+<h2 id="step-2-distributed-pubsub-kafka-snssqs">Step 2: Distributed Pub/Sub (Kafka / SNS+SQS)</h2>
+<p>The same concept, externalized to a message broker:</p>
+<pre><code class="language-python">import json
+from dataclasses import dataclass, asdict
+from typing import List
+
+
+@dataclass
+class OrderEvent:
+    order_id: str
+    customer_id: str
+    total: float
+    items: List[str]
+
+
+# --- Publisher (Order Service) ---
+class OrderService:
+    def __init__(self, kafka_producer):
+        self.producer = kafka_producer
+
+    def place_order(self, event: OrderEvent) -&gt; None:
+        # Business logic: validate, persist order to DB
+        print(f&quot;Order {event.order_id} persisted to database&quot;)
+
+        # Publish event — async, non-blocking, durable
+        self.producer.send(
+            topic=&quot;order.placed&quot;,
+            key=event.order_id.encode(),
+            value=json.dumps(asdict(event)).encode(),
+            headers=[(&quot;idempotency-key&quot;, event.order_id.encode())]
+        )
+        print(f&quot;Event published to 'order.placed' topic&quot;)
+
+
+# --- Consumer: Inventory Service (separate process/container) ---
+def inventory_consumer(message):
+    event = json.loads(message.value)
+    print(f&quot;[Inventory] Reserving stock for {event['order_id']}: {event['items']}&quot;)
+    # Independent retry, independent scaling, independent failure domain
+
+
+# --- Consumer: Email Service (separate process/container) ---
+def email_consumer(message):
+    event = json.loads(message.value)
+    print(f&quot;[Email] Sending confirmation to {event['customer_id']}&quot;)
+    # If this fails, it retries independently — does NOT block inventory
+
+
+# --- Consumer: Analytics Service (separate process/container) ---
+def analytics_consumer(message):
+    event = json.loads(message.value)
+    print(f&quot;[Analytics] Recording order {event['order_id']}, total=${event['total']}&quot;)
+    # Can lag behind without affecting order placement latency
+</code></pre>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-34.svg" alt="Diagram 34 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h2 id="step-3-what-changes-in-the-transition">Step 3: What Changes in the Transition</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>In-Process Observer</th>
+<th>Distributed Pub/Sub</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Delivery guarantee</strong></td>
+<td>None — crash = lost events</td>
+<td>At-least-once (Kafka offsets, SQS visibility timeout)</td>
+</tr>
+<tr>
+<td><strong>Serialization</strong></td>
+<td>Native objects — zero overhead</td>
+<td>JSON/Avro/Protobuf — schema evolution required</td>
+</tr>
+<tr>
+<td><strong>Ordering</strong></td>
+<td>Guaranteed (synchronous loop)</td>
+<td>Per-partition ordering (Kafka), no ordering (SNS)</td>
+</tr>
+<tr>
+<td><strong>Error isolation</strong></td>
+<td>One observer failure blocks all</td>
+<td>Each consumer fails independently</td>
+</tr>
+<tr>
+<td><strong>Latency</strong></td>
+<td>Microseconds (in-process)</td>
+<td>Milliseconds to seconds (network + broker)</td>
+</tr>
+<tr>
+<td><strong>Scaling</strong></td>
+<td>Vertical only (same process)</td>
+<td>Horizontal — add consumer instances per topic</td>
+</tr>
+<tr>
+<td><strong>Replay</strong></td>
+<td>Impossible — fire and forget</td>
+<td>Possible — reset consumer offset to replay events</td>
+</tr>
+<tr>
+<td><strong>Dead letters</strong></td>
+<td>None — exception propagates</td>
+<td>DLQ captures failed messages for later inspection</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td>Stack traces in one process</td>
+<td>Distributed tracing (correlation IDs across services)</td>
+</tr>
+<tr>
+<td><strong>Idempotency</strong></td>
+<td>Not needed (single execution)</td>
+<td>Required — at-least-once means possible duplicates</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="key-takeaway">Key Takeaway</h3>
+<blockquote>
+<p>The pattern is the same — <strong>decouple producer from consumers via event notification</strong>. What changes is the infrastructure: serialization, delivery semantics, error handling, and scaling model. In interviews, articulate this evolution: "We start with Observer for simplicity, and when we need durability, independent scaling, and fault isolation, we externalize it to Kafka pub/sub."</p>
+</blockquote>
+<hr>
 <h1 id="architectural-decision-records-adrs">Architectural Decision Records (ADRs)</h1>
 <h2 id="adr-001-choosing-between-strategy-and-ifelse">ADR-001: Choosing Between Strategy and If/Else</h2>
 <p><strong>Context</strong>: The pricing engine needs to support multiple pricing algorithms that may vary by customer tier and promotional period.</p>
@@ -4958,6 +5299,927 @@ app.use(async (ctx, _next) =&gt; {
 <li><strong>Applying patterns dogmatically</strong>: "We always use Repository" — no, sometimes direct ORM access is fine for simple CRUD.</li>
 </ul>
 <hr>
+<h1 id="section-5-resilience-patterns_1">Section 5: Resilience Patterns</h1>
+<p>Resilience patterns protect distributed systems from cascading failures, transient errors, and resource exhaustion. These are <strong>first-class architectural patterns</strong> — not afterthoughts — and should be designed in from the start.</p>
+<hr>
+<h2 id="51-circuit-breaker-pattern">5.1 Circuit Breaker Pattern</h2>
+<h3 id="definition_19">Definition</h3>
+<p>The Circuit Breaker pattern prevents an application from repeatedly trying to execute an operation that is likely to fail. Like an electrical circuit breaker, it "trips" after a threshold of failures and stops sending requests to the failing service for a cooldown period, allowing it to recover.</p>
+<h3 id="state-machine">State Machine</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-35.svg" alt="Diagram 35 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="code-example">Code Example</h3>
+<pre><code class="language-python">import time
+from enum import Enum
+from dataclasses import dataclass, field
+from typing import Callable, Any, Optional
+
+
+class CircuitState(Enum):
+    CLOSED = &quot;closed&quot;        # Normal operation
+    OPEN = &quot;open&quot;            # Failing — reject requests
+    HALF_OPEN = &quot;half_open&quot;  # Testing recovery
+
+
+@dataclass
+class CircuitBreaker:
+    failure_threshold: int = 5        # Failures before opening
+    recovery_timeout: float = 30.0    # Seconds before half-open
+    success_threshold: int = 3        # Successes to close from half-open
+
+    state: CircuitState = field(default=CircuitState.CLOSED, init=False)
+    failure_count: int = field(default=0, init=False)
+    success_count: int = field(default=0, init=False)
+    last_failure_time: float = field(default=0.0, init=False)
+
+    def call(self, func: Callable, *args, **kwargs) -&gt; Any:
+        if self.state == CircuitState.OPEN:
+            if time.time() - self.last_failure_time &gt;= self.recovery_timeout:
+                self.state = CircuitState.HALF_OPEN
+                self.success_count = 0
+            else:
+                raise CircuitOpenError(
+                    f&quot;Circuit is OPEN. Retry after {self.recovery_timeout}s&quot;
+                )
+
+        try:
+            result = func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise
+
+    def _on_success(self):
+        if self.state == CircuitState.HALF_OPEN:
+            self.success_count += 1
+            if self.success_count &gt;= self.success_threshold:
+                self.state = CircuitState.CLOSED
+                self.failure_count = 0
+        else:
+            self.failure_count = 0
+
+    def _on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = time.time()
+        if self.failure_count &gt;= self.failure_threshold:
+            self.state = CircuitState.OPEN
+
+
+class CircuitOpenError(Exception):
+    pass
+</code></pre>
+<h3 id="when-to-use_19">When to Use</h3>
+<ul>
+<li>Calling external services (payment gateways, third-party APIs) that may become unavailable.</li>
+<li>Protecting downstream services from being overwhelmed by retry storms.</li>
+<li>When you need a fallback response (cached data, default value) during outages.</li>
+</ul>
+<h3 id="when-not-to-use_19">When NOT to Use</h3>
+<ul>
+<li>For in-process method calls that do not involve network or I/O.</li>
+<li>When the downstream service has no recovery mechanism (circuit breaker just delays the inevitable).</li>
+<li>For operations that must succeed or fail atomically (use retries with idempotency instead).</li>
+</ul>
+<h3 id="trade-offs_17">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prevents cascading failures</td>
+<td>Adds complexity to service calls</td>
+</tr>
+<tr>
+<td>Allows downstream services to recover</td>
+<td>Threshold tuning is empirical — too aggressive trips too early</td>
+</tr>
+<tr>
+<td>Provides fast failure (no waiting for timeout)</td>
+<td>Half-open probing can slow recovery detection</td>
+</tr>
+<tr>
+<td>Enables graceful degradation with fallbacks</td>
+<td>State must be shared across threads/instances</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="52-bulkhead-pattern">5.2 Bulkhead Pattern</h2>
+<h3 id="definition_20">Definition</h3>
+<p>The Bulkhead pattern isolates different parts of a system into independent failure domains — like watertight compartments in a ship. If one compartment floods, the others remain intact. In practice, this means <strong>separate thread pools, connection pools, or process boundaries</strong> for different downstream dependencies.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-36.svg" alt="Diagram 36 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="code-example_1">Code Example</h3>
+<pre><code class="language-python">from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from typing import Callable, Any
+
+
+class Bulkhead:
+    &quot;&quot;&quot;Isolate downstream calls with a dedicated thread pool.&quot;&quot;&quot;
+
+    def __init__(self, name: str, max_concurrent: int = 10, queue_size: int = 20):
+        self.name = name
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_concurrent,
+            thread_name_prefix=f&quot;bulkhead-{name}&quot;
+        )
+        self.max_concurrent = max_concurrent
+
+    def execute(self, func: Callable, *args, timeout: float = 5.0, **kwargs) -&gt; Any:
+        future = self._executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            future.cancel()
+            raise BulkheadTimeoutError(
+                f&quot;Bulkhead '{self.name}' call timed out after {timeout}s&quot;
+            )
+
+
+class BulkheadTimeoutError(Exception):
+    pass
+
+
+# Usage — each downstream service gets its own isolated pool
+payment_bulkhead = Bulkhead(&quot;payment&quot;, max_concurrent=10)
+inventory_bulkhead = Bulkhead(&quot;inventory&quot;, max_concurrent=10)
+email_bulkhead = Bulkhead(&quot;email&quot;, max_concurrent=5)
+
+# Payment service being slow does NOT exhaust inventory's thread pool
+# result = payment_bulkhead.execute(call_payment_service, order_id, timeout=3.0)
+</code></pre>
+<h3 id="when-to-use_20">When to Use</h3>
+<ul>
+<li>When one slow downstream service can exhaust shared resources (thread pools, connections) and affect unrelated services.</li>
+<li>In microservice architectures where each service has multiple downstream dependencies.</li>
+<li>When you need to guarantee that critical paths (checkout) are not affected by non-critical paths (recommendations).</li>
+</ul>
+<h3 id="when-not-to-use_20">When NOT to Use</h3>
+<ul>
+<li>In monoliths with a single database where all operations share the same connection pool by necessity.</li>
+<li>When the overhead of maintaining multiple pools outweighs the isolation benefit.</li>
+<li>For lightweight in-memory operations that do not block.</li>
+</ul>
+<h3 id="trade-offs_18">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fault isolation — one failure does not cascade</td>
+<td>Higher resource consumption (multiple pools)</td>
+</tr>
+<tr>
+<td>Predictable behavior under partial failure</td>
+<td>Sizing each pool requires load testing</td>
+</tr>
+<tr>
+<td>Enables independent timeouts per dependency</td>
+<td>Underutilized pools waste resources</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="53-retry-with-exponential-backoff-jitter">5.3 Retry with Exponential Backoff + Jitter</h2>
+<h3 id="definition_21">Definition</h3>
+<p>Retry with exponential backoff progressively increases the delay between retry attempts. <strong>Jitter</strong> adds randomness to prevent thundering herds — where all clients retry at the same instant after a shared failure.</p>
+<h3 id="formula">Formula</h3>
+<pre><code>delay = min(base_delay * 2^attempt + random_jitter, max_delay)
+</code></pre>
+<h3 id="code-example_2">Code Example</h3>
+<pre><code class="language-python">import time
+import random
+from typing import Callable, Any, Tuple, Type
+
+
+def retry_with_backoff(
+    func: Callable,
+    *args,
+    max_retries: int = 5,
+    base_delay: float = 0.5,
+    max_delay: float = 30.0,
+    retryable_exceptions: Tuple[Type[Exception], ...] = (IOError, TimeoutError),
+    **kwargs
+) -&gt; Any:
+    &quot;&quot;&quot;Retry with exponential backoff and full jitter.&quot;&quot;&quot;
+    for attempt in range(max_retries + 1):
+        try:
+            return func(*args, **kwargs)
+        except retryable_exceptions as e:
+            if attempt == max_retries:
+                raise  # Exhausted retries
+            # Exponential backoff with full jitter
+            exp_delay = base_delay * (2 ** attempt)
+            jittered_delay = random.uniform(0, min(exp_delay, max_delay))
+            print(f&quot;Attempt {attempt + 1} failed: {e}. Retrying in {jittered_delay:.2f}s&quot;)
+            time.sleep(jittered_delay)
+</code></pre>
+<h3 id="when-to-use_21">When to Use</h3>
+<ul>
+<li>Transient network errors (DNS failures, TCP resets, 503 responses).</li>
+<li>Rate-limited APIs that return 429 (Too Many Requests).</li>
+<li>Cloud services that have occasional availability blips.</li>
+</ul>
+<h3 id="when-not-to-use_21">When NOT to Use</h3>
+<ul>
+<li>For non-retryable errors (400 Bad Request, 401 Unauthorized, 404 Not Found).</li>
+<li>When the operation is not idempotent — retrying a non-idempotent operation can cause duplicates.</li>
+<li>When strict latency SLAs make retries unacceptable (use fallback instead).</li>
+</ul>
+<h3 id="trade-offs_19">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Handles transient failures gracefully</td>
+<td>Increases end-to-end latency on failures</td>
+</tr>
+<tr>
+<td>Jitter prevents thundering herd</td>
+<td>Retrying non-idempotent operations causes duplicates</td>
+</tr>
+<tr>
+<td>Simple to implement and widely supported</td>
+<td>Can mask persistent failures if max_retries is too high</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="54-timeout-deadline-propagation">5.4 Timeout + Deadline Propagation</h2>
+<h3 id="definition_22">Definition</h3>
+<p>Every external call must have a <strong>timeout</strong>. Deadline propagation ensures that when a request enters a system with a 5-second deadline, each downstream call inherits the <em>remaining</em> deadline rather than starting its own full timeout — preventing the total latency from exceeding the original deadline.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-37.svg" alt="Diagram 37 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="code-example_3">Code Example</h3>
+<pre><code class="language-python">import time
+from dataclasses import dataclass
+
+
+@dataclass
+class Deadline:
+    &quot;&quot;&quot;Propagatable deadline that tracks remaining time.&quot;&quot;&quot;
+    absolute_deadline: float  # Unix timestamp when deadline expires
+
+    @classmethod
+    def from_timeout(cls, timeout_seconds: float) -&gt; &quot;Deadline&quot;:
+        return cls(absolute_deadline=time.time() + timeout_seconds)
+
+    @property
+    def remaining(self) -&gt; float:
+        return max(0.0, self.absolute_deadline - time.time())
+
+    @property
+    def is_expired(self) -&gt; bool:
+        return self.remaining &lt;= 0
+
+    def for_downstream(self, overhead: float = 0.1) -&gt; &quot;Deadline&quot;:
+        &quot;&quot;&quot;Create a tighter deadline for downstream calls, reserving overhead.&quot;&quot;&quot;
+        return Deadline(absolute_deadline=self.absolute_deadline - overhead)
+
+
+# Usage
+deadline = Deadline.from_timeout(5.0)  # 5-second deadline from client
+
+# Before calling downstream service
+if deadline.is_expired:
+    raise TimeoutError(&quot;Deadline already expired before downstream call&quot;)
+
+downstream_deadline = deadline.for_downstream(overhead=0.2)
+# Pass downstream_deadline.remaining as the HTTP timeout to the next service
+</code></pre>
+<h3 id="when-to-use_22">When to Use</h3>
+<ul>
+<li>Any system with chained synchronous calls (API Gateway → Service A → Service B).</li>
+<li>When end-to-end latency SLAs must be enforced across multiple hops.</li>
+<li>In gRPC systems where deadline propagation is built into the protocol.</li>
+</ul>
+<h3 id="when-not-to-use_22">When NOT to Use</h3>
+<ul>
+<li>For fire-and-forget async operations where the caller does not wait for a response.</li>
+<li>For batch jobs where latency is measured in minutes, not seconds.</li>
+</ul>
+<h3 id="trade-offs_20">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prevents unbounded latency accumulation</td>
+<td>Requires all services to support deadline headers</td>
+</tr>
+<tr>
+<td>Enables fast failure when time is exhausted</td>
+<td>Tight deadlines can cause premature failures</td>
+</tr>
+<tr>
+<td>Provides clear SLA enforcement</td>
+<td>Overhead calculation requires profiling</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h1 id="section-6-cloud-native-patterns_1">Section 6: Cloud-Native Patterns</h1>
+<p>Cloud-native patterns emerged from container orchestration, service mesh, and microservice deployment practices. They complement GoF patterns by addressing operational concerns at the infrastructure level.</p>
+<hr>
+<h2 id="61-sidecar-pattern">6.1 Sidecar Pattern</h2>
+<h3 id="definition_23">Definition</h3>
+<p>The Sidecar pattern deploys a helper container alongside the main application container in the same pod (Kubernetes) or task (ECS). The sidecar handles cross-cutting concerns — logging, monitoring, proxying, TLS termination — without modifying the application code.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-38.svg" alt="Diagram 38 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="when-to-use_23">When to Use</h3>
+<ul>
+<li>Adding observability (logging, tracing, metrics) to services written in different languages without modifying each one.</li>
+<li>Service mesh proxies (Envoy, Linkerd-proxy) for mTLS, retries, and load balancing.</li>
+<li>Secret injection (Vault Agent sidecar) that refreshes credentials without app restarts.</li>
+</ul>
+<h3 id="when-not-to-use_23">When NOT to Use</h3>
+<ul>
+<li>For simple single-container deployments where the overhead of a sidecar is not justified.</li>
+<li>When the cross-cutting concern is language-specific and better served by a library (e.g., an in-process logging library).</li>
+<li>When latency added by the sidecar proxy (typically &lt;1ms) is unacceptable.</li>
+</ul>
+<h3 id="trade-offs_21">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Language-agnostic — works with any runtime</td>
+<td>Additional resource consumption (CPU, memory per pod)</td>
+</tr>
+<tr>
+<td>Independent lifecycle — update sidecar without redeploying app</td>
+<td>Adds operational complexity (two containers to monitor)</td>
+</tr>
+<tr>
+<td>Consistent cross-cutting behavior across all services</td>
+<td>localhost networking adds small latency</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="62-ambassador-pattern">6.2 Ambassador Pattern</h2>
+<h3 id="definition_24">Definition</h3>
+<p>The Ambassador pattern deploys a proxy container that acts as an <strong>outbound gateway</strong> for a legacy or unmodifiable service. The ambassador handles concerns the legacy service cannot: retries, circuit breaking, TLS, protocol translation.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-39.svg" alt="Diagram 39 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="when-to-use_24">When to Use</h3>
+<ul>
+<li>Wrapping legacy services that cannot be modified to support modern protocols (mTLS, gRPC, HTTP/2).</li>
+<li>Adding retry logic, circuit breaking, or rate limiting to outbound calls from services you do not own.</li>
+<li>Protocol translation (HTTP → gRPC, SOAP → REST) at the pod level.</li>
+</ul>
+<h3 id="when-not-to-use_24">When NOT to Use</h3>
+<ul>
+<li>When you control the service code and can add these features as libraries or middleware.</li>
+<li>When a service mesh already provides the same functionality cluster-wide (avoid double-proxying).</li>
+</ul>
+<h3 id="trade-offs_22">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Modernize legacy services without code changes</td>
+<td>Extra container per pod increases resource usage</td>
+</tr>
+<tr>
+<td>Encapsulates outbound complexity</td>
+<td>Must keep ambassador config in sync with downstream changes</td>
+</tr>
+<tr>
+<td>Can be shared across multiple legacy services</td>
+<td>Debugging requires inspecting ambassador logs separately</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="63-operator-pattern-kubernetes-custom-controllers">6.3 Operator Pattern (Kubernetes Custom Controllers)</h2>
+<h3 id="definition_25">Definition</h3>
+<p>The Operator pattern extends Kubernetes by encoding domain-specific operational knowledge into a <strong>custom controller</strong> that watches Custom Resource Definitions (CRDs) and reconciles actual state to desired state. Operators automate tasks that would otherwise require human operators: database provisioning, backup scheduling, failover, and scaling.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-40.svg" alt="Diagram 40 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="when-to-use_25">When to Use</h3>
+<ul>
+<li>Managing stateful applications (databases, message brokers, caches) on Kubernetes.</li>
+<li>Automating Day-2 operations: backups, failover, version upgrades, scaling.</li>
+<li>When you need declarative management of complex infrastructure ("I want a 3-node Postgres cluster with daily backups" as a YAML file).</li>
+</ul>
+<h3 id="when-not-to-use_25">When NOT to Use</h3>
+<ul>
+<li>For stateless applications where Deployments and HPA are sufficient.</li>
+<li>When a managed cloud service (RDS, Cloud SQL) already handles the operational complexity.</li>
+<li>When the operational knowledge is simple enough for a Helm chart or Kustomize overlay.</li>
+</ul>
+<h3 id="trade-offs_23">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Declarative — desired state in YAML</td>
+<td>Operators themselves are complex software that can have bugs</td>
+</tr>
+<tr>
+<td>Automates complex operational tasks</td>
+<td>Must be maintained and upgraded independently</td>
+</tr>
+<tr>
+<td>Extends Kubernetes natively</td>
+<td>CRDs add API surface area to the cluster</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="64-init-container-pattern">6.4 Init Container Pattern</h2>
+<h3 id="definition_26">Definition</h3>
+<p>Init Containers run <strong>before</strong> the main application container starts and must complete successfully. They handle one-time setup tasks: database migrations, config file generation, dependency health checks, or secret fetching.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-41.svg" alt="Diagram 41 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="when-to-use_26">When to Use</h3>
+<ul>
+<li>Running database migrations before the application starts (Flyway, Alembic).</li>
+<li>Waiting for dependent services to become healthy before starting the app.</li>
+<li>Generating config files from templates or fetching secrets from a vault.</li>
+</ul>
+<h3 id="when-not-to-use_26">When NOT to Use</h3>
+<ul>
+<li>For ongoing background tasks — use sidecar containers instead.</li>
+<li>When startup dependencies can be handled by the application itself with retry logic.</li>
+<li>When init tasks are slow enough to significantly delay pod readiness.</li>
+</ul>
+<h3 id="trade-offs_24">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Separates setup from application logic</td>
+<td>Failed init container blocks pod startup entirely</td>
+</tr>
+<tr>
+<td>Runs with different permissions than the app</td>
+<td>Adds to pod startup time</td>
+</tr>
+<tr>
+<td>Sequential execution ensures dependency ordering</td>
+<td>Cannot share process state with the main container</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h1 id="section-7-distributed-patterns-appendix_1">Section 7: Distributed Patterns (Appendix)</h1>
+<p>These patterns address the fundamental challenges of distributed transactions, event-driven consistency, and exactly-once processing. They are essential for any system that spans multiple services and databases.</p>
+<hr>
+<h2 id="71-transactional-outbox-pattern">7.1 Transactional Outbox Pattern</h2>
+<h3 id="definition_27">Definition</h3>
+<p>The Outbox pattern ensures <strong>atomicity between a database write and an event publish</strong> by writing the event to an "outbox" table in the same database transaction as the business data. A separate process (poller or CDC) then reads from the outbox and publishes to the message broker.</p>
+<h3 id="sequence-diagram_9">Sequence Diagram</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-42.svg" alt="Diagram 42 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="code-example_4">Code Example</h3>
+<pre><code class="language-python">from dataclasses import dataclass
+import json
+import uuid
+from datetime import datetime
+
+
+@dataclass
+class OutboxEntry:
+    id: str
+    aggregate_type: str
+    aggregate_id: str
+    event_type: str
+    payload: str
+    created_at: datetime
+    published: bool = False
+
+
+class OrderService:
+    def __init__(self, db_session, outbox_repo):
+        self.db = db_session
+        self.outbox = outbox_repo
+
+    def place_order(self, order_data: dict) -&gt; str:
+        &quot;&quot;&quot;Write order + outbox event in the same transaction.&quot;&quot;&quot;
+        with self.db.begin():  # Single atomic transaction
+            # 1. Write business data
+            order_id = str(uuid.uuid4())
+            self.db.execute(
+                &quot;INSERT INTO orders (id, customer_id, total) VALUES (:id, :cid, :total)&quot;,
+                {&quot;id&quot;: order_id, &quot;cid&quot;: order_data[&quot;customer_id&quot;], &quot;total&quot;: order_data[&quot;total&quot;]}
+            )
+
+            # 2. Write event to outbox (same transaction!)
+            self.outbox.insert(OutboxEntry(
+                id=str(uuid.uuid4()),
+                aggregate_type=&quot;Order&quot;,
+                aggregate_id=order_id,
+                event_type=&quot;OrderPlaced&quot;,
+                payload=json.dumps({&quot;order_id&quot;: order_id, **order_data}),
+                created_at=datetime.utcnow(),
+            ))
+
+        return order_id  # Both committed or both rolled back
+</code></pre>
+<h3 id="when-to-use_27">When to Use</h3>
+<ul>
+<li>When you need guaranteed event publishing after a database write (no "write succeeded but event lost" scenarios).</li>
+<li>When dual-write to DB + message broker is not acceptable (it is not — one can fail while the other succeeds).</li>
+<li>In event-driven architectures where consistency between the data store and event stream is critical.</li>
+</ul>
+<h3 id="when-not-to-use_27">When NOT to Use</h3>
+<ul>
+<li>When eventual consistency is not required (single-service, single-DB CRUD operations).</li>
+<li>When the volume of events is so high that the outbox table becomes a bottleneck (consider CDC directly).</li>
+<li>When you are using an event store (e.g., EventStoreDB) that natively combines storage and event streaming.</li>
+</ul>
+<h3 id="trade-offs_25">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Atomic write + publish guarantee</td>
+<td>Added complexity (outbox table + poller)</td>
+</tr>
+<tr>
+<td>No distributed transactions needed</td>
+<td>Polling introduces latency (configurable)</td>
+</tr>
+<tr>
+<td>Works with any relational database</td>
+<td>Outbox table must be cleaned up periodically</td>
+</tr>
+<tr>
+<td>At-least-once delivery (idempotent consumers required)</td>
+<td>Ordering is by outbox insertion order, not global</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="72-saga-pattern">7.2 Saga Pattern</h2>
+<h3 id="definition_28">Definition</h3>
+<p>The Saga pattern manages <strong>distributed transactions across multiple services</strong> by breaking them into a sequence of local transactions, each with a compensating action that undoes its effect if a later step fails. There are two coordination styles: <strong>orchestration</strong> (central coordinator) and <strong>choreography</strong> (event-driven, decentralized).</p>
+<h3 id="orchestration-vs-choreography">Orchestration vs Choreography</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-43.svg" alt="Diagram 43 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="code-example-orchestration">Code Example (Orchestration)</h3>
+<pre><code class="language-python">from dataclasses import dataclass
+from typing import List, Callable, Optional
+from enum import Enum
+
+
+class SagaStepStatus(Enum):
+    PENDING = &quot;pending&quot;
+    COMPLETED = &quot;completed&quot;
+    COMPENSATED = &quot;compensated&quot;
+    FAILED = &quot;failed&quot;
+
+
+@dataclass
+class SagaStep:
+    name: str
+    action: Callable
+    compensation: Callable
+    status: SagaStepStatus = SagaStepStatus.PENDING
+
+
+class SagaOrchestrator:
+    &quot;&quot;&quot;Orchestrates a sequence of steps with compensating rollback.&quot;&quot;&quot;
+
+    def __init__(self, steps: List[SagaStep]):
+        self.steps = steps
+        self.completed_steps: List[SagaStep] = []
+
+    def execute(self, context: dict) -&gt; dict:
+        for step in self.steps:
+            try:
+                print(f&quot;Executing: {step.name}&quot;)
+                step.action(context)
+                step.status = SagaStepStatus.COMPLETED
+                self.completed_steps.append(step)
+            except Exception as e:
+                print(f&quot;Step '{step.name}' failed: {e}. Starting compensation...&quot;)
+                step.status = SagaStepStatus.FAILED
+                self._compensate(context)
+                raise SagaFailedError(f&quot;Saga failed at step '{step.name}': {e}&quot;)
+        return context
+
+    def _compensate(self, context: dict):
+        &quot;&quot;&quot;Compensate completed steps in reverse order.&quot;&quot;&quot;
+        for step in reversed(self.completed_steps):
+            try:
+                print(f&quot;Compensating: {step.name}&quot;)
+                step.compensation(context)
+                step.status = SagaStepStatus.COMPENSATED
+            except Exception as e:
+                print(f&quot;Compensation failed for '{step.name}': {e}. Manual intervention required.&quot;)
+
+
+class SagaFailedError(Exception):
+    pass
+
+
+# Usage
+def reserve_inventory(ctx):
+    ctx[&quot;inventory_reserved&quot;] = True
+
+def release_inventory(ctx):
+    ctx[&quot;inventory_reserved&quot;] = False
+
+def charge_payment(ctx):
+    ctx[&quot;payment_charged&quot;] = True
+
+def refund_payment(ctx):
+    ctx[&quot;payment_charged&quot;] = False
+
+def schedule_shipping(ctx):
+    # Simulate failure
+    raise RuntimeError(&quot;Shipping service unavailable&quot;)
+
+def cancel_shipping(ctx):
+    ctx.pop(&quot;shipping_scheduled&quot;, None)
+
+
+saga = SagaOrchestrator([
+    SagaStep(&quot;Reserve Inventory&quot;, reserve_inventory, release_inventory),
+    SagaStep(&quot;Charge Payment&quot;, charge_payment, refund_payment),
+    SagaStep(&quot;Schedule Shipping&quot;, schedule_shipping, cancel_shipping),
+])
+
+# saga.execute({})  # Will fail at shipping, compensate payment then inventory
+</code></pre>
+<h3 id="when-to-use_28">When to Use</h3>
+<ul>
+<li>When a business transaction spans multiple services/databases and ACID transactions are not possible.</li>
+<li>When you need automatic rollback (compensation) across distributed services.</li>
+<li>Orchestration: when you need central visibility and control over the transaction flow.</li>
+<li>Choreography: when services are highly decoupled and you want no central coordinator.</li>
+</ul>
+<h3 id="when-not-to-use_28">When NOT to Use</h3>
+<ul>
+<li>When all operations can be performed in a single database transaction (use ACID instead).</li>
+<li>When compensating actions are not possible (e.g., you cannot "unsend" an email).</li>
+<li>When the number of steps is small enough that a simple try/catch with manual rollback is clearer.</li>
+</ul>
+<h3 id="trade-offs_26">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enables distributed transactions without 2PC</td>
+<td>Compensation logic doubles development effort</td>
+</tr>
+<tr>
+<td>Each service retains autonomy and local transactions</td>
+<td>Eventual consistency — intermediate states are visible</td>
+</tr>
+<tr>
+<td>Orchestration provides clear flow visibility</td>
+<td>Choreography can become hard to trace (event spaghetti)</td>
+</tr>
+<tr>
+<td>No global locks — better performance than 2PC</td>
+<td>Saga does not provide isolation (dirty reads possible)</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="73-change-data-capture-cdc">7.3 Change Data Capture (CDC)</h2>
+<h3 id="definition_29">Definition</h3>
+<p>Change Data Capture reads the database's <strong>transaction log</strong> (WAL in Postgres, binlog in MySQL) to capture every insert, update, and delete as an event stream. Tools like <strong>Debezium</strong> (with Kafka Connect) turn your database into an event source without modifying application code.</p>
+<h3 id="flow-diagram">Flow Diagram</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-44.svg" alt="Diagram 44 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="code-example-debezium-connector-config">Code Example (Debezium connector config)</h3>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;orders-connector&quot;,
+  &quot;config&quot;: {
+    &quot;connector.class&quot;: &quot;io.debezium.connector.postgresql.PostgresConnector&quot;,
+    &quot;database.hostname&quot;: &quot;orders-db.internal&quot;,
+    &quot;database.port&quot;: &quot;5432&quot;,
+    &quot;database.user&quot;: &quot;debezium&quot;,
+    &quot;database.password&quot;: &quot;${secrets:db-password}&quot;,
+    &quot;database.dbname&quot;: &quot;orders&quot;,
+    &quot;table.include.list&quot;: &quot;public.orders,public.order_items&quot;,
+    &quot;topic.prefix&quot;: &quot;cdc.orders&quot;,
+    &quot;plugin.name&quot;: &quot;pgoutput&quot;,
+    &quot;slot.name&quot;: &quot;debezium_orders&quot;,
+    &quot;publication.name&quot;: &quot;orders_publication&quot;,
+    &quot;transforms&quot;: &quot;unwrap&quot;,
+    &quot;transforms.unwrap.type&quot;: &quot;io.debezium.transforms.ExtractNewRecordState&quot;,
+    &quot;key.converter&quot;: &quot;org.apache.kafka.connect.json.JsonConverter&quot;,
+    &quot;value.converter&quot;: &quot;org.apache.kafka.connect.json.JsonConverter&quot;
+  }
+}
+</code></pre>
+<h3 id="when-to-use_29">When to Use</h3>
+<ul>
+<li>When you need to replicate data changes to downstream systems (search indexes, caches, analytics) without modifying the source application.</li>
+<li>When implementing the Outbox pattern without a poller — CDC reads the outbox table from the WAL directly.</li>
+<li>When building event sourcing from an existing CRUD database (strangler fig migration).</li>
+<li>For audit logging that captures every change, including those made by direct SQL.</li>
+</ul>
+<h3 id="when-not-to-use_29">When NOT to Use</h3>
+<ul>
+<li>When the database does not support logical replication or WAL access.</li>
+<li>When the schema changes frequently — CDC must handle schema evolution.</li>
+<li>When the volume of changes is low enough that application-level event publishing is simpler.</li>
+</ul>
+<h3 id="trade-offs_27">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zero application code changes</td>
+<td>Requires database-level access and WAL configuration</td>
+</tr>
+<tr>
+<td>Captures ALL changes (including direct SQL)</td>
+<td>Schema evolution requires careful handling</td>
+</tr>
+<tr>
+<td>Low latency (reads from WAL in near real-time)</td>
+<td>Adds operational complexity (Kafka Connect, connectors)</td>
+</tr>
+<tr>
+<td>No dual-write problem</td>
+<td>Connector failures can cause replication lag</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="74-idempotent-consumer-pattern">7.4 Idempotent Consumer Pattern</h2>
+<h3 id="definition_30">Definition</h3>
+<p>An idempotent consumer can process the <strong>same message multiple times</strong> and produce the same result as processing it once. This is essential in at-least-once delivery systems (Kafka, SQS) where duplicate messages are expected.</p>
+<h3 id="code-example_5">Code Example</h3>
+<pre><code class="language-python">import hashlib
+from datetime import datetime, timedelta
+from typing import Optional
+
+
+class IdempotencyStore:
+    &quot;&quot;&quot;Tracks processed message IDs to prevent duplicate processing.&quot;&quot;&quot;
+
+    def __init__(self, redis_client, ttl_hours: int = 24):
+        self.redis = redis_client
+        self.ttl = timedelta(hours=ttl_hours)
+
+    def is_duplicate(self, idempotency_key: str) -&gt; bool:
+        &quot;&quot;&quot;Check if this message was already processed.&quot;&quot;&quot;
+        return self.redis.exists(f&quot;idempotency:{idempotency_key}&quot;)
+
+    def mark_processed(self, idempotency_key: str, result: Optional[str] = None):
+        &quot;&quot;&quot;Record that this message has been processed.&quot;&quot;&quot;
+        key = f&quot;idempotency:{idempotency_key}&quot;
+        self.redis.set(key, result or &quot;processed&quot;, ex=int(self.ttl.total_seconds()))
+
+
+class OrderEventConsumer:
+    def __init__(self, idempotency_store: IdempotencyStore, order_repo):
+        self.idempotency = idempotency_store
+        self.orders = order_repo
+
+    def handle_order_placed(self, message: dict):
+        # Extract idempotency key from message headers or payload
+        idem_key = message.get(&quot;idempotency_key&quot;) or message[&quot;order_id&quot;]
+
+        if self.idempotency.is_duplicate(idem_key):
+            print(f&quot;Duplicate message for {idem_key} — skipping&quot;)
+            return  # Acknowledge without reprocessing
+
+        # Process the message (business logic)
+        self.orders.reserve_inventory(message[&quot;order_id&quot;], message[&quot;items&quot;])
+
+        # Mark as processed AFTER successful processing
+        self.idempotency.mark_processed(idem_key)
+        print(f&quot;Processed order {message['order_id']}&quot;)
+</code></pre>
+<h3 id="when-to-use_30">When to Use</h3>
+<ul>
+<li>Any consumer reading from at-least-once delivery systems (Kafka, SQS, RabbitMQ, Pub/Sub).</li>
+<li>When upstream publishers may retry and produce duplicate events.</li>
+<li>For financial transactions where double-processing has real monetary impact.</li>
+</ul>
+<h3 id="when-not-to-use_30">When NOT to Use</h3>
+<ul>
+<li>When using exactly-once delivery systems (rare in practice — most systems are at-least-once).</li>
+<li>When the operation is naturally idempotent (e.g., <code>SET status = 'shipped'</code> is already idempotent).</li>
+</ul>
+<h3 id="trade-offs_28">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Safe duplicate handling</td>
+<td>Requires an idempotency store (Redis, DB table)</td>
+</tr>
+<tr>
+<td>Enables at-least-once delivery without side effects</td>
+<td>Store must be fast and highly available</td>
+</tr>
+<tr>
+<td>Simple to implement with key-value stores</td>
+<td>TTL management — keys must expire to prevent unbounded growth</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="75-transactional-outbox-cdc-combined-pattern">7.5 Transactional Outbox + CDC Combined Pattern</h2>
+<h3 id="definition_31">Definition</h3>
+<p>The most robust pattern for guaranteed event publishing: write business data and outbox events in the same DB transaction, then use <strong>CDC (Debezium)</strong> to stream the outbox table to Kafka — eliminating the need for a custom poller.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F02-design-patterns-diagram-45.svg" alt="Diagram 45 for Design Patterns (GoF + Practical)" loading="lazy"></figure>
+<h3 id="how-it-works">How It Works</h3>
+<ol>
+<li><strong>Application</strong> writes business data + outbox entry in one DB transaction (atomicity).</li>
+<li><strong>Debezium</strong> reads the outbox table changes from the database WAL (no polling, no lag).</li>
+<li><strong>Kafka</strong> receives the event and fans out to consumer groups.</li>
+<li><strong>Each consumer</strong> uses idempotency keys to handle at-least-once delivery safely.</li>
+</ol>
+<h3 id="when-to-use_31">When to Use</h3>
+<ul>
+<li>Production-grade event-driven architectures where guaranteed delivery matters.</li>
+<li>When you already run Kafka and can add Kafka Connect/Debezium to the infrastructure.</li>
+<li>When you want sub-second latency between DB write and event availability (CDC is faster than polling).</li>
+</ul>
+<h3 id="when-not-to-use_31">When NOT to Use</h3>
+<ul>
+<li>When your infrastructure cannot support Kafka Connect / Debezium (simpler to use a polling outbox).</li>
+<li>For small-scale systems where a cron-based outbox poller is sufficient.</li>
+<li>When using a fully managed event sourcing platform (EventStoreDB, Axon Server) that handles this natively.</li>
+</ul>
+<h3 id="trade-offs_29">Trade-offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Advantage</th>
+<th>Disadvantage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Strongest consistency guarantee (atomic write + WAL-based publish)</td>
+<td>Most operationally complex (DB + Debezium + Kafka)</td>
+</tr>
+<tr>
+<td>No polling delay — events stream in near real-time</td>
+<td>Requires WAL access and replication slot configuration</td>
+</tr>
+<tr>
+<td>Scales to very high event throughput</td>
+<td>Schema evolution must be managed at both DB and Kafka levels</td>
+</tr>
+<tr>
+<td>Consumers are independently scalable and fault-tolerant</td>
+<td>Monitoring requires Kafka Connect metrics + consumer lag tracking</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
 <h1 id="practice-questions">Practice Questions</h1>
 <h2 id="conceptual-questions">Conceptual Questions</h2>
 <p><strong>Q1.</strong> You are designing a notification system that must support email, SMS, push, and Slack. A new channel (WhatsApp) will be added next quarter. Which pattern(s) would you use and why?</p>
@@ -5088,6 +6350,9 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#section-2-structural-patterns">Section 2 — Structural Patterns</a></li>
 <li><a href="#section-3-behavioral-patterns">Section 3 — Behavioral Patterns</a></li>
 <li><a href="#section-4-modern-backend-patterns">Section 4 — Modern Backend Patterns</a></li>
+<li><a href="#section-5-resilience-patterns">Section 5 — Resilience Patterns</a></li>
+<li><a href="#section-6-cloud-native-patterns">Section 6 — Cloud-Native Patterns</a></li>
+<li><a href="#section-7-distributed-patterns-appendix">Section 7 — Distributed Patterns (Appendix)</a></li>
 </ul>
 </li>
 <li><a href="#why-design-patterns-matter-in-system-design">Why Design Patterns Matter in System Design</a></li>
@@ -5106,6 +6371,7 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#trade-offs">Trade-offs</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-insights">Interview Insights</a></li>
+<li><a href="#system-scale-failure-mode">System-Scale Failure Mode</a></li>
 </ul>
 </li>
 <li><a href="#12-factory-method-pattern">1.2 Factory Method Pattern</a><ul>
@@ -5196,6 +6462,7 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#trade-offs_7">Trade-offs</a></li>
 <li><a href="#common-mistakes_5">Common Mistakes</a></li>
 <li><a href="#interview-insights_7">Interview Insights</a></li>
+<li><a href="#system-scale-failure-mode_1">System-Scale Failure Mode</a></li>
 </ul>
 </li>
 <li><a href="#24-decorator-pattern">2.4 Decorator Pattern</a><ul>
@@ -5233,6 +6500,7 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#trade-offs_10">Trade-offs</a></li>
 <li><a href="#common-mistakes_6">Common Mistakes</a></li>
 <li><a href="#interview-insights_10">Interview Insights</a></li>
+<li><a href="#system-scale-failure-mode_2">System-Scale Failure Mode</a></li>
 </ul>
 </li>
 <li><a href="#32-strategy-pattern">3.2 Strategy Pattern</a><ul>
@@ -5244,6 +6512,7 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#when-to-use_11">When to Use</a></li>
 <li><a href="#when-not-to-use_11">When NOT to Use</a></li>
 <li><a href="#interview-insights_11">Interview Insights</a></li>
+<li><a href="#system-scale-failure-mode_3">System-Scale Failure Mode</a></li>
 </ul>
 </li>
 <li><a href="#33-command-pattern">3.3 Command Pattern</a><ul>
@@ -5279,6 +6548,7 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#when-not-to-use_14">When NOT to Use</a></li>
 <li><a href="#trade-offs_12">Trade-offs</a></li>
 <li><a href="#interview-insights_14">Interview Insights</a></li>
+<li><a href="#system-scale-failure-mode_4">System-Scale Failure Mode</a></li>
 </ul>
 </li>
 <li><a href="#41-repository-pattern">4.1 Repository Pattern</a><ul>
@@ -5333,7 +6603,16 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#creational-patterns-comparison">Creational Patterns Comparison</a></li>
 <li><a href="#structural-patterns-comparison">Structural Patterns Comparison</a></li>
 <li><a href="#behavioral-patterns-comparison">Behavioral Patterns Comparison</a></li>
-<li><a href="#modern-backend-patterns-comparison">Modern Backend Patterns Comparison</a></li>
+<li><a href="#modern-backend-patterns-comparison">Modern Backend Patterns Comparison</a><ul>
+<li><a href="#how-to-read-this-table">How to Read This Table</a></li>
+</ul>
+</li>
+<li><a href="#step-1-in-process-observer-pattern">Step 1: In-Process Observer Pattern</a></li>
+<li><a href="#step-2-distributed-pubsub-kafka-snssqs">Step 2: Distributed Pub/Sub (Kafka / SNS+SQS)</a></li>
+<li><a href="#step-3-what-changes-in-the-transition">Step 3: What Changes in the Transition</a><ul>
+<li><a href="#key-takeaway">Key Takeaway</a></li>
+</ul>
+</li>
 <li><a href="#adr-001-choosing-between-strategy-and-ifelse">ADR-001: Choosing Between Strategy and If/Else</a></li>
 <li><a href="#adr-002-repository-pattern-vs-direct-orm-access">ADR-002: Repository Pattern vs Direct ORM Access</a></li>
 <li><a href="#adr-003-middleware-pipeline-vs-decorator-chain">ADR-003: Middleware Pipeline vs Decorator Chain</a></li>
@@ -5341,6 +6620,111 @@ app.use(async (ctx, _next) =&gt; {
 <li><a href="#how-patterns-come-up-in-system-design-interviews">How Patterns Come Up in System Design Interviews</a></li>
 <li><a href="#patterns-to-name-drop-at-key-moments">Patterns to Name-Drop at Key Moments</a></li>
 <li><a href="#red-flags-to-avoid">Red Flags to Avoid</a></li>
+<li><a href="#51-circuit-breaker-pattern">5.1 Circuit Breaker Pattern</a><ul>
+<li><a href="#definition_19">Definition</a></li>
+<li><a href="#state-machine">State Machine</a></li>
+<li><a href="#code-example">Code Example</a></li>
+<li><a href="#when-to-use_19">When to Use</a></li>
+<li><a href="#when-not-to-use_19">When NOT to Use</a></li>
+<li><a href="#trade-offs_17">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#52-bulkhead-pattern">5.2 Bulkhead Pattern</a><ul>
+<li><a href="#definition_20">Definition</a></li>
+<li><a href="#code-example_1">Code Example</a></li>
+<li><a href="#when-to-use_20">When to Use</a></li>
+<li><a href="#when-not-to-use_20">When NOT to Use</a></li>
+<li><a href="#trade-offs_18">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#53-retry-with-exponential-backoff-jitter">5.3 Retry with Exponential Backoff + Jitter</a><ul>
+<li><a href="#definition_21">Definition</a></li>
+<li><a href="#formula">Formula</a></li>
+<li><a href="#code-example_2">Code Example</a></li>
+<li><a href="#when-to-use_21">When to Use</a></li>
+<li><a href="#when-not-to-use_21">When NOT to Use</a></li>
+<li><a href="#trade-offs_19">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#54-timeout-deadline-propagation">5.4 Timeout + Deadline Propagation</a><ul>
+<li><a href="#definition_22">Definition</a></li>
+<li><a href="#code-example_3">Code Example</a></li>
+<li><a href="#when-to-use_22">When to Use</a></li>
+<li><a href="#when-not-to-use_22">When NOT to Use</a></li>
+<li><a href="#trade-offs_20">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#61-sidecar-pattern">6.1 Sidecar Pattern</a><ul>
+<li><a href="#definition_23">Definition</a></li>
+<li><a href="#when-to-use_23">When to Use</a></li>
+<li><a href="#when-not-to-use_23">When NOT to Use</a></li>
+<li><a href="#trade-offs_21">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#62-ambassador-pattern">6.2 Ambassador Pattern</a><ul>
+<li><a href="#definition_24">Definition</a></li>
+<li><a href="#when-to-use_24">When to Use</a></li>
+<li><a href="#when-not-to-use_24">When NOT to Use</a></li>
+<li><a href="#trade-offs_22">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#63-operator-pattern-kubernetes-custom-controllers">6.3 Operator Pattern (Kubernetes Custom Controllers)</a><ul>
+<li><a href="#definition_25">Definition</a></li>
+<li><a href="#when-to-use_25">When to Use</a></li>
+<li><a href="#when-not-to-use_25">When NOT to Use</a></li>
+<li><a href="#trade-offs_23">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#64-init-container-pattern">6.4 Init Container Pattern</a><ul>
+<li><a href="#definition_26">Definition</a></li>
+<li><a href="#when-to-use_26">When to Use</a></li>
+<li><a href="#when-not-to-use_26">When NOT to Use</a></li>
+<li><a href="#trade-offs_24">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#71-transactional-outbox-pattern">7.1 Transactional Outbox Pattern</a><ul>
+<li><a href="#definition_27">Definition</a></li>
+<li><a href="#sequence-diagram_9">Sequence Diagram</a></li>
+<li><a href="#code-example_4">Code Example</a></li>
+<li><a href="#when-to-use_27">When to Use</a></li>
+<li><a href="#when-not-to-use_27">When NOT to Use</a></li>
+<li><a href="#trade-offs_25">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#72-saga-pattern">7.2 Saga Pattern</a><ul>
+<li><a href="#definition_28">Definition</a></li>
+<li><a href="#orchestration-vs-choreography">Orchestration vs Choreography</a></li>
+<li><a href="#code-example-orchestration">Code Example (Orchestration)</a></li>
+<li><a href="#when-to-use_28">When to Use</a></li>
+<li><a href="#when-not-to-use_28">When NOT to Use</a></li>
+<li><a href="#trade-offs_26">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#73-change-data-capture-cdc">7.3 Change Data Capture (CDC)</a><ul>
+<li><a href="#definition_29">Definition</a></li>
+<li><a href="#flow-diagram">Flow Diagram</a></li>
+<li><a href="#code-example-debezium-connector-config">Code Example (Debezium connector config)</a></li>
+<li><a href="#when-to-use_29">When to Use</a></li>
+<li><a href="#when-not-to-use_29">When NOT to Use</a></li>
+<li><a href="#trade-offs_27">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#74-idempotent-consumer-pattern">7.4 Idempotent Consumer Pattern</a><ul>
+<li><a href="#definition_30">Definition</a></li>
+<li><a href="#code-example_5">Code Example</a></li>
+<li><a href="#when-to-use_30">When to Use</a></li>
+<li><a href="#when-not-to-use_30">When NOT to Use</a></li>
+<li><a href="#trade-offs_28">Trade-offs</a></li>
+</ul>
+</li>
+<li><a href="#75-transactional-outbox-cdc-combined-pattern">7.5 Transactional Outbox + CDC Combined Pattern</a><ul>
+<li><a href="#definition_31">Definition</a></li>
+<li><a href="#how-it-works">How It Works</a></li>
+<li><a href="#when-to-use_31">When to Use</a></li>
+<li><a href="#when-not-to-use_31">When NOT to Use</a></li>
+<li><a href="#trade-offs_29">Trade-offs</a></li>
+</ul>
+</li>
 <li><a href="#conceptual-questions">Conceptual Questions</a></li>
 <li><a href="#scenario-based-questions">Scenario-Based Questions</a></li>
 <li><a href="#further-reading">Further Reading</a></li>
