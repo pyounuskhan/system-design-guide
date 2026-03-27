@@ -20,7 +20,7 @@ The battle-tested rules that guide code structure: SOLID, DRY, KISS, YAGNI, Sepa
 The craft of writing code that humans can read, review, and refactor: clean code habits, naming conventions for APIs and databases, refactoring patterns, and modularity metrics.
 
 ### Section 3 — System-Level Principles
-The architectural forces that shape distributed systems: loose coupling, high cohesion, idempotency, statelessness, fault isolation, backward compatibility, and extensibility. Each includes Mermaid diagrams, real-world case studies, and concrete implementation strategies.
+The architectural forces that shape distributed systems: loose coupling, high cohesion, idempotency, statelessness, fault isolation, backward compatibility, extensibility, operations-as-code / SRE error budgets, and security-by-design / zero trust. Each includes Mermaid diagrams, real-world case studies, and concrete implementation strategies.
 
 The chapter closes with Architecture Decision Records, an interview angle guide, an evolution roadmap, and 15+ practice questions.
 
@@ -31,7 +31,7 @@ The chapter closes with Architecture Decision Records, an interview angle guide,
 - Every system design interview begins with implicit assumptions about principle literacy. Candidates who can name the principle they are applying ("I'm choosing stateless services here to enable horizontal scaling") demonstrate senior-level reasoning.
 - Principles act as a **shared language** across teams. When a code reviewer says "this violates SRP," both parties know the conversation is about responsibility boundaries, not personal preference.
 - Principles create **guardrails for trade-off analysis**. Without YAGNI, teams gold-plate. Without extensibility thinking, teams paint themselves into corners. The tension between principles is where real engineering happens.
-- Large-scale system failures — from Knight Capital's $440M loss to Cloudflare's global outage — can often be traced to principle violations: tight coupling, missing idempotency, insufficient fault isolation.
+- Large-scale system failures — from Knight Capital's $440M loss [Source: SEC Report, 2013] to Cloudflare's global outage [Source: Cloudflare Blog, 2019] — can often be traced to principle violations: tight coupling, missing idempotency, insufficient fault isolation.
 - Understanding principles lets engineers reason about systems they have never built before, which is exactly the skill tested in system design interviews.
 
 ---
@@ -1537,6 +1537,8 @@ graph LR
 
 - LoD is the principle behind the "API Gateway" discussion. When an interviewer asks why you place a gateway between clients and services, cite LoD: "Clients should not need to know the internal service topology."
 
+> **Key Takeaway — Section 1:** SOLID, DRY, KISS, YAGNI, Separation of Concerns, Composition over Inheritance, and the Law of Demeter form the foundation of every well-designed system. They are not rules to apply mechanically but forces to balance: YAGNI tempers OCP, DRY must not create coupling, and SRP boundaries should follow stakeholder lines. In interviews, naming the principle behind each decision signals senior-level reasoning.
+
 ---
 
 # SECTION 2: Code-Level Design
@@ -2023,6 +2025,8 @@ graph TB
 ```
 
 The "utils" package is a classic example of **coincidental cohesion** — unrelated elements grouped because no one knew where else to put them. Every element in it should migrate to a domain-specific module.
+
+> **Key Takeaway — Section 2:** Clean code is not aesthetic preference — it is an economic decision. Good naming eliminates comments, low cognitive complexity reduces debugging time, consistent conventions accelerate onboarding, and high-cohesion modules make refactoring safe. Measure modularity with coupling and cohesion metrics rather than gut feeling.
 
 ---
 
@@ -3026,6 +3030,154 @@ pipeline.use(auth_middleware)
 
 ---
 
+## 3.8 Operations as Code and SRE Error Budgets
+
+### Definition
+
+Operations as Code (also known as Infrastructure as Code, or IaC) treats infrastructure provisioning, configuration, and operational procedures as version-controlled, peer-reviewed, and tested code artifacts rather than manual runbook steps.
+
+SRE Error Budgets formalize the balance between reliability and feature velocity: the error budget is `1 - SLO`. If the SLO is 99.9%, the error budget is 0.1% of total time (approximately 8.7 hours per year). As long as the budget has headroom, teams ship features; when the budget is exhausted, teams focus on reliability.
+
+### Why It Matters in System Design
+
+- **IaC as a design principle:** Manually provisioned infrastructure is a form of hidden coupling — the system's behavior depends on undocumented state. IaC makes infrastructure reproducible, auditable, and testable.
+- **Error budgets resolve the reliability-vs-velocity tension.** Without an error budget, reliability and product teams are in perpetual conflict. The error budget provides a shared, data-driven decision framework.
+- **Toil elimination** is the SRE principle that operational work which is manual, repetitive, automatable, and scales linearly with system growth should be systematically eliminated. Toil is the operational equivalent of technical debt.
+
+### Error Budget Decision Flow
+
+```mermaid
+flowchart TD
+    START["Measure SLI Against SLO"] --> CHECK{"Error Budget\nRemaining?"}
+    CHECK -- "Budget > 0" --> SHIP["Ship Features\n& Experiments"]
+    CHECK -- "Budget Exhausted" --> FREEZE["Feature Freeze:\nFocus on Reliability"]
+    SHIP --> MONITOR["Monitor SLI\nContinuously"]
+    FREEZE --> FIX["Invest in:\n- Automation\n- Redundancy\n- Testing"]
+    FIX --> MONITOR
+    MONITOR --> START
+
+    style CHECK fill:#FFF3E0,stroke:#E65100
+    style SHIP fill:#E8F5E9,stroke:#2E7D32
+    style FREEZE fill:#FFEBEE,stroke:#B71C1C
+    style FIX fill:#E3F2FD,stroke:#1565C0
+```
+
+### Infrastructure as Code Principles
+
+| Principle | Description | Example |
+|---|---|---|
+| **Declarative over imperative** | Describe the desired state, not the steps to get there | Terraform HCL, Kubernetes YAML |
+| **Idempotent applies** | Running the same IaC twice produces the same result | `terraform apply` converges to desired state |
+| **Version-controlled** | All infrastructure changes go through pull requests | GitOps workflow with ArgoCD |
+| **Tested** | Infrastructure code has unit and integration tests | `terratest`, `checkov` for policy checks |
+| **Immutable infrastructure** | Replace instances rather than patching in place | AMI baking, container image promotion |
+
+### Toil Elimination Criteria
+
+Work qualifies as toil if it meets ALL of the following:
+
+1. **Manual** — a human performs the steps
+2. **Repetitive** — the same task recurs
+3. **Automatable** — a machine could do it
+4. **Reactive** — triggered by an event, not proactive
+5. **No enduring value** — does not permanently improve the system
+6. **Scales linearly** — effort grows with system size
+
+### Trade-offs
+
+| Benefit | Cost |
+|---|---|
+| Reproducible environments | Learning curve for IaC tools |
+| Auditable change history | Initial setup investment |
+| Data-driven reliability decisions (error budgets) | Requires mature monitoring and SLI/SLO definition |
+| Reduced toil frees engineering time | Automation itself requires maintenance |
+
+### Interview Insights
+
+- When asked about deployment strategy, mention IaC: "All infrastructure is defined in Terraform and deployed via a GitOps pipeline — no manual changes."
+- When discussing reliability targets, introduce error budgets: "We set a 99.95% SLO and use the error budget to decide when to ship features versus invest in reliability."
+
+---
+
+## 3.9 Security-by-Design and Zero Trust
+
+### Definition
+
+Security-by-Design treats security as a foundational architectural principle, not a bolt-on phase. **Zero Trust** is the security model that assumes no implicit trust based on network location, identity, or previous authentication — every request must be verified.
+
+> Never trust, always verify.
+
+### Why It Matters in System Design
+
+- Traditional perimeter-based security ("castle and moat") fails in cloud-native, microservice architectures where the network boundary is porous and services communicate across trust zones.
+- Security breaches are among the most expensive system failures. Treating security as a first-class design principle prevents the most common classes of vulnerabilities at the architectural level.
+- **Shift-left security** means integrating security practices early in the development lifecycle (design, code, CI) rather than only at deployment or in production.
+
+### Zero Trust Core Tenets
+
+1. **Verify explicitly** — Authenticate and authorize every request based on all available data (identity, device, location, behavior).
+2. **Least-privilege access** — Grant the minimum permissions needed, with just-in-time and just-enough access.
+3. **Assume breach** — Design systems to limit blast radius when (not if) a component is compromised.
+
+### Zero Trust Verification Flow
+
+```mermaid
+flowchart LR
+    REQ["Incoming Request"] --> AUTHN{"Authenticate\nIdentity"}
+    AUTHN -- "Valid Token" --> AUTHZ{"Authorize\nPermission"}
+    AUTHN -- "Invalid" --> DENY1["Deny\n(401)"]
+    AUTHZ -- "Permitted" --> CONTEXT{"Verify Context:\nDevice, Location,\nBehavior"}
+    AUTHZ -- "Forbidden" --> DENY2["Deny\n(403)"]
+    CONTEXT -- "Trusted" --> ALLOW["Allow +\nLog + Monitor"]
+    CONTEXT -- "Anomalous" --> MFA["Step-Up\nVerification"]
+    MFA -- "Passed" --> ALLOW
+    MFA -- "Failed" --> DENY3["Deny + Alert"]
+
+    style ALLOW fill:#E8F5E9,stroke:#2E7D32
+    style DENY1 fill:#FFEBEE,stroke:#B71C1C
+    style DENY2 fill:#FFEBEE,stroke:#B71C1C
+    style DENY3 fill:#FFEBEE,stroke:#B71C1C
+```
+
+### Defense in Depth Layers
+
+| Layer | What It Protects | Examples |
+|---|---|---|
+| **Network** | Communication channels | mTLS between services, network policies, service mesh |
+| **Identity** | Who is making the request | OAuth 2.0 / OIDC, short-lived tokens, workload identity |
+| **Application** | Business logic | Input validation, parameterized queries, CSRF tokens |
+| **Data** | Stored and in-transit data | Encryption at rest (AES-256), encryption in transit (TLS 1.3) |
+| **Monitoring** | Detection and response | Audit logs, anomaly detection, SIEM, automated response |
+
+### Shift-Left Security Practices
+
+| Practice | Phase | Tool Examples |
+|---|---|---|
+| Threat modeling | Design | STRIDE, PASTA, attack trees |
+| Static analysis (SAST) | Code | Semgrep, CodeQL, SonarQube |
+| Dependency scanning (SCA) | Build | Snyk, Dependabot, Trivy |
+| Secret detection | Code / CI | git-secrets, truffleHog, detect-secrets |
+| Policy-as-code | Deploy | OPA/Rego, Kyverno, Sentinel |
+| Runtime protection (RASP) | Production | WAF, runtime anomaly detection |
+
+### Trade-offs
+
+| Benefit | Cost |
+|---|---|
+| Reduced breach blast radius | Increased latency from per-request verification |
+| Compliance with SOC2, HIPAA, PCI | More complex infrastructure (service mesh, PKI) |
+| Defense against lateral movement | Developer experience friction (secret management, auth flows) |
+| Early vulnerability detection (shift-left) | Tooling and training investment |
+
+### Interview Insights
+
+- When designing any system with authentication, mention Zero Trust: "Service-to-service communication uses mTLS, and every request is authorized against an RBAC policy — no service trusts another implicitly."
+- When asked about security, frame it as a layered principle: "I apply defense in depth — network isolation, identity verification, application-level validation, data encryption, and monitoring — so that no single layer's failure exposes the system."
+
+> **Key Takeaway — Section 3:** System-level principles — loose coupling, high cohesion, idempotency, statelessness, fault isolation, backward compatibility, extensibility, operations-as-code, SRE error budgets, and zero trust security — are the architectural equivalents of the code-level principles in Section 1. They govern how services communicate, fail, evolve, scale, and stay secure. In every system design interview, explicitly naming these principles when justifying decisions separates senior candidates from junior ones.
+
+---
+
 # Architecture Decision Records (ADRs)
 
 ADRs document the reasoning behind significant architectural decisions. They serve as organizational memory — when a new engineer asks "Why do we use event sourcing for orders?" the ADR provides the answer.
@@ -3267,6 +3419,53 @@ graph LR
 **Q16.** Compare composition over inheritance at the code level and at the system level. Provide examples of each.
 
 **Expected answer:** Code level: instead of a `LoggingEmailSender extends EmailSender` hierarchy, compose a `LoggingDecorator` with an `EmailSender`. System level: instead of building a monolithic service that inherits features by copying code from other services, compose independent services (order, payment, inventory) that communicate through APIs and events. The principle is the same: build complex behavior by combining simple, independent components rather than building deep hierarchies.
+
+---
+
+## Principles for Architects — Executive Checklist
+
+Use this one-page checklist as a quick reference to evaluate whether your architecture respects the key principles covered in this chapter.
+
+| Principle | One-Line Definition | When to Apply | Common Violation Signal |
+|---|---|---|---|
+| **SRP** | One module, one reason to change | Service boundary decisions, class design | A change to billing logic forces redeploying the auth service |
+| **OCP** | Open for extension, closed for modification | Adding new variants (payment methods, channels) | Every new feature requires modifying a central `if/else` block |
+| **LSP** | Subtypes must honor base type contracts | API versioning, interface hierarchies | A v2 endpoint breaks v1 consumers |
+| **ISP** | No client should depend on methods it does not use | API surface design, SDK design | Mobile clients download 50 fields when they need 3 |
+| **DIP** | Depend on abstractions, not implementations | Service wiring, testability | Unit tests require a live database connection |
+| **DRY** | Single source of truth for every piece of knowledge | Shared business logic, schema definitions | Tax calculation logic copy-pasted across three services |
+| **KISS** | Prefer the simplest solution that works | Technology selection, architecture decisions | A two-person team running Kubernetes with a service mesh |
+| **YAGNI** | Do not build for hypothetical requirements | Feature scoping, capacity design | Designing for 10 billion users when the prompt says 1 million |
+| **SoC** | Separate independent concerns into distinct layers | Layered architecture, frontend/backend split | HTTP parsing and SQL queries in the same function |
+| **Composition over Inheritance** | Build behavior by assembling parts, not deep hierarchies | Middleware, notification pipelines | A 5-level class hierarchy where changing the base class breaks everything |
+| **Law of Demeter** | Only talk to immediate collaborators | API gateway design, service interaction | Service A calls B, which calls C, which calls D in a synchronous chain |
+| **Loose Coupling** | Minimize inter-module knowledge | Event-driven design, API contracts | Renaming a field in Service A breaks Services B, C, and D |
+| **High Cohesion** | Group related elements together | Module and package design | A `utils` package with 50 unrelated functions |
+| **Idempotency** | Same request, same result, no side effects on retry | Payment processing, message handling | Duplicate charges after a network retry |
+| **Statelessness** | No server-side session state per request | Horizontal scaling, autoscaling | Sticky sessions required because state is stored in local memory |
+| **Fault Isolation** | One failure should not cascade | Circuit breakers, bulkhead patterns | A slow review service causes checkout timeouts |
+| **Backward Compatibility** | New versions must not break old clients | API evolution, schema migration | A column rename causes downtime across 15 services |
+| **Extensibility** | New features via extension, not modification | Plugin systems, middleware pipelines | Adding a new payment method requires changes in 12 files |
+| **IaC / Operations as Code** | Treat infrastructure as version-controlled code | Cloud provisioning, deployment automation | Snowflake servers that cannot be reproduced |
+| **SRE Error Budgets** | Balance reliability with feature velocity | Release cadence decisions, reliability investments | Perpetual conflict between product and reliability teams |
+| **Zero Trust / Security-by-Design** | Never trust, always verify | Service-to-service auth, data access | Services trust each other because they share a VPC |
+
+---
+
+## Well-Architected Framework Mapping
+
+The principles covered in this chapter map directly to the pillars defined by the major cloud providers' Well-Architected Frameworks (AWS, GCP, Azure). Use this table to connect chapter concepts to framework language when working with cloud-native architectures or preparing for cloud certification exams.
+
+| Well-Architected Pillar | Chapter Principles That Apply | Key Relationship |
+|---|---|---|
+| **Operational Excellence** | IaC (3.8), Toil Elimination (3.8), SRE Error Budgets (3.8), ADRs | Treat operations as code; use error budgets for data-driven decisions; document decisions in ADRs |
+| **Security** | Zero Trust (3.9), Defense in Depth (3.9), Shift-Left Security (3.9), Least Privilege | Never trust, always verify; layer defenses; integrate security early in the lifecycle |
+| **Reliability** | Fault Isolation (3.5), Idempotency (3.3), Statelessness (3.4), Error Budgets (3.8) | Isolate failures with circuit breakers; make retries safe with idempotency; scale with statelessness |
+| **Performance Efficiency** | KISS (1.3), Statelessness (3.4), Loose Coupling (3.1), SoC (1.5) | Simplicity enables optimization; stateless services scale horizontally; loose coupling allows independent tuning |
+| **Cost Optimization** | YAGNI (1.4), KISS (1.3), Toil Elimination (3.8) | Build only what is needed; simplicity reduces operational cost; automate toil to free engineering time |
+| **Sustainability** | DRY (1.2), Modularity (2.5), Extensibility (3.7) | Eliminate waste; reuse components; extend rather than rebuild |
+
+> **Note:** AWS, GCP, and Azure each define these pillars with slightly different emphasis, but the underlying principles are universal. The mapping above uses the common denominator across all three frameworks.
 
 ---
 
