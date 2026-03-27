@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>65 min read</small>
+                      <small>76 min read</small>
                     </span>
                   </a>
                 </li>
@@ -998,7 +998,7 @@
           <div class="chapter-meta-strip">
             <div class="summary-pill">
               <span class="summary-label">Reading time</span>
-              <strong>65 min read</strong>
+              <strong>76 min read</strong>
             </div>
             <div class="summary-pill">
               <span class="summary-label">Focus</span>
@@ -1046,6 +1046,166 @@
 <li>Migration between styles is <strong>the most expensive refactoring</strong> in software. Understanding the migration paths before you start prevents multi-year rewrites.</li>
 <li>In interviews, demonstrating that you <strong>chose</strong> an architecture (and can articulate why) separates senior candidates from those who default to microservices because it sounds impressive.</li>
 </ul>
+<hr>
+<h2 id="style-selection-rubric">Style Selection Rubric</h2>
+<p>Use this decision matrix to score each architecture style against your project's real constraints. Rate each cell: <strong>★★★</strong> = ideal fit, <strong>★★</strong> = workable with trade-offs, <strong>★</strong> = poor fit / significant friction.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Constraint</th>
+<th>Monolith</th>
+<th>Modular Monolith</th>
+<th>Microservices</th>
+<th>Event-Driven</th>
+<th>Serverless</th>
+<th>Hexagonal</th>
+<th>Clean</th>
+<th>CQRS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Team size &lt; 10</strong></td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★★</td>
+<td>★</td>
+</tr>
+<tr>
+<td><strong>Team size 10-50</strong></td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+</tr>
+<tr>
+<td><strong>Team size 50+</strong></td>
+<td>★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★</td>
+<td>★★</td>
+<td>★★</td>
+<td>★★★</td>
+</tr>
+<tr>
+<td><strong>High deployment frequency (10+/day)</strong></td>
+<td>★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★★</td>
+<td>★★★</td>
+</tr>
+<tr>
+<td><strong>Low latency required (&lt; 50ms p99)</strong></td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★</td>
+<td>★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★★ (read side)</td>
+</tr>
+<tr>
+<td><strong>Strong data consistency required</strong></td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★</td>
+<td>★</td>
+<td>★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+</tr>
+<tr>
+<td><strong>Regulatory / compliance heavy</strong></td>
+<td>★★</td>
+<td>★★</td>
+<td>★★</td>
+<td>★★</td>
+<td>★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+</tr>
+<tr>
+<td><strong>Tight budget / small infra team</strong></td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★★</td>
+<td>★</td>
+</tr>
+<tr>
+<td><strong>Expected scale &gt; 100K RPS</strong></td>
+<td>★</td>
+<td>★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★</td>
+<td>★</td>
+<td>★★★</td>
+</tr>
+<tr>
+<td><strong>High domain complexity</strong></td>
+<td>★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★</td>
+<td>★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★★</td>
+</tr>
+<tr>
+<td><strong>Time-to-market pressure</strong></td>
+<td>★★★</td>
+<td>★★</td>
+<td>★</td>
+<td>★</td>
+<td>★★★</td>
+<td>★</td>
+<td>★</td>
+<td>★</td>
+</tr>
+<tr>
+<td><strong>Bursty / unpredictable traffic</strong></td>
+<td>★</td>
+<td>★</td>
+<td>★★</td>
+<td>★★★</td>
+<td>★★★</td>
+<td>★</td>
+<td>★</td>
+<td>★★</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>How to use this rubric:</strong>
+1. List your top 5-7 constraints from the rows above.
+2. Score each architecture style for those constraints.
+3. Sum the stars — the highest score is your starting point.
+4. Validate with the Decision Flowchart below.</p>
+<blockquote>
+<p><strong>Interview tip:</strong> When an interviewer gives you constraints, mentally run through this rubric. Saying "Given our team size of 8 and time-to-market pressure, a monolith scores highest, but given our regulatory requirements, I would structure it as a hexagonal modular monolith" demonstrates structured decision-making.</p>
+</blockquote>
 <hr>
 <h2 id="architecture-comparison-matrix">Architecture Comparison Matrix</h2>
 <p>Before diving into each style, this matrix provides a high-level comparison across the dimensions that matter most in production and interviews.</p>
@@ -1406,6 +1566,15 @@
 - (-) Must enforce module boundaries through code reviews and linting — no physical enforcement.
 - (-) All modules share a deployment cadence — no independent releases.
 - (-) If the team grows to 30+ engineers, we may need to extract high-contention modules into separate services.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Single deployment = entire system blast radius.</strong> A memory leak in the payments module crashes the user-facing API, the admin dashboard, and the background job processor simultaneously.</li>
+<li><strong>Shared database contention.</strong> A poorly indexed query in the reporting module locks tables used by the order processing hot path, causing cascading timeouts.</li>
+<li><strong>Module boundary erosion.</strong> Without physical enforcement, engineers create cross-module dependencies that make future extraction exponentially harder. The "modular" monolith silently becomes a big ball of mud.</li>
+<li><strong>Vertical scaling ceiling.</strong> When the largest available instance cannot handle the load, you have no incremental scaling option — only a costly re-architecture.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-2-layered-n-tier-architecture_1">Style 2: Layered (N-Tier) Architecture</h1>
 <h2 id="definition_1">Definition</h2>
@@ -1608,6 +1777,15 @@
 - (+) Simple testing — mock the repository to test services, mock the service to test controllers.
 - (-) If business logic grows complex (multi-step approval workflows with conditional routing), the service layer will become bloated.
 - (-) No natural place for cross-cutting concerns (audit logging, authorization checks) — may need AOP or middleware.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>God service in the business layer.</strong> A single <code>OrderService</code> with 5,000 lines handles every order-related operation. It becomes the bottleneck for every team and every change.</li>
+<li><strong>Tight coupling between layers.</strong> Persistence annotations (<code>@Entity</code>, <code>@Column</code>) leak into the business layer, making it impossible to change the database without rewriting business logic.</li>
+<li><strong>Layer skipping under pressure.</strong> Controllers call repositories directly "just this once," eroding the architecture until the layers are meaningless.</li>
+<li><strong>Cross-cutting concern scatter.</strong> Logging, auth, and validation logic duplicated across every controller because the layered model has no natural home for these concerns.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-3-microservices-architecture_1">Style 3: Microservices Architecture</h1>
 <h2 id="definition_2">Definition</h2>
@@ -1822,6 +2000,15 @@
 - (-) Data consistency between services requires implementing sagas for cross-service transactions.
 - (-) Operational complexity increases significantly — we need per-service monitoring and alerting.
 - (-) Developer onboarding becomes harder — understanding the full system requires understanding 20+ services.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Distributed transactions and data inconsistency.</strong> A saga across 5 services partially completes, leaving the system in an inconsistent state that requires manual intervention to fix.</li>
+<li><strong>Cascading failures.</strong> Service A calls B calls C calls D. D becomes slow, causing C to timeout, B to queue, and A to return 503s to users. Without circuit breakers, one slow service takes down the entire request chain.</li>
+<li><strong>Observability complexity.</strong> A single user request touches 12 services. Debugging requires distributed tracing, centralized logging, and correlated metrics — each of which must be maintained.</li>
+<li><strong>Distributed monolith.</strong> Services that share a database, deploy together, or cannot function independently. You have all the operational complexity of microservices with none of the benefits.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-4-event-driven-architecture_1">Style 4: Event-Driven Architecture</h1>
 <h2 id="definition_3">Definition</h2>
@@ -2021,6 +2208,15 @@
 - (-) We must implement idempotent consumers (Kafka guarantees at-least-once delivery).
 - (-) We need a dead letter queue strategy for events that fail processing after retries.
 - (-) Debugging requires distributed tracing (correlation IDs across events).</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Event ordering issues.</strong> Two events — <code>OrderPlaced</code> then <code>OrderCancelled</code> — arrive out of order at a consumer. The system processes the cancellation first and then "places" the already-cancelled order.</li>
+<li><strong>Duplicate event processing.</strong> At-least-once delivery means consumers receive the same event twice. Without idempotency keys, a payment is charged twice or inventory is decremented twice.</li>
+<li><strong>Debugging difficulty.</strong> A bug in the order flow requires tracing events across 8 consumers, 3 Kafka topics, and 2 dead letter queues. There is no single stack trace — only a distributed event trail.</li>
+<li><strong>Event schema evolution.</strong> Changing the <code>OrderPlaced</code> event schema breaks all 8 consumers simultaneously unless you have a schema registry and backward compatibility guarantees.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-5-serverless-architecture_1">Style 5: Serverless Architecture</h1>
 <h2 id="definition_4">Definition</h2>
@@ -2334,6 +2530,15 @@
 - (-) Cold starts add ~300ms to the first invocation after idle periods. Acceptable for background processing.
 - (-) Maximum execution time of 15 minutes. Acceptable — thumbnail generation takes 2-5 seconds.
 - (-) Vendor lock-in to AWS Lambda + S3 trigger integration.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Cold start latency.</strong> The first invocation after idle time adds 300ms-3s of latency. For user-facing APIs, this creates an inconsistent experience where 1 in 50 requests is noticeably slow.</li>
+<li><strong>Vendor lock-in.</strong> Your business logic is deeply coupled to AWS Lambda, API Gateway, DynamoDB, and Step Functions. Migrating to Azure or GCP requires rewriting the integration layer.</li>
+<li><strong>Timeout limits.</strong> A batch processing job that takes 16 minutes fails because Lambda has a 15-minute maximum. You discover this in production after the job runs successfully on small datasets.</li>
+<li><strong>Connection exhaustion.</strong> A traffic spike launches 5,000 concurrent Lambda instances, each opening a database connection. The database accepts 500 max connections and crashes, taking down the entire system.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-6-hexagonal-architecture-ports-adapters_1">Style 6: Hexagonal Architecture (Ports &amp; Adapters)</h1>
 <h2 id="definition_5">Definition</h2>
@@ -2527,6 +2732,15 @@ class PostgresOrderRepository implements OrderRepository {
 - (-) More boilerplate code — DTOs, mappers, port interfaces, adapter implementations.
 - (-) Engineers must learn the pattern and resist shortcuts (e.g., using JPA entities as domain objects).
 - (-) Simple CRUD operations (e.g., updating a customer's address) feel over-engineered.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Over-abstraction.</strong> Every interaction, no matter how simple, requires defining a port interface, an adapter implementation, and a mapping layer. A simple "get user by ID" touches 6 files.</li>
+<li><strong>Port proliferation.</strong> Teams create one port per method instead of cohesive port interfaces, resulting in hundreds of single-method interfaces that are harder to navigate than the problem they solve.</li>
+<li><strong>Adapter testing gaps.</strong> Teams achieve 95% coverage of the core but skip adapter integration tests. The production database adapter has a subtle query bug that unit tests with mocks cannot catch.</li>
+<li><strong>Premature port extraction.</strong> Teams define ports for infrastructure they will never swap (e.g., a PostgreSQL port when there is zero chance of changing databases), adding complexity without benefit.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-7-clean-architecture_1">Style 7: Clean Architecture</h1>
 <h2 id="definition_6">Definition</h2>
@@ -2713,6 +2927,15 @@ Dependencies only point →→→ inward
 - (-) Initial development is slower due to interface definitions, DTOs, and mappers at each layer boundary.
 - (-) Engineers must be trained on the dependency rule and resist "just this once" shortcuts.
 - (-) Simple CRUD operations (e.g., update provider address) flow through all four layers unnecessarily.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Layer explosion.</strong> Entity, domain model, persistence model, DTO, view model, API response — six representations of the same <code>Order</code> concept, each requiring mappers. Engineers spend more time mapping than building features.</li>
+<li><strong>Mapping fatigue.</strong> Every new field must be added to 4-6 model classes and their corresponding mappers. A simple "add phone number" change touches 12 files.</li>
+<li><strong>Misapplied to simple domains.</strong> A CRUD admin panel with Clean Architecture has 4 layers of indirection for "read row from database, show on screen." The architecture overhead exceeds the domain complexity.</li>
+<li><strong>Dependency rule violations under deadline pressure.</strong> Engineers import a framework type in the entity layer "just for this sprint." The violation spreads, and within 6 months the dependency rule is unenforced.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="style-8-cqrs-command-query-responsibility-segregation">Style 8: CQRS (Command Query Responsibility Segregation)</h1>
 <h2 id="definition_7">Definition</h2>
@@ -2923,6 +3146,15 @@ Sync:           Kafka / CDC (Debezium)
 - (-) Product updates are eventually consistent — a price change may take 1-2 seconds to appear on the product page.
 - (-) We must operate and monitor a Debezium CDC pipeline and an Elasticsearch cluster.
 - (-) Elasticsearch index schema must be managed and versioned alongside the PostgreSQL schema.</p>
+<blockquote>
+<p><strong>Failure Modes</strong></p>
+<ul>
+<li><strong>Eventual consistency confusion.</strong> A user updates their profile, refreshes the page, and sees the old data because the read model has not caught up. Without read-your-writes guarantees or optimistic UI, users report "data loss."</li>
+<li><strong>Dual-model complexity.</strong> The write model uses PostgreSQL with normalized tables. The read model uses Elasticsearch with denormalized documents. A schema change requires coordinated updates to both models, the CDC pipeline, and the projection logic.</li>
+<li><strong>Projection lag under load.</strong> During a flash sale, the write model processes 10,000 orders/second. The read model projection falls 30 seconds behind. Customers see "in stock" for items that sold out 30 seconds ago.</li>
+<li><strong>Rebuild time.</strong> The Elasticsearch read model becomes corrupted. Rebuilding from 2 years of events in the PostgreSQL event store takes 18 hours, during which the product catalog shows stale data.</li>
+</ul>
+</blockquote>
 <hr>
 <h1 id="migration-paths-between-architecture-styles">Migration Paths Between Architecture Styles</h1>
 <p>Understanding how to migrate between architecture styles is critical for both production systems and interviews. Most real-world systems evolve through multiple styles over their lifetime.</p>
@@ -3738,6 +3970,66 @@ Zero-downtime. No write-side changes. No data loss risk.
 - Your services already handle their own retries, timeouts, and circuit breaking
 - Your team lacks Kubernetes operations expertise
 - The resource overhead of sidecars (50-100 MB RAM per pod) is significant for your budget</p>
+<h2 id="service-mesh-as-style-enabler">Service Mesh as Style Enabler</h2>
+<p>A service mesh is <strong>not an architecture style</strong> — it is an <strong>infrastructure capability</strong> that enables microservices to operate reliably at scale. Without a service mesh, each microservice must implement its own retries, circuit breaking, mTLS, rate limiting, and observability. The service mesh extracts these cross-cutting concerns into the infrastructure layer.</p>
+<h3 id="data-plane-vs-control-plane">Data Plane vs Control Plane</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-38.svg" alt="Diagram 38 for System Architecture Styles" loading="lazy"></figure>
+<p><strong>How it works:</strong>
+- <strong>Data plane (Envoy sidecars):</strong> Intercepts all inbound and outbound traffic for each service. Handles mTLS, retries, circuit breaking, load balancing, and metrics collection. The service itself is unaware of the sidecar.
+- <strong>Control plane (Istio/Linkerd control components):</strong> Configures the sidecars, distributes certificates, pushes routing rules, and aggregates telemetry. Operators interact with the control plane; the data plane executes.</p>
+<h3 id="service-mesh-comparison-istio-vs-linkerd">Service Mesh Comparison: Istio vs Linkerd</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Istio</th>
+<th>Linkerd</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Complexity</strong></td>
+<td>High (many components, steep learning curve)</td>
+<td>Low (simple architecture, fast to adopt)</td>
+</tr>
+<tr>
+<td><strong>Resource overhead</strong></td>
+<td>~50-100 MB RAM per sidecar</td>
+<td>~10-20 MB RAM per sidecar</td>
+</tr>
+<tr>
+<td><strong>Feature set</strong></td>
+<td>Full (traffic management, security, observability, extensibility)</td>
+<td>Focused (mTLS, retries, observability)</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Large organizations needing fine-grained traffic control</td>
+<td>Teams wanting mesh benefits with minimal overhead</td>
+</tr>
+<tr>
+<td><strong>Sidecar proxy</strong></td>
+<td>Envoy (C++)</td>
+<td>Linkerd2-proxy (Rust, purpose-built)</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="platform-engineering-control-plane-pattern">Platform Engineering Control Plane Pattern</h2>
+<p>As organizations scale beyond 50 microservices, the service mesh alone is not enough. Teams need a <strong>platform control plane</strong> — an Internal Developer Platform (IDP) — that abstracts infrastructure complexity behind self-service interfaces.</p>
+<p><strong>What the platform control plane provides:</strong>
+- <strong>Service provisioning:</strong> "I need a new service" produces a repository, CI/CD pipeline, monitoring dashboard, and Kubernetes deployment in minutes.
+- <strong>Environment management:</strong> Dev, staging, production environments with consistent configuration and secrets management.
+- <strong>Service catalog:</strong> A searchable registry of all services with owners, dependencies, API documentation, and SLOs.
+- <strong>Golden paths:</strong> Opinionated templates that encode best practices (observability, security, resilience) so teams start with a production-ready baseline.</p>
+<p><strong>When to invest in a platform control plane:</strong>
+- You have 50+ microservices and 10+ teams.
+- Teams spend more than 20% of their time on infrastructure tasks instead of product work.
+- Service creation takes days or weeks instead of minutes.
+- There is no consistent approach to observability, security, or deployment across teams.</p>
+<p><strong>When a platform control plane is overkill:</strong>
+- You have fewer than 20 services.
+- A single platform team can manage all infrastructure manually.
+- Your team is too small to staff a dedicated platform engineering group (typically needs 3-5 engineers).</p>
 <hr>
 <h1 id="deep-dive-clean-architecture-file-structure">Deep Dive: Clean Architecture File Structure</h1>
 <h2 id="recommended-package-structure-javakotlin">Recommended Package Structure (Java/Kotlin)</h2>
@@ -3887,13 +4179,73 @@ void applicationLayerDoesNotDependOnAdapters() {
 <p>Real-world systems rarely use a single architecture style. Here are common hybrid patterns found in production.</p>
 <h2 id="pattern-1-modular-monolith-event-driven-integrations">Pattern 1: Modular Monolith + Event-Driven Integrations</h2>
 <p>The core application is a modular monolith. External integrations (notifications, analytics, search indexing) are connected via an event bus.</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-38.svg" alt="Diagram 38 for System Architecture Styles" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-39.svg" alt="Diagram 39 for System Architecture Styles" loading="lazy"></figure>
 <h2 id="pattern-2-microservices-cqrs-for-hot-paths">Pattern 2: Microservices + CQRS for Hot Paths</h2>
 <p>Most services use simple CRUD. The highest-traffic service (product catalog) uses CQRS with a separate read model.</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-39.svg" alt="Diagram 39 for System Architecture Styles" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-40.svg" alt="Diagram 40 for System Architecture Styles" loading="lazy"></figure>
 <h2 id="pattern-3-serverless-containers">Pattern 3: Serverless + Containers</h2>
 <p>Core business logic runs in containers (ECS, Kubernetes). Stateless, bursty workloads run as serverless functions.</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-40.svg" alt="Diagram 40 for System Architecture Styles" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-41.svg" alt="Diagram 41 for System Architecture Styles" loading="lazy"></figure>
+<h2 id="pattern-4-cqrs-applied-to-specific-bounded-contexts-within-a-monolith">Pattern 4: CQRS Applied to Specific Bounded Contexts Within a Monolith</h2>
+<p>Not every bounded context needs CQRS. Apply it surgically to the highest-traffic read paths while keeping the rest of the monolith as simple CRUD.</p>
+<p><strong>When to use this pattern:</strong>
+- You have one or two "hot" read paths (product catalog, feed timeline) with 100x the traffic of write paths.
+- The rest of the system is straightforward CRUD with no read/write asymmetry.
+- You want the benefits of CQRS without the operational complexity of a fully distributed system.</p>
+<p><strong>Implementation approach:</strong>
+1. Identify the bounded context with the highest read/write ratio (e.g., product catalog: 100K reads/sec vs 500 writes/sec).
+2. Add a denormalized read model (Elasticsearch, Redis, materialized view) for that context only.
+3. Use CDC (Debezium) or domain events within the monolith to synchronize the read model.
+4. Keep all other bounded contexts on the shared relational database with standard queries.</p>
+<h2 id="pattern-5-strangler-fig-migration-monolith-to-microservices-incrementally">Pattern 5: Strangler Fig Migration (Monolith to Microservices Incrementally)</h2>
+<p>The Strangler Fig pattern is the safest migration path from monolith to microservices. Named after the strangler fig tree that grows around its host, this pattern gradually replaces monolith functionality with new services while keeping the system operational.</p>
+<p><strong>Migration steps:</strong>
+1. <strong>Intercept at the edge.</strong> Place an API gateway or reverse proxy in front of the monolith.
+2. <strong>Extract one bounded context.</strong> Choose the module with the clearest boundaries and highest change frequency.
+3. <strong>Route traffic.</strong> The gateway routes requests for the extracted context to the new service; all other traffic goes to the monolith.
+4. <strong>Repeat.</strong> Extract the next bounded context. Each extraction shrinks the monolith.
+5. <strong>Decommission.</strong> When no traffic routes to the monolith, decommission it.</p>
+<p><strong>Key principle:</strong> At every stage, the system is fully functional. There is no "big bang" cutover.</p>
+<h2 id="hybrid-architecture-diagram-monolith-core-async-event-bus-serverless-workers">Hybrid Architecture Diagram: Monolith Core + Async Event Bus + Serverless Workers</h2>
+<p>This is the most common real-world hybrid pattern. The monolith handles core business logic with ACID transactions. An event bus decouples async workflows. Serverless workers handle bursty, stateless processing.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-42.svg" alt="Diagram 42 for System Architecture Styles" loading="lazy"></figure>
+<h2 id="real-world-architecture-evolution-examples">Real-World Architecture Evolution Examples</h2>
+<p>Understanding how successful companies evolved their architectures provides concrete evidence for interview discussions and production decision-making.</p>
+<h3 id="amazon-monolith-to-soa-to-microservices-2001-2010">Amazon: Monolith to SOA to Microservices (2001-2010)</h3>
+<ul>
+<li><strong>2001:</strong> Single monolithic C++ application (Obidos). All of amazon.com ran as one deployable.</li>
+<li><strong>2002:</strong> Jeff Bezos issues the famous "API mandate" — all teams must expose their data and functionality through service interfaces.</li>
+<li><strong>2003-2006:</strong> Teams extract services incrementally. No big-bang rewrite. Each team owns its service and its data.</li>
+<li><strong>2006:</strong> AWS launches — infrastructure built for internal microservices becomes a product.</li>
+<li><strong>2010+:</strong> Hundreds of microservices with independent deployment, monitoring, and on-call.</li>
+</ul>
+<p><strong>Key lesson:</strong> The API mandate forced service boundaries before the technology was ready. Culture change preceded architecture change.</p>
+<h3 id="netflix-monolith-to-microservices-event-driven-2008-2015">Netflix: Monolith to Microservices + Event-Driven (2008-2015)</h3>
+<ul>
+<li><strong>2008:</strong> Monolithic Java application with a single Oracle database. A database corruption incident caused a 3-day outage.</li>
+<li><strong>2009:</strong> Decision to migrate to AWS and decompose into microservices. Adopted the Strangler Fig pattern.</li>
+<li><strong>2010-2012:</strong> Developed the Netflix OSS stack (Eureka, Zuul, Hystrix, Ribbon) to solve microservices challenges.</li>
+<li><strong>2013-2015:</strong> Fully migrated to ~700 microservices on AWS. Adopted event-driven patterns for real-time personalization and recommendation pipelines.</li>
+<li><strong>2020+:</strong> Continues to evolve — adopted GraphQL Federation for API composition.</li>
+</ul>
+<p><strong>Key lesson:</strong> Netflix built the tools it needed (circuit breakers, service discovery) because they did not exist yet. The migration took 7 years.</p>
+<h3 id="shopify-monolith-to-modular-monolith-chose-not-to-go-microservices">Shopify: Monolith to Modular Monolith (Chose NOT to Go Microservices)</h3>
+<ul>
+<li><strong>2004-2016:</strong> Ruby on Rails monolith. As the team grew to 1,000+ engineers, the monolith became painful — long CI times, merge conflicts, deployment queues.</li>
+<li><strong>2017:</strong> Evaluated microservices. Concluded that the operational complexity was not worth it for their team structure and domain.</li>
+<li><strong>2018-2020:</strong> Invested heavily in "componentization" — enforcing module boundaries within the monolith using static analysis, dependency rules, and team ownership.</li>
+<li><strong>2020+:</strong> Runs one of the largest modular monoliths in the world. Modules have clear APIs, separate test suites, and team ownership — but deploy as one unit.</li>
+</ul>
+<p><strong>Key lesson:</strong> Microservices are not the inevitable destination. Shopify proved that a well-structured monolith can scale to 1,000+ engineers with discipline and tooling.</p>
+<h3 id="uber-monolith-to-microservices-to-domain-oriented-microservices-2015-2020">Uber: Monolith to Microservices to Domain-Oriented Microservices (2015-2020)</h3>
+<ul>
+<li><strong>2012-2014:</strong> Python monolith handling all ride-matching, dispatch, and payment.</li>
+<li><strong>2015-2017:</strong> Aggressive decomposition into ~2,200 microservices. Each service was small and independently deployable.</li>
+<li><strong>2018:</strong> Realized the pendulum had swung too far. Too many services, too much inter-service communication, too much operational overhead. Debugging a single ride required tracing through 20+ services.</li>
+<li><strong>2019-2020:</strong> Adopted "Domain-Oriented Microservice Architecture" (DOMA) — grouping related microservices into domains with a gateway, reducing inter-domain coupling.</li>
+<li><strong>2020+:</strong> Domains act as "macro-services" with internal microservices. Cross-domain communication goes through well-defined domain APIs.</li>
+</ul>
+<p><strong>Key lesson:</strong> There is a cost curve for microservices. Too few services creates coupling; too many creates chaos. Uber found the optimal granularity through painful experience.</p>
 <hr>
 <h1 id="extended-interview-practice-scenario-based-questions">Extended Interview Practice: Scenario-Based Questions</h1>
 <h2 id="scenario-1-architecture-evolution">Scenario 1: Architecture Evolution</h2>
@@ -3920,6 +4272,70 @@ void applicationLayerDoesNotDependOnAdapters() {
 3. <strong>WebSocket server for real-time.</strong> A dedicated WebSocket handler (within the monolith) manages real-time cursor positions and edits. This could be the first module extracted as a separate service later (different scaling characteristics from REST API).
 4. <strong>Event sourcing for document history.</strong> Every edit is an event. This naturally supports undo/redo, version history, and conflict resolution. Apply event sourcing to the document module specifically, not to the entire application.
 5. <strong>Evolution plan:</strong> After launch, if the WebSocket server needs different scaling (persistent connections vs stateless HTTP), extract it as the first microservice. The document storage and user management remain in the monolith.</p>
+<hr>
+<h1 id="style-evolution-patterns">Style Evolution Patterns</h1>
+<p>Architecture is not a one-time decision. Every successful system evolves its architecture as the team grows, the domain deepens, and the scale increases. This section documents the actual architecture evolution of four major companies — providing concrete evidence for interview discussions and production planning.</p>
+<h2 id="architecture-evolution-flowchart">Architecture Evolution Flowchart</h2>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F03-system-architecture-styles-diagram-43.svg" alt="Diagram 43 for System Architecture Styles" loading="lazy"></figure>
+<h2 id="lessons-from-architecture-evolution">Lessons from Architecture Evolution</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Company</th>
+<th>Starting Style</th>
+<th>Ending Style</th>
+<th>Migration Duration</th>
+<th>Key Trigger</th>
+<th>Key Lesson</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Amazon</strong></td>
+<td>Monolith (C++)</td>
+<td>Microservices</td>
+<td>~8 years (2001-2010)</td>
+<td>Team coupling; deployment bottlenecks</td>
+<td>Culture change (API mandate) precedes architecture change</td>
+</tr>
+<tr>
+<td><strong>Netflix</strong></td>
+<td>Monolith (Java)</td>
+<td>Microservices + Event-Driven</td>
+<td>~7 years (2008-2015)</td>
+<td>3-day database outage</td>
+<td>Build the tools you need; do not wait for the ecosystem</td>
+</tr>
+<tr>
+<td><strong>Shopify</strong></td>
+<td>Monolith (Rails)</td>
+<td>Modular Monolith</td>
+<td>~3 years (2017-2020)</td>
+<td>CI/CD bottlenecks at 1000+ engineers</td>
+<td>Microservices are not the inevitable destination</td>
+</tr>
+<tr>
+<td><strong>Uber</strong></td>
+<td>Monolith (Python)</td>
+<td>Domain-Oriented Microservices</td>
+<td>~8 years (2012-2020)</td>
+<td>Operational chaos at 2200 services</td>
+<td>Too many microservices is as harmful as too few</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="common-evolution-triggers">Common Evolution Triggers</h2>
+<p>When you observe these signals, it is time to evaluate the next architecture style:</p>
+<ol>
+<li><strong>Deployment queue grows beyond 2 days.</strong> Multiple teams waiting to deploy means the monolith has become a coordination bottleneck. Consider modular monolith or Strangler Fig extraction.</li>
+<li><strong>10x scaling asymmetry.</strong> One module needs 100x the compute of another, but both scale together. Consider extracting that module as an independent service.</li>
+<li><strong>Team autonomy demands.</strong> Teams want different languages, frameworks, or deployment cadences. Consider microservices with clear bounded contexts.</li>
+<li><strong>Operational chaos.</strong> More than 20% of engineering time goes to debugging cross-service issues, managing deployments, or responding to cascading failures. Consider domain-oriented grouping or platform engineering investment.</li>
+<li><strong>Compliance or isolation requirements.</strong> Regulatory requirements demand that certain data or processing be physically isolated. Consider extracting the regulated domain as a separate service with its own data store.</li>
+</ol>
+<blockquote>
+<p><strong>Interview tip:</strong> When discussing architecture choices, frame them as evolution decisions. "We would start with a modular monolith for time-to-market, instrument the module boundaries, and plan extraction of the highest-traffic modules when we observe deployment queue growth or 10x scaling asymmetry" is a much stronger answer than "We should use microservices."</p>
+</blockquote>
 <hr>
 <h1 id="glossary">Glossary</h1>
 <div class="table-wrap"><table>
@@ -4073,6 +4489,7 @@ void applicationLayerDoesNotDependOnAdapters() {
 </ul>
 </li>
 <li><a href="#why-architecture-styles-matter-in-real-systems">Why Architecture Styles Matter in Real Systems</a></li>
+<li><a href="#style-selection-rubric">Style Selection Rubric</a></li>
 <li><a href="#architecture-comparison-matrix">Architecture Comparison Matrix</a></li>
 <li><a href="#decision-flowchart-choosing-an-architecture-style">Decision Flowchart: Choosing an Architecture Style</a></li>
 <li><a href="#definition">Definition</a></li>
@@ -4286,14 +4703,33 @@ void applicationLayerDoesNotDependOnAdapters() {
 <li><a href="#service-mesh-components">Service Mesh Components</a></li>
 <li><a href="#service-mesh-capabilities">Service Mesh Capabilities</a></li>
 <li><a href="#when-to-add-a-service-mesh">When to Add a Service Mesh</a></li>
+<li><a href="#service-mesh-as-style-enabler">Service Mesh as Style Enabler</a><ul>
+<li><a href="#data-plane-vs-control-plane">Data Plane vs Control Plane</a></li>
+<li><a href="#service-mesh-comparison-istio-vs-linkerd">Service Mesh Comparison: Istio vs Linkerd</a></li>
+</ul>
+</li>
+<li><a href="#platform-engineering-control-plane-pattern">Platform Engineering Control Plane Pattern</a></li>
 <li><a href="#recommended-package-structure-javakotlin">Recommended Package Structure (Java/Kotlin)</a></li>
 <li><a href="#examples">Examples</a></li>
 <li><a href="#pattern-1-modular-monolith-event-driven-integrations">Pattern 1: Modular Monolith + Event-Driven Integrations</a></li>
 <li><a href="#pattern-2-microservices-cqrs-for-hot-paths">Pattern 2: Microservices + CQRS for Hot Paths</a></li>
 <li><a href="#pattern-3-serverless-containers">Pattern 3: Serverless + Containers</a></li>
+<li><a href="#pattern-4-cqrs-applied-to-specific-bounded-contexts-within-a-monolith">Pattern 4: CQRS Applied to Specific Bounded Contexts Within a Monolith</a></li>
+<li><a href="#pattern-5-strangler-fig-migration-monolith-to-microservices-incrementally">Pattern 5: Strangler Fig Migration (Monolith to Microservices Incrementally)</a></li>
+<li><a href="#hybrid-architecture-diagram-monolith-core-async-event-bus-serverless-workers">Hybrid Architecture Diagram: Monolith Core + Async Event Bus + Serverless Workers</a></li>
+<li><a href="#real-world-architecture-evolution-examples">Real-World Architecture Evolution Examples</a><ul>
+<li><a href="#amazon-monolith-to-soa-to-microservices-2001-2010">Amazon: Monolith to SOA to Microservices (2001-2010)</a></li>
+<li><a href="#netflix-monolith-to-microservices-event-driven-2008-2015">Netflix: Monolith to Microservices + Event-Driven (2008-2015)</a></li>
+<li><a href="#shopify-monolith-to-modular-monolith-chose-not-to-go-microservices">Shopify: Monolith to Modular Monolith (Chose NOT to Go Microservices)</a></li>
+<li><a href="#uber-monolith-to-microservices-to-domain-oriented-microservices-2015-2020">Uber: Monolith to Microservices to Domain-Oriented Microservices (2015-2020)</a></li>
+</ul>
+</li>
 <li><a href="#scenario-1-architecture-evolution">Scenario 1: Architecture Evolution</a></li>
 <li><a href="#scenario-2-consistency-vs-availability">Scenario 2: Consistency vs Availability</a></li>
 <li><a href="#scenario-3-choosing-architecture-for-a-new-product">Scenario 3: Choosing Architecture for a New Product</a></li>
+<li><a href="#architecture-evolution-flowchart">Architecture Evolution Flowchart</a></li>
+<li><a href="#lessons-from-architecture-evolution">Lessons from Architecture Evolution</a></li>
+<li><a href="#common-evolution-triggers">Common Evolution Triggers</a></li>
 </ul>
 </div>
 
