@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>91 min read</small>
                     </span>
                   </a>
                 </li>
@@ -998,7 +998,7 @@
           <div class="chapter-meta-strip">
             <div class="summary-pill">
               <span class="summary-label">Reading time</span>
-              <strong>79 min read</strong>
+              <strong>91 min read</strong>
             </div>
             <div class="summary-pill">
               <span class="summary-label">Focus</span>
@@ -1132,6 +1132,73 @@
 </tr>
 </tbody>
 </table></div>
+<hr>
+<h2 id="distributed-systems-crib-sheet">Distributed Systems Crib Sheet</h2>
+<p>A quick-reference card for the rules of thumb that every distributed systems engineer should internalize. Pin this to your wall.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Rule of Thumb</th>
+<th>Common Mistake</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Timeouts</strong></td>
+<td>Always set them. Formula: <code>timeout = p99 latency x 2 + network jitter</code>. A missing timeout = hang forever.</td>
+<td>Using the default (no timeout) and wondering why threads pool-starve during a downstream outage.</td>
+</tr>
+<tr>
+<td><strong>Clocks</strong></td>
+<td>Physical clocks drift (~100-250 us/sec with NTP). Use logical clocks (Lamport, vector) for ordering. Hybrid logical clocks (HLC) give you the best of both worlds.</td>
+<td>Comparing <code>System.currentTimeMillis()</code> across machines and treating it as a total order.</td>
+</tr>
+<tr>
+<td><strong>Consensus</strong></td>
+<td>Impossible without communication (FLP result). Raft/Paxos for crash-fault leader election. ZAB for ZooKeeper. PBFT for Byzantine faults (requires 3f+1 nodes).</td>
+<td>Assuming consensus is "just a database write" and ignoring the latency cost of a round-trip quorum.</td>
+</tr>
+<tr>
+<td><strong>Partitions</strong></td>
+<td>Will happen. Choose CP or AP <strong>per operation</strong>, not per system. A shopping cart can be AP while payments must be CP.</td>
+<td>Labeling an entire system as "CP" or "AP" and applying a single consistency model everywhere.</td>
+</tr>
+<tr>
+<td><strong>Idempotency</strong></td>
+<td>Every RPC must be safe to retry. Attach an idempotency key (UUID) to every mutating request. Server deduplicates by key.</td>
+<td>Retrying a <code>POST /charge</code> without an idempotency key and double-charging the customer.</td>
+</tr>
+<tr>
+<td><strong>Ordering</strong></td>
+<td>Total order is expensive (requires consensus). Causal order is usually sufficient and far cheaper.</td>
+<td>Paying for total order (Raft log) when causal order (vector clocks) would satisfy the requirements.</td>
+</tr>
+<tr>
+<td><strong>Exactly-once delivery</strong></td>
+<td>Does not exist in distributed systems. Use <strong>at-least-once delivery + idempotent consumers</strong> to achieve effectively-exactly-once processing.</td>
+<td>Building a system that assumes the message broker guarantees exactly-once and skipping deduplication logic.</td>
+</tr>
+<tr>
+<td><strong>Retries</strong></td>
+<td>Use exponential backoff with jitter. Cap the number of retries. Use circuit breakers to stop retrying a dead service.</td>
+<td>Immediate retry storms that amplify a partial outage into a full outage (retry amplification).</td>
+</tr>
+<tr>
+<td><strong>Partial failure</strong></td>
+<td>Some nodes fail while others succeed. Every call can return success, failure, or <strong>unknown</strong> (timeout). The "unknown" case is the hardest.</td>
+<td>Treating a timeout as a failure and rolling back, when the remote operation actually succeeded.</td>
+</tr>
+<tr>
+<td><strong>Distributed state</strong></td>
+<td>State that lives on more than one machine is the root of all complexity. Minimize shared mutable state. Prefer stateless services + centralized state stores.</td>
+<td>Caching state locally in each service instance and then wondering why replicas disagree.</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>Interview tip:</strong> If you can recite this table from memory and explain each row with a real-world example, you already understand distributed systems better than most candidates.</p>
+</blockquote>
 <hr>
 <hr>
 <h1 id="section-1-core-concepts_1">Section 1: Core Concepts</h1>
@@ -4573,6 +4640,368 @@ For every service endpoint:
 - Bugs are reproducible (deterministic replay).
 - No need for a real cluster during testing.</p>
 <hr>
+<h2 id="causal-consistency-and-crdts-for-collaboration">Causal Consistency and CRDTs for Collaboration</h2>
+<h3 id="why-causal-consistency-matters">Why Causal Consistency Matters</h3>
+<p>Causal consistency preserves cause-and-effect ordering without requiring global coordination. If operation A causally precedes operation B (e.g., A is a post and B is a reply to that post), then every node observes A before B. Concurrent operations (those with no causal relationship) may be observed in different orders at different nodes — and that is acceptable.</p>
+<p><strong>Why this is powerful:</strong> Causal consistency enables multi-region writes without conflicts for the vast majority of operations, because most real-world operations are either causally related (and thus ordered) or truly independent (and thus safe to reorder). It avoids the latency penalty of linearizability while providing much stronger guarantees than eventual consistency.</p>
+<p><strong>When causal consistency is sufficient vs when you need linearizability:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Causal Consistency</th>
+<th>Linearizability Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Social media feed (post, then comment)</td>
+<td>Sufficient — causal order preserves thread structure</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td>Collaborative document editing</td>
+<td>Sufficient — CRDTs resolve concurrent edits</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td>Bank account balance after transfer</td>
+<td>Not sufficient — need real-time recency</td>
+<td>Required</td>
+</tr>
+<tr>
+<td>Distributed lock acquisition</td>
+<td>Not sufficient — need total order</td>
+<td>Required</td>
+</tr>
+<tr>
+<td>Leader election</td>
+<td>Not sufficient — need single winner</td>
+<td>Required</td>
+</tr>
+<tr>
+<td>Shopping cart merge after partition</td>
+<td>Sufficient — concurrent adds are commutative</td>
+<td>Not needed</td>
+</tr>
+<tr>
+<td>Inventory decrement (last item)</td>
+<td>Not sufficient — need atomic compare-and-swap</td>
+<td>Required</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="crdts-conflict-free-replicated-data-types">CRDTs: Conflict-Free Replicated Data Types</h3>
+<p>CRDTs are data structures that can be replicated across nodes, updated independently and concurrently, and always merged deterministically without conflicts. They achieve <strong>strong eventual consistency</strong> — all replicas that have received the same set of updates (in any order) are guaranteed to be in the same state.</p>
+<p><strong>Core CRDT types:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>CRDT</th>
+<th>Type</th>
+<th>Description</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>G-Counter</strong></td>
+<td>State-based</td>
+<td>Grow-only counter; each node increments its own slot; total = sum of all slots</td>
+<td>Like counts, view counts, analytics</td>
+</tr>
+<tr>
+<td><strong>PN-Counter</strong></td>
+<td>State-based</td>
+<td>Pair of G-Counters (positive + negative); value = P - N</td>
+<td>Inventory counts, vote tallies</td>
+</tr>
+<tr>
+<td><strong>OR-Set</strong> (Observed-Remove Set)</td>
+<td>Operation-based</td>
+<td>Add/remove elements with unique tags; concurrent add wins over remove</td>
+<td>Shopping carts, collaborative tag sets</td>
+</tr>
+<tr>
+<td><strong>LWW-Register</strong> (Last-Writer-Wins)</td>
+<td>State-based</td>
+<td>Register with timestamp; highest timestamp wins</td>
+<td>User profile fields, configuration</td>
+</tr>
+<tr>
+<td><strong>MV-Register</strong> (Multi-Value)</td>
+<td>State-based</td>
+<td>Preserves all concurrent writes; application resolves</td>
+<td>Conflict-aware settings</td>
+</tr>
+<tr>
+<td><strong>RGA</strong> (Replicated Growable Array)</td>
+<td>Operation-based</td>
+<td>Ordered list supporting insert/delete; used for collaborative text</td>
+<td>Google Docs-style editing, Figma layers</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Real-world CRDT adoption:</strong>
+- <strong>Figma</strong> — Uses a custom CRDT for multiplayer design collaboration, enabling real-time co-editing across regions with zero coordination.
+- <strong>Riak</strong> — Natively supports CRDTs (counters, sets, maps, flags) as first-class data types in its KV store.
+- <strong>Redis (CRDTs)</strong> — Redis Enterprise uses CRDTs for active-active geo-replication.
+- <strong>Automerge</strong> — Open-source CRDT library for JSON documents; used in local-first applications.
+- <strong>Yjs</strong> — High-performance CRDT library for collaborative text editing; powers many collaborative editors.</p>
+<h3 id="causal-ordering-across-nodes">Causal Ordering Across Nodes</h3>
+<p>The following diagram shows how causal ordering is maintained across three nodes using vector clocks. Events that are causally related are observed in order; concurrent events (no causal link) may be observed in any order.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F07-distributed-system-fundamentals-diagram-24.svg" alt="Diagram 24 for Distributed System Fundamentals" loading="lazy"></figure>
+<h3 id="trade-offs-causal-consistency-vs-other-models">Trade-offs: Causal Consistency vs Other Models</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Eventual Consistency</th>
+<th>Causal Consistency</th>
+<th>Linearizability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ordering guarantee</strong></td>
+<td>None (convergence only)</td>
+<td>Cause-and-effect preserved</td>
+<td>Total real-time order</td>
+</tr>
+<tr>
+<td><strong>Coordination required</strong></td>
+<td>None</td>
+<td>Metadata (vector clocks)</td>
+<td>Global consensus</td>
+</tr>
+<tr>
+<td><strong>Write latency</strong></td>
+<td>Local (fastest)</td>
+<td>Local (with metadata overhead)</td>
+<td>Quorum round-trip (slowest)</td>
+</tr>
+<tr>
+<td><strong>Read latency</strong></td>
+<td>Local</td>
+<td>Local (may wait for causal dependencies)</td>
+<td>Quorum round-trip</td>
+</tr>
+<tr>
+<td><strong>Availability during partition</strong></td>
+<td>Full</td>
+<td>Full (within causal constraints)</td>
+<td>Reduced (minority unavailable)</td>
+</tr>
+<tr>
+<td><strong>Implementation complexity</strong></td>
+<td>Low</td>
+<td>Medium (dependency tracking)</td>
+<td>High (consensus protocol)</td>
+</tr>
+<tr>
+<td><strong>Data anomalies possible</strong></td>
+<td>Stale reads, reordering</td>
+<td>Concurrent reordering only</td>
+<td>None</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="debugging-distributed-systems">Debugging Distributed Systems</h2>
+<h3 id="why-debugging-is-fundamentally-different">Why Debugging Is Fundamentally Different</h3>
+<p>Debugging a distributed system is not like debugging a monolith with a bigger stack trace. Three properties make it qualitatively harder:</p>
+<ol>
+<li><strong>Non-determinism</strong> — The same inputs can produce different outputs depending on timing, network delays, and scheduling. You cannot reproduce a bug by "running it again."</li>
+<li><strong>Partial failure</strong> — Some nodes succeed while others fail. The system is simultaneously working and broken.</li>
+<li><strong>No global state</strong> — There is no single point where you can pause execution and inspect everything. Each node has its own local view, and those views may be inconsistent.</li>
+</ol>
+<h3 id="tools-and-techniques">Tools and Techniques</h3>
+<p><strong>1. Distributed Tracing (OpenTelemetry, Jaeger, Zipkin)</strong></p>
+<p>A distributed trace follows a single request as it traverses multiple services. Each service adds a "span" with timing, metadata, and parent-child relationships. The trace ID propagates across all RPCs.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F07-distributed-system-fundamentals-diagram-25.svg" alt="Diagram 25 for Distributed System Fundamentals" loading="lazy"></figure>
+<p><strong>2. Correlation IDs</strong></p>
+<p>Every request entering the system gets a unique correlation ID (UUID). This ID is propagated through all logs, RPCs, message queue publishes, and database operations. When something goes wrong, grep for the correlation ID and you get the complete story across all services.</p>
+<p><strong>3. Structured Logging with Consistent Schemas</strong></p>
+<p>Use JSON-structured logs with a consistent schema across all services:
+- <code>timestamp</code> (ISO 8601 with timezone)
+- <code>trace_id</code>, <code>span_id</code>, <code>correlation_id</code>
+- <code>service_name</code>, <code>instance_id</code>
+- <code>level</code> (INFO, WARN, ERROR)
+- <code>message</code>, <code>error_code</code>, <code>duration_ms</code></p>
+<p><strong>4. Chaos Engineering (Chaos Monkey, Litmus, Gremlin)</strong></p>
+<p>Do not wait for production failures to discover weaknesses. Proactively inject failures:
+- Kill random service instances (Chaos Monkey)
+- Inject network latency between specific services (Gremlin)
+- Simulate disk full, CPU saturation, DNS failures (Litmus)
+- Corrupt messages on the wire to test validation</p>
+<p><strong>5. Observability vs Monitoring</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Monitoring</th>
+<th>Observability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>What it answers</strong></td>
+<td>"Is the system healthy?" (known-knowns)</td>
+<td>"Why is the system unhealthy?" (unknown-unknowns)</td>
+</tr>
+<tr>
+<td><strong>Data model</strong></td>
+<td>Pre-defined metrics and dashboards</td>
+<td>High-cardinality events, traces, logs</td>
+</tr>
+<tr>
+<td><strong>Query style</strong></td>
+<td>Pre-built alerts on known thresholds</td>
+<td>Ad-hoc exploration of novel failures</td>
+</tr>
+<tr>
+<td><strong>Tools</strong></td>
+<td>Prometheus, Grafana, CloudWatch</td>
+<td>Honeycomb, Jaeger, OpenTelemetry</td>
+</tr>
+<tr>
+<td><strong>When it fails</strong></td>
+<td>Novel failure modes that no alert covers</td>
+<td>Does not "fail" — the data is always there to query</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="common-debugging-anti-patterns">Common Debugging Anti-Patterns</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Anti-Pattern</th>
+<th>Why It Fails</th>
+<th>What to Do Instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"It works on my machine"</td>
+<td>Your machine is a single node with no network latency, no clock skew, and no partial failure.</td>
+<td>Test in a staging cluster with fault injection.</td>
+</tr>
+<tr>
+<td>Reading logs sequentially</td>
+<td>In a distributed system, logs from different services are interleaved and not time-ordered due to clock skew.</td>
+<td>Use distributed tracing. Sort by trace ID, not timestamp.</td>
+</tr>
+<tr>
+<td>Ignoring clock skew in timestamps</td>
+<td>A log entry at 12:00:00.000 on Service A may have happened AFTER a log entry at 12:00:00.050 on Service B if A's clock is 100ms ahead.</td>
+<td>Use logical timestamps (trace spans) for ordering. Use NTP-synced clocks only for human-readable context.</td>
+</tr>
+<tr>
+<td>Blaming the network</td>
+<td>"The network dropped a packet" is rarely the root cause. The question is: why did your system not handle the dropped packet?</td>
+<td>Design for network unreliability. Use retries, timeouts, circuit breakers, and idempotency.</td>
+</tr>
+<tr>
+<td>Adding more logging post-mortem</td>
+<td>You never have the right logs after the fact.</td>
+<td>Invest in observability upfront: high-cardinality events, traces, and structured logs from day one.</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>Cross-reference:</strong> See <strong>F10 — Observability &amp; Monitoring</strong> for comprehensive coverage of metrics, logging, tracing, alerting, and SLO-based reliability engineering.</p>
+</blockquote>
+<hr>
+<h2 id="modern-multi-region-write-paths">Modern Multi-Region Write Paths</h2>
+<p>Serving users globally requires data to be close to them. The fundamental challenge is: how do you handle writes from multiple regions simultaneously? There are four dominant patterns, each with distinct trade-offs.</p>
+<h3 id="pattern-1-single-leader-with-regional-read-replicas">Pattern 1: Single-Leader with Regional Read Replicas</h3>
+<p>One region holds the leader (primary). All writes go to the leader. Other regions have read replicas for low-latency reads.</p>
+<ul>
+<li><strong>Write path:</strong> Client (any region) --&gt; Leader region --&gt; Replicate async to read replicas.</li>
+<li><strong>Read path:</strong> Client --&gt; Nearest read replica (may be stale).</li>
+<li><strong>Example:</strong> Amazon Aurora Global Database, PostgreSQL with streaming replication.</li>
+<li><strong>Best for:</strong> Read-heavy workloads where write latency for remote users is acceptable.</li>
+</ul>
+<h3 id="pattern-2-multi-leader-with-conflict-resolution">Pattern 2: Multi-Leader with Conflict Resolution</h3>
+<p>Multiple regions each have a leader. Writes are accepted locally and conflicts are resolved during replication.</p>
+<ul>
+<li><strong>Write path:</strong> Client --&gt; Local leader --&gt; Async replicate to other leaders --&gt; Conflict resolution on merge.</li>
+<li><strong>Read path:</strong> Client --&gt; Local leader (strong within region).</li>
+<li><strong>Example:</strong> CockroachDB (serializable via hybrid logical clocks), Google Spanner (TrueTime + Paxos).</li>
+<li><strong>Best for:</strong> Workloads needing low write latency globally with strong consistency guarantees.</li>
+</ul>
+<h3 id="pattern-3-leaderless-with-crdts">Pattern 3: Leaderless with CRDTs</h3>
+<p>No leader at all. Any node accepts writes. CRDTs or LWW ensure convergence.</p>
+<ul>
+<li><strong>Write path:</strong> Client --&gt; Any local node --&gt; Gossip/async replicate to all nodes.</li>
+<li><strong>Read path:</strong> Client --&gt; Any local node (may require read-repair).</li>
+<li><strong>Example:</strong> Riak (native CRDTs), Cassandra with LWW, DynamoDB Global Tables.</li>
+<li><strong>Best for:</strong> High-availability workloads where eventual/causal consistency is sufficient.</li>
+</ul>
+<h3 id="pattern-4-regional-sharding-data-affinity">Pattern 4: Regional Sharding (Data Affinity)</h3>
+<p>User data is assigned to a "home region" based on geography. Writes for a user always go to their home region. Cross-region reads use caching or async replication.</p>
+<ul>
+<li><strong>Write path:</strong> Client --&gt; Home region (determined by user location or regulation).</li>
+<li><strong>Read path:</strong> Client --&gt; Home region (or cached read replica for non-sensitive data).</li>
+<li><strong>Example:</strong> GDPR-compliant systems, Shopify's regional pod architecture.</li>
+<li><strong>Best for:</strong> Regulatory compliance (data residency), predictable latency, reduced cross-region traffic.</li>
+</ul>
+<h3 id="comparing-the-four-patterns">Comparing the Four Patterns</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F07-distributed-system-fundamentals-diagram-26.svg" alt="Diagram 26 for Distributed System Fundamentals" loading="lazy"></figure>
+<h3 id="decision-matrix">Decision Matrix</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Write Latency</th>
+<th>Read Latency</th>
+<th>Consistency</th>
+<th>Complexity</th>
+<th>Example Systems</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Single-Leader</strong></td>
+<td>High for remote users (cross-region RTT)</td>
+<td>Low (local replica)</td>
+<td>Strong (leader) / Eventual (replicas)</td>
+<td>Low</td>
+<td>Aurora Global, PostgreSQL</td>
+</tr>
+<tr>
+<td><strong>Multi-Leader</strong></td>
+<td>Low (local leader)</td>
+<td>Low (local leader)</td>
+<td>Serializable (Spanner, CRDB) or conflict-resolved</td>
+<td>High</td>
+<td>Google Spanner (TrueTime), CockroachDB (HLC)</td>
+</tr>
+<tr>
+<td><strong>Leaderless + CRDTs</strong></td>
+<td>Low (any node)</td>
+<td>Low (any node, read-repair)</td>
+<td>Eventual / Causal</td>
+<td>Medium</td>
+<td>Riak, Cassandra, DynamoDB Global Tables</td>
+</tr>
+<tr>
+<td><strong>Regional Sharding</strong></td>
+<td>Low (home region)</td>
+<td>Low (home) / Medium (cross-region)</td>
+<td>Strong within region</td>
+<td>Medium</td>
+<td>Shopify Pods, GDPR-compliant systems</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="real-world-implementation-notes">Real-World Implementation Notes</h3>
+<ul>
+<li><strong>Google Spanner</strong> uses TrueTime (GPS + atomic clocks) to bound clock uncertainty, enabling globally serializable transactions with commit-wait. Write latency is bounded by the TrueTime uncertainty interval (~7ms within a region, higher cross-region).</li>
+<li><strong>CockroachDB</strong> uses hybrid logical clocks (HLC) because it cannot rely on specialized hardware. HLC provides causal ordering with bounded uncertainty intervals. Reads in the uncertainty window trigger restarts (higher latency, correct results).</li>
+<li><strong>DynamoDB Global Tables</strong> uses last-writer-wins (LWW) with wall-clock timestamps for conflict resolution. This means concurrent writes to the same key in different regions may silently lose data — acceptable for many workloads, dangerous for others.</li>
+</ul>
+<hr>
 <hr>
 <h1 id="interview-angle">Interview Angle</h1>
 <hr>
@@ -4880,6 +5309,119 @@ For every service endpoint:
 - Cache inventory data aggressively with short TTL (30-60 seconds). During partition, serve from cache. After cache expires, show "availability unknown."
 - Never block the entire product page because one downstream service is unreachable.</p>
 <hr>
+<h2 id="what-to-memorize-vs-what-to-reason-about">What to Memorize vs What to Reason About</h2>
+<p>Not everything in distributed systems deserves equal space in your brain. Some things are facts you must recall instantly (in an interview or an incident). Others are frameworks you apply through reasoning. And some are implementation details best looked up in documentation.</p>
+<h3 id="the-three-column-guide">The Three-Column Guide</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Category</th>
+<th>What</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Memorize</strong> (instant recall)</td>
+<td><strong>CAP theorem statement</strong> — "You can have at most two of Consistency, Availability, and Partition Tolerance"</td>
+<td>You will be asked this directly. It is the foundation of every consistency discussion.</td>
+</tr>
+<tr>
+<td><strong>Memorize</strong></td>
+<td><strong>FLP impossibility result</strong> — "No deterministic consensus protocol can guarantee termination in an asynchronous system with even one crash failure"</td>
+<td>Explains why all practical consensus protocols use timeouts, randomization, or partial synchrony.</td>
+</tr>
+<tr>
+<td><strong>Memorize</strong></td>
+<td><strong>Two Generals problem</strong> — "Two parties cannot achieve guaranteed agreement over an unreliable channel"</td>
+<td>The intuition behind why distributed consensus is fundamentally hard.</td>
+</tr>
+<tr>
+<td><strong>Memorize</strong></td>
+<td><strong>Byzantine Generals bound: 3f+1</strong> — "To tolerate f Byzantine faults, you need at least 3f+1 nodes"</td>
+<td>Required for any discussion of BFT, blockchain, or trust boundaries.</td>
+</tr>
+<tr>
+<td><strong>Memorize</strong></td>
+<td><strong>Raft leader election steps</strong> — RequestVote, majority grant, heartbeats, term increment</td>
+<td>Raft is the most interview-relevant consensus protocol. Know the happy path and the edge cases.</td>
+</tr>
+<tr>
+<td><strong>Memorize</strong></td>
+<td><strong>Quorum formula: R + W &gt; N</strong> — "Read quorum + Write quorum must exceed total replicas for strong consistency"</td>
+<td>Used in every discussion of Dynamo-style systems, Cassandra tunable consistency, etc.</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Reason about</strong> (apply to your design)</td>
+<td><strong>Which consistency model fits your use case</strong> — Linearizable? Causal? Eventual?</td>
+<td>The right answer depends on your specific requirements. No single model is universally correct.</td>
+</tr>
+<tr>
+<td><strong>Reason about</strong></td>
+<td><strong>How to handle partial failures in your specific system</strong> — What happens when service X is down but Y is up?</td>
+<td>Every system has unique failure modes. Reason through them; do not memorize a checklist.</td>
+</tr>
+<tr>
+<td><strong>Reason about</strong></td>
+<td><strong>Where to place partition boundaries</strong> — Which services can tolerate being in different failure domains?</td>
+<td>This is a design decision that requires understanding your data flow and consistency needs.</td>
+</tr>
+<tr>
+<td><strong>Reason about</strong></td>
+<td><strong>Timeout budget calculation</strong> — How to distribute a 500ms SLA across 4 downstream services?</td>
+<td>Depends on your dependency graph, p99 latencies, and retry policies. Apply the formula, do not memorize numbers.</td>
+</tr>
+<tr>
+<td><strong>Reason about</strong></td>
+<td><strong>Replication topology choice</strong> — Single-leader, multi-leader, or leaderless?</td>
+<td>Depends on read/write ratio, geographic distribution, and consistency requirements. Reason from trade-offs.</td>
+</tr>
+<tr>
+<td><strong>Reason about</strong></td>
+<td><strong>Failure blast radius</strong> — How does the failure of one component cascade?</td>
+<td>Map your dependency graph and reason about each edge. No universal answer.</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Never memorize</strong> (look up)</td>
+<td><strong>Specific Paxos message formats</strong> — Prepare, Promise, Accept, Accepted phases and their exact payloads</td>
+<td>Nobody expects you to implement Paxos from memory. Understand the invariants, look up the protocol.</td>
+</tr>
+<tr>
+<td><strong>Never memorize</strong></td>
+<td><strong>Exact Raft log replication protocol</strong> — AppendEntries RPC fields, log matching property proof</td>
+<td>Understand why logs must match; look up the exact mechanism in the Raft paper when implementing.</td>
+</tr>
+<tr>
+<td><strong>Never memorize</strong></td>
+<td><strong>ZAB implementation details</strong> — ZooKeeper Atomic Broadcast message types and state machine</td>
+<td>Know that ZAB exists and what it guarantees. Implementation details live in the ZooKeeper source code.</td>
+</tr>
+<tr>
+<td><strong>Never memorize</strong></td>
+<td><strong>PBFT message flow</strong> — Pre-prepare, Prepare, Commit phase exact message contents</td>
+<td>Know the 3f+1 bound and the three-phase structure. Look up specifics when building a BFT system.</td>
+</tr>
+<tr>
+<td><strong>Never memorize</strong></td>
+<td><strong>Phi accrual failure detector math</strong> — The exact formula for phi calculation</td>
+<td>Know it uses adaptive thresholds based on heartbeat history. Look up the paper for the math.</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>The meta-rule:</strong> Memorize results and invariants (they compress into sentences). Reason about design decisions (they require context). Look up protocols and algorithms (they are too detailed to carry in your head and you will get the details wrong).</p>
+</blockquote>
+<hr>
 <hr>
 <h1 id="summary">Summary</h1>
 <hr>
@@ -5075,6 +5617,7 @@ For every service endpoint:
 </li>
 <li><a href="#why-this-topic-matters-in-real-systems">Why This Topic Matters in Real Systems</a></li>
 <li><a href="#foundational-definitions">Foundational Definitions</a></li>
+<li><a href="#distributed-systems-crib-sheet">Distributed Systems Crib Sheet</a></li>
 <li><a href="#11-cap-theorem">1.1 CAP Theorem</a><ul>
 <li><a href="#111-historical-context">1.1.1 Historical Context</a></li>
 <li><a href="#112-formal-proof-sketch">1.1.2 Formal Proof Sketch</a></li>
@@ -5234,6 +5777,29 @@ For every service endpoint:
 <li><a href="#deterministic-simulation-testing">Deterministic Simulation Testing</a></li>
 </ul>
 </li>
+<li><a href="#causal-consistency-and-crdts-for-collaboration">Causal Consistency and CRDTs for Collaboration</a><ul>
+<li><a href="#why-causal-consistency-matters">Why Causal Consistency Matters</a></li>
+<li><a href="#crdts-conflict-free-replicated-data-types">CRDTs: Conflict-Free Replicated Data Types</a></li>
+<li><a href="#causal-ordering-across-nodes">Causal Ordering Across Nodes</a></li>
+<li><a href="#trade-offs-causal-consistency-vs-other-models">Trade-offs: Causal Consistency vs Other Models</a></li>
+</ul>
+</li>
+<li><a href="#debugging-distributed-systems">Debugging Distributed Systems</a><ul>
+<li><a href="#why-debugging-is-fundamentally-different">Why Debugging Is Fundamentally Different</a></li>
+<li><a href="#tools-and-techniques">Tools and Techniques</a></li>
+<li><a href="#common-debugging-anti-patterns">Common Debugging Anti-Patterns</a></li>
+</ul>
+</li>
+<li><a href="#modern-multi-region-write-paths">Modern Multi-Region Write Paths</a><ul>
+<li><a href="#pattern-1-single-leader-with-regional-read-replicas">Pattern 1: Single-Leader with Regional Read Replicas</a></li>
+<li><a href="#pattern-2-multi-leader-with-conflict-resolution">Pattern 2: Multi-Leader with Conflict Resolution</a></li>
+<li><a href="#pattern-3-leaderless-with-crdts">Pattern 3: Leaderless with CRDTs</a></li>
+<li><a href="#pattern-4-regional-sharding-data-affinity">Pattern 4: Regional Sharding (Data Affinity)</a></li>
+<li><a href="#comparing-the-four-patterns">Comparing the Four Patterns</a></li>
+<li><a href="#decision-matrix">Decision Matrix</a></li>
+<li><a href="#real-world-implementation-notes">Real-World Implementation Notes</a></li>
+</ul>
+</li>
 <li><a href="#how-interviewers-test-distributed-system-fundamentals">How Interviewers Test Distributed System Fundamentals</a><ul>
 <li><a href="#question-pattern-1-trade-off-analysis">Question Pattern 1: Trade-off Analysis</a></li>
 <li><a href="#question-pattern-2-failure-scenario-analysis">Question Pattern 2: Failure Scenario Analysis</a></li>
@@ -5260,6 +5826,10 @@ For every service endpoint:
 <li><a href="#question-14-gossip-protocol-design">Question 14: Gossip Protocol Design</a></li>
 <li><a href="#question-15-pacelc-in-system-selection">Question 15: PACELC in System Selection</a></li>
 <li><a href="#question-16-designing-for-network-partitions">Question 16: Designing for Network Partitions</a></li>
+<li><a href="#what-to-memorize-vs-what-to-reason-about">What to Memorize vs What to Reason About</a><ul>
+<li><a href="#the-three-column-guide">The Three-Column Guide</a></li>
+</ul>
+</li>
 <li><a href="#section-1-core-concepts_2">Section 1 — Core Concepts</a></li>
 <li><a href="#section-2-time-ordering_2">Section 2 — Time &amp; Ordering</a></li>
 <li><a href="#section-3-fault-tolerance_2">Section 3 — Fault Tolerance</a></li>
