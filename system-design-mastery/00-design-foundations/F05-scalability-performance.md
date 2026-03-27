@@ -3169,6 +3169,278 @@ Serverless platforms (AWS Lambda, Google Cloud Functions, Azure Functions) provi
 
 ---
 
+## Performance Engineering Loop
+
+Performance optimization is not guesswork — it is a disciplined, iterative process. The Performance Engineering Loop provides a structured methodology that prevents premature optimization and ensures every change is validated with data.
+
+```mermaid
+flowchart TD
+    M["1. Measure\n(baseline p50/p95/p99,\nthroughput, error rate)"] --> H["2. Hypothesize\n(identify bottleneck:\nCPU/memory/I/O/network/contention)"]
+    H --> C["3. Change\n(apply ONE optimization)"]
+    C --> V["4. Verify\n(re-measure against baseline)"]
+    V --> D{"Improvement\nsufficient?"}
+    D -->|No| M
+    D -->|Yes| A["5. Accept & Document"]
+    A --> N{"New bottleneck\nemerged?"}
+    N -->|Yes| M
+    N -->|No| Done["Ship it"]
+```
+
+### Step-by-Step Methodology
+
+| Step | Action | Tools | Output |
+|------|--------|-------|--------|
+| **1. Measure** | Profile under realistic load | k6, Locust, Gatling, pprof, perf | Baseline: p50=45ms, p95=120ms, p99=450ms |
+| **2. Hypothesize** | Analyze flame graphs, slow query logs, connection pool metrics | Jaeger, flame graphs, pg_stat_statements | "90% of p99 time is in DB query X" |
+| **3. Change** | Apply ONE fix (add index, add cache, optimize query) | Code change, config change | Index added on `orders(user_id, created_at)` |
+| **4. Verify** | Re-run same load test, compare | Same tools as Step 1 | New: p50=42ms, p95=85ms, p99=180ms |
+| **5. Accept** | Document what changed and why | ADR, runbook | "Added composite index, p99 improved 60%" |
+
+### Observability Cost Budget
+
+Adding observability has overhead. Budget for it explicitly:
+
+| Observability Component | Typical CPU Overhead | Memory Overhead | Recommendation |
+|------------------------|---------------------|-----------------|----------------|
+| Structured logging (JSON) | 0.5-1% | 50-100MB for buffers | Always on |
+| Metrics (Prometheus scraping) | 0.1-0.5% | 10-50MB | Always on |
+| Distributed tracing (sampling) | 1-3% | 100-200MB | Sample 1-10% in production |
+| Continuous profiling | 1-2% | 50-100MB | On in staging, sample in prod |
+| **Total budget** | **1-5%** | **200-450MB** | **Accept this as cost of operating** |
+
+> **Interview insight**: When asked "how would you optimize X?", always start with "First, I'd measure to find the actual bottleneck" — this signals senior thinking. Never jump to "add a cache" without evidence.
+
+---
+
+## Tail Latency Management Playbook
+
+### Why Tail Latency Matters
+
+Average latency is misleading. In fan-out architectures, the slowest backend determines the user-visible latency. If a request fans out to 100 services and each has 1% chance of being slow, the probability that at least one is slow is:
+
+```
+P(at least one slow) = 1 - (0.99)^100 = 63.4%
+```
+
+This means **63% of user requests** will experience tail latency — even though each individual service is "fast" 99% of the time. This is Jeff Dean's insight from "The Tail at Scale" (Google, 2013).
+
+### Sources of Tail Latency
+
+| Source | Typical Impact | Detection | Mitigation |
+|--------|---------------|-----------|------------|
+| **GC pauses** (JVM, Go) | 10-200ms spikes | GC logs, p99 spikes | Tune heap, use G1/ZGC, reduce allocation |
+| **Noisy neighbors** (shared infra) | 5-50ms variance | CPU steal time, I/O wait | Dedicated instances, CPU pinning |
+| **Disk I/O spikes** | 10-500ms | iowait, disk queue depth | SSDs, pre-warm caches, async I/O |
+| **Lock contention** | 1-100ms | Thread dumps, lock wait time | Lock-free structures, finer granularity |
+| **Cold caches** | 50-500ms | Cache miss rate spikes | Pre-warming, lazy population |
+| **Network retransmissions** | 200ms+ per retransmit | TCP retransmit stats | Connection pooling, keep-alive |
+| **Head-of-line blocking** | Unbounded | Queue depth monitoring | Separate queues per priority |
+
+### Tail Latency Patterns
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant LB as Load Balancer
+    participant R1 as Replica 1 (fast)
+    participant R2 as Replica 2 (slow)
+
+    Note over C: Hedged Request Pattern
+    C->>LB: Request
+    LB->>R1: Forward (primary)
+    LB->>R2: Forward (hedge, after 5ms delay)
+    R1-->>LB: Response (12ms)
+    LB-->>C: Return first response
+    Note over R2: Cancel or ignore R2 response
+    R2-->>LB: Response (450ms, discarded)
+```
+
+| Pattern | How It Works | Tail Reduction | Extra Cost | When to Use |
+|---------|-------------|---------------|-----------|-------------|
+| **Hedged requests** | Send to 2 replicas after brief delay; use first response | p99 → ~p50 | 2-5% extra load | Read-heavy, idempotent operations |
+| **Tied requests** | Send to 2, first to start cancels other | Better than hedged | Requires cancel protocol | When servers have variable queue depths |
+| **Request deadlines** | Propagate deadline through call chain; abandon if exceeded | Prevents cascade | None (saves work) | All RPC calls |
+| **Canary requests** | Test with one backend before full fan-out | Detects slow backends | +1 RTT for canary | High fan-out queries |
+| **Latency-based LB** | Route to replica with lowest recent p50 | Avoids slow replicas | LB state overhead | When replicas have uneven performance |
+| **Backup requests with cancellation** | Send backup after p95 deadline; cancel slower | p99 → ~p95 | 5% extra load | Google-style fan-out services |
+
+> **Interview insight**: When designing any fan-out system (search, recommendations, aggregation), proactively mention hedged requests and deadline propagation. This shows awareness of production-grade latency management.
+
+---
+
+## Retry Budget and Resilience-Performance Interaction
+
+### The Retry Amplification Problem
+
+Retries are essential for reliability but dangerous for performance. During an outage, retries amplify load exponentially:
+
+```
+effective_load = base_load × (1 + retry_rate × avg_retries_per_failure)
+
+Example during partial outage (30% error rate, 3 retries per failure):
+  effective_load = 10,000 RPS × (1 + 0.30 × 3) = 19,000 RPS
+  → Nearly 2x the normal load hits an already-struggling system
+```
+
+```mermaid
+flowchart TD
+    subgraph Normal["Normal: 10K RPS"]
+        N1["Service A → Service B\n10K RPS, 0.1% errors"]
+    end
+    subgraph Degraded["Degraded: Service B at 50% capacity"]
+        D1["Service A → Service B\n10K RPS + 5K retries = 15K RPS"]
+        D2["Service B overwhelmed\nError rate jumps to 60%"]
+    end
+    subgraph Cascade["Cascade: Total failure"]
+        C1["Service A → Service B\n10K + 18K retries = 28K RPS"]
+        C2["Service B collapses\n100% errors"]
+        C3["Service A also collapses\n(thread pool exhausted)"]
+    end
+    Normal -->|"B loses 50% capacity"| Degraded
+    Degraded -->|"Retries amplify"| Cascade
+```
+
+### Retry Budget Pattern
+
+Limit retries to a percentage of total traffic rather than per-request retry counts:
+
+```python
+class RetryBudget:
+    """Allow retries only up to X% of recent successful traffic."""
+
+    def __init__(self, budget_ratio=0.10, window_seconds=10):
+        self.budget_ratio = budget_ratio  # 10% retry budget
+        self.window = window_seconds
+        self.successes = []  # timestamps
+        self.retries_used = []  # timestamps
+
+    def can_retry(self) -> bool:
+        now = time.time()
+        cutoff = now - self.window
+        recent_successes = sum(1 for t in self.successes if t > cutoff)
+        recent_retries = sum(1 for t in self.retries_used if t > cutoff)
+        max_retries = int(recent_successes * self.budget_ratio)
+        return recent_retries < max_retries
+```
+
+### Hedging vs Retrying
+
+| Aspect | Retrying | Hedging |
+|--------|----------|---------|
+| **Timing** | After failure (reactive) | Before failure (proactive) |
+| **Latency impact** | Adds full RTT per retry | Adds ~0 latency (parallel) |
+| **Load impact** | Amplifies during outage | Constant ~2-5% overhead |
+| **Idempotency requirement** | Required | Required |
+| **Best for** | Transient errors, write operations | Read operations, fan-out |
+| **Risk** | Retry storms during outage | Wasted work when all replicas fast |
+
+> **Key rule**: Use retry budgets (not just per-request retry limits) to prevent cascading failures. Link retry budgets to SLO error budgets — if your error budget is exhausted, retries should stop.
+
+---
+
+## Latency Budget Worksheet
+
+A latency budget breaks an end-to-end request into segments, allocating a time budget to each. This is a critical tool for design reviews and capacity planning.
+
+### Example: E-Commerce Product Page (200ms SLO)
+
+| # | Segment | Budget | Actual p50 | Actual p99 | Remaining | Owner |
+|---|---------|--------|-----------|-----------|-----------|-------|
+| 1 | CDN / Edge | 10ms | 5ms | 12ms | 190ms | Infra |
+| 2 | Load Balancer | 2ms | 1ms | 3ms | 188ms | Infra |
+| 3 | API Gateway (auth + rate limit) | 15ms | 10ms | 18ms | 173ms | Platform |
+| 4 | Product Service (app logic) | 25ms | 15ms | 30ms | 148ms | Product team |
+| 5 | Database query (product data) | 20ms | 12ms | 25ms | 128ms | Product team |
+| 6 | Cache lookup (pricing) | 3ms | 1ms | 5ms | 125ms | Product team |
+| 7 | Inventory Service (RPC) | 30ms | 20ms | 45ms | 95ms | Inventory team |
+| 8 | Recommendation Service (RPC) | 50ms | 35ms | 80ms | 45ms | ML team |
+| 9 | Serialization + response | 5ms | 3ms | 8ms | 40ms | Product team |
+| 10 | Network transit (client) | 30ms | 15ms | 40ms | 10ms | N/A |
+| | **Total** | **190ms** | **117ms** | **266ms** | | |
+
+### "Budget Blown" Scenario
+
+The p99 total (266ms) exceeds the 200ms SLO. Remediation options:
+
+1. **Recommendation Service** consumes 80ms at p99 — add timeout at 50ms with graceful degradation (show default recommendations on timeout)
+2. **Inventory Service** at 45ms p99 — add cache with 5-second TTL (acceptable staleness for display)
+3. **Database query** at 25ms p99 — add covering index to eliminate sequential scan
+
+After fixes: p99 estimate = 5 + 3 + 18 + 30 + 15 + 5 + 15 + 50 + 8 + 40 = 189ms ✅
+
+### How to Use in Design Reviews
+
+1. **Before building**: Create the worksheet with budgets. Get team agreement.
+2. **During development**: Measure each segment. Flag any segment exceeding budget.
+3. **Before launch**: Run load test. Verify end-to-end p99 meets SLO.
+4. **In production**: Set alerts on per-segment latency. Dashboard showing budget utilization.
+
+---
+
+## Performance Anti-Patterns
+
+### Anti-Pattern 1: N+1 Query Problem
+
+> ⚠️ **Detection signal**: Latency scales linearly with result count. 100 items = 101 queries.
+
+**Before (N+1):**
+```sql
+-- 1 query to get orders
+SELECT * FROM orders WHERE user_id = 123;
+-- Then for EACH order (N queries):
+SELECT * FROM order_items WHERE order_id = 1;
+SELECT * FROM order_items WHERE order_id = 2;
+-- ... 100 more queries
+```
+
+**After (JOIN or batch):**
+```sql
+-- 1 query with JOIN
+SELECT o.*, oi.*
+FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+WHERE o.user_id = 123;
+
+-- Or batch with IN clause
+SELECT * FROM order_items WHERE order_id IN (1, 2, 3, ...);
+```
+
+**Fix**: Use JOINs, batch loading (DataLoader pattern), or eager loading in ORMs.
+
+### Anti-Pattern 2: Premature Optimization
+
+> ⚠️ **Detection signal**: Complex caching/sharding for a system handling 100 RPS. Engineer spent 2 weeks on optimization without profiling data.
+
+**Rule**: "Measure first, optimize second." A single PostgreSQL instance handles 10,000+ simple queries/second. You don't need Redis until you've proven the DB is the bottleneck.
+
+**When optimization IS appropriate**: When profiling shows a specific bottleneck, when approaching known limits (connection pool, memory), or when SLO violations are measured.
+
+### Anti-Pattern 3: Synchronous Fan-Out Without Timeout Budgets
+
+> ⚠️ **Detection signal**: p99 latency equals sum of all downstream p99 latencies. One slow service blocks entire response.
+
+**Problem**: Calling 5 services sequentially, each with 200ms timeout = 1000ms worst case.
+
+**Fix**: Parallelize independent calls. Set per-call timeouts that sum to less than your SLO. Use circuit breakers for non-critical calls.
+
+### Anti-Pattern 4: Unbounded Queues Causing Memory Pressure
+
+> ⚠️ **Detection signal**: OOM kills during traffic spikes. Memory usage grows linearly with queue depth.
+
+**Problem**: In-memory queue with no size limit. During a spike, producers outpace consumers, queue grows until JVM runs out of heap.
+
+**Fix**: Set max queue size. Apply back-pressure (reject or slow producers). Use external queues (Kafka, SQS) with bounded consumer concurrency.
+
+### Anti-Pattern 5: Missing Connection Pooling
+
+> ⚠️ **Detection signal**: "too many connections" errors under load. Each request opens a new TCP connection to the database.
+
+**Problem**: Creating a new DB connection takes 5-20ms (TCP handshake + TLS + auth). At 1000 RPS, that's 5-20 seconds of cumulative connection overhead per second.
+
+**Fix**: Use connection pools (HikariCP for Java, pgBouncer for PostgreSQL, connection pool in ORMs). Size pool = (number of CPU cores × 2) + number of disk spindles.
+
+---
+
 ## Summary
 
 Scalability and performance are not problems you solve once — they are ongoing engineering disciplines that evolve with your system's growth. The key principles:
