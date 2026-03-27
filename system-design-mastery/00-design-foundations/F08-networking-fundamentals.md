@@ -324,6 +324,98 @@ If the client has previously connected, it can send early data in the first flig
 | Certificate transparency | CT logs for public audit of issued certificates |
 | Short-lived certificates | 90-day (Let's Encrypt) or even 24-hour certificates for higher security |
 
+### 1.1.5a Modern Protocol Updates (2026-Ready)
+
+This section consolidates the latest protocol developments that affect real-world system design decisions as of 2026.
+
+#### TLS 1.3 Behavioral Changes (Production Impact)
+
+TLS 1.3 is no longer optional — it is the baseline for secure communication.
+
+| TLS 1.3 Change | Why It Matters for System Design |
+|---|---|
+| **1-RTT handshake** | Reduces connection latency by 33-50% compared to TLS 1.2 (2-RTT). Critical for mobile and high-latency links. |
+| **0-RTT resumption** | Returning clients send encrypted data in the first packet. Use only for idempotent requests (GET) due to replay risk. |
+| **Removed RSA key exchange** | Only ephemeral Diffie-Hellman (ECDHE) is supported. Eliminates passive decryption if private key is compromised. |
+| **Mandatory forward secrecy** | Every session uses unique keys. Compromise of long-term keys does not decrypt past sessions. |
+| **Removed ChangeCipherSpec** | Simpler state machine, fewer implementation bugs. |
+| **Encrypted handshake** | Server certificate is encrypted, preventing passive fingerprinting of server identity. |
+
+> **Compliance note:** TLS 1.2 is deprecated for PCI DSS 4.0 (effective March 2025). All payment-handling systems must use TLS 1.3. Many organizations are adopting TLS 1.3-only policies for all internal and external traffic.
+
+**Version annotation for existing protocol sections:**
+- HTTP/1.1 (Section 1.1.2): Still uses TLS 1.2 in many legacy deployments. Upgrade path: enable TLS 1.3 at the load balancer/reverse proxy.
+- HTTP/2 (Section 1.1.3): Requires ALPN (Application-Layer Protocol Negotiation) in TLS. TLS 1.3 with HTTP/2 is the recommended baseline for 2026.
+- HTTP/3 (Section 1.1.4): Mandates TLS 1.3 — there is no HTTP/3 without TLS 1.3 since it is built into QUIC.
+
+#### QUIC/HTTP/3 Production Readiness (2026 Status)
+
+QUIC is no longer experimental. Major platforms have adopted it in production:
+
+| Capability | Detail |
+|---|---|
+| **Transport** | UDP-based with built-in TLS 1.3 — no separate TLS handshake layer |
+| **0-RTT connection** | Resumed connections send data immediately; new connections complete in 1-RTT |
+| **Connection migration** | Connections survive IP changes (Wi-Fi to cellular) via connection IDs instead of IP/port tuples |
+| **HOL blocking elimination** | Packet loss in one stream does not block other streams (unlike TCP where all streams stall) |
+| **Congestion control** | Pluggable — supports BBR, Cubic, and custom algorithms per connection |
+
+**Real-world adoption and performance:**
+- Google reports ~30% latency reduction for YouTube video start times with QUIC/HTTP/3
+- Cloudflare sees 12-15% improvement in TTFB for HTTP/3 vs HTTP/2
+- Meta uses QUIC for mobile app traffic, reducing connection failures by 20% on lossy networks
+- As of 2026, ~30% of global web traffic uses HTTP/3
+
+**When NOT to use HTTP/3:**
+- Corporate networks with strict firewall rules blocking UDP/443
+- Low-loss, low-latency data center east-west traffic (TCP overhead is negligible)
+- Systems requiring deep packet inspection (QUIC encrypts more of the header)
+
+#### gRPC over HTTP/2 vs HTTP/3
+
+| Aspect | gRPC over HTTP/2 | gRPC over HTTP/3 (experimental) |
+|---|---|---|
+| Transport | TCP with optional TLS | QUIC (UDP) with mandatory TLS 1.3 |
+| Multiplexing | HTTP/2 streams (TCP HOL blocking) | QUIC streams (no HOL blocking) |
+| Connection setup | 2-3 RTT (TCP + TLS) | 1 RTT (new), 0 RTT (resumed) |
+| Streaming | Bidirectional streaming, all 4 modes | Same 4 modes, better loss resilience |
+| Connection migration | Not supported | Supported (mobile-friendly) |
+| Maturity | Production-ready everywhere | Early adoption (2025-2026), supported in envoy and grpc-go |
+
+**Recommendation:** Use gRPC over HTTP/2 for data center service-to-service communication. Evaluate gRPC over HTTP/3 for mobile clients and cross-region calls where latency and connection stability matter.
+
+#### Handshake Comparison: TLS 1.2 vs TLS 1.3 vs QUIC
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+
+    rect rgb(255, 235, 235)
+    Note over C,S: TLS 1.2 — 2 RTT (deprecated for PCI DSS 4.0)
+    C->>S: ClientHello (cipher suites)
+    S->>C: ServerHello + Certificate + KeyExchange
+    C->>S: ClientKeyExchange + ChangeCipherSpec
+    S->>C: ChangeCipherSpec + Finished
+    Note over C,S: 2 round trips before application data
+    end
+
+    rect rgb(235, 255, 235)
+    Note over C,S: TLS 1.3 — 1 RTT (mandatory forward secrecy)
+    C->>S: ClientHello + KeyShare (ECDHE)
+    S->>C: ServerHello + KeyShare + EncryptedExtensions + Cert + Finished
+    C->>S: Finished + Application Data
+    Note over C,S: 1 round trip — 50% faster than TLS 1.2
+    end
+
+    rect rgb(235, 235, 255)
+    Note over C,S: QUIC — 0 RTT (resumed connections)
+    C->>S: 0-RTT Data + ClientHello (PSK + KeyShare)
+    S->>C: ServerHello + Handshake + Application Data
+    Note over C,S: Data sent immediately on resumed connections
+    end
+```
+
 ### 1.1.6 HTTP Methods, Status Codes, and Headers (System Design Essentials)
 
 **Methods and Idempotency**
@@ -3229,6 +3321,534 @@ Trace: GET /api/orders/123
 - `tls.handshake_time`: Time to complete TLS handshake
 - `http.request_content_length`: Request body size
 - `http.response_content_length`: Response body size
+
+---
+
+## 3.9 Multi-Region Latency Budgeting
+
+In multi-region architectures, the network is the dominant source of latency. The speed of light imposes hard physical limits that no amount of optimization can overcome. Engineers must budget latency explicitly.
+
+### 3.9.1 Speed of Light Limits
+
+Light in fiber travels at roughly 2/3 the speed of light in vacuum (~200,000 km/s). This sets the theoretical minimum RTT between regions. Real-world RTTs are 1.5-2x the theoretical minimum due to routing, switching, and protocol overhead.
+
+| Route | Distance (km) | Theoretical Min RTT | Typical RTT |
+|---|---|---|---|
+| US East (Virginia) ↔ US West (Oregon) | 3,700 | ~37ms | 60-70ms |
+| US East (Virginia) ↔ EU West (Ireland) | 5,500 | ~55ms | 75-85ms |
+| US East (Virginia) ↔ AP Southeast (Singapore) | 15,300 | ~153ms | 200-230ms |
+| US West (Oregon) ↔ AP Northeast (Tokyo) | 7,700 | ~77ms | 100-120ms |
+| EU West (Ireland) ↔ AP Southeast (Singapore) | 10,800 | ~108ms | 160-180ms |
+| US East (Virginia) ↔ SA East (Sao Paulo) | 7,600 | ~76ms | 120-140ms |
+
+### 3.9.2 Inter-Region Cloud Latency Reference (Major Providers)
+
+| Region Pair | AWS (typical) | GCP (typical) | Azure (typical) |
+|---|---|---|---|
+| us-east-1 ↔ eu-west-1 | 75-85ms | 80-90ms | 75-85ms |
+| us-east-1 ↔ ap-southeast-1 | 200-230ms | 190-220ms | 200-230ms |
+| us-east-1 ↔ us-west-2 | 60-70ms | 55-65ms | 60-70ms |
+| eu-west-1 ↔ ap-northeast-1 | 220-250ms | 210-240ms | 220-250ms |
+| Same AZ | < 0.5ms | < 0.5ms | < 0.5ms |
+| Cross-AZ (same region) | 1-2ms | 1-2ms | 1-2ms |
+
+### 3.9.3 Latency Budget Worksheet (Network-Focused)
+
+For a user request that spans multiple regions, every network hop must be accounted for:
+
+```
+Example: User in Tokyo reads data that requires cross-region coordination
+
+Step                                  | Budget    | Cumulative
+--------------------------------------|-----------|----------
+Client → CDN Edge (Tokyo)             |    5ms    |     5ms
+CDN Miss → Origin (us-east-1)         |  110ms    |   115ms
+Origin → Database (same region)       |    2ms    |   117ms
+Database cross-region read (eu-west)  |   80ms    |   197ms
+Response: Origin → CDN Edge           |  110ms    |   307ms
+CDN Edge → Client                     |    5ms    |   312ms
+--------------------------------------|-----------|----------
+Total network budget                  |  312ms    |
+Application processing budget         |   38ms    |
+--------------------------------------|-----------|----------
+Target P99 latency                    |  350ms    |
+```
+
+**Rule of thumb:** If your latency budget exceeds 300ms for any user-facing request, you need regional data locality or async patterns.
+
+### 3.9.4 Strategies for Multi-Region Latency Reduction
+
+| Strategy | Latency Reduction | Complexity | Use When |
+|---|---|---|---|
+| **Regional routing (GeoDNS/Anycast)** | Route users to nearest region | Low | Read-heavy workloads with regional data copies |
+| **CDN edge caching** | Eliminate origin round-trip for cacheable content | Low | Static assets, API responses with TTL |
+| **Connection pooling** | Eliminate repeated handshake overhead | Medium | High-throughput service-to-service calls |
+| **Async replication** | Avoid synchronous cross-region writes | Medium | Eventual consistency is acceptable |
+| **Read replicas per region** | Local reads, cross-region writes only | Medium | Read-heavy with infrequent writes |
+| **CRDT / conflict-free writes** | Local writes with automatic merge | High | Multi-region active-active writes (see F07) |
+| **Edge compute (Cloudflare Workers, Lambda@Edge)** | Execute logic at the edge | Medium | Personalization, A/B testing, auth validation |
+
+### 3.9.5 Multi-Region Request Path with Latency Annotations
+
+```mermaid
+graph LR
+    User["User (Tokyo)"]
+    CDN["CDN Edge<br/>Tokyo<br/>+5ms"]
+    DNS["DNS<br/>GeoDNS<br/>+2ms"]
+    Origin["Origin<br/>us-east-1<br/>+110ms RTT"]
+    DB_Primary["DB Primary<br/>us-east-1<br/>+2ms"]
+    DB_Replica["DB Replica<br/>eu-west-1<br/>+80ms RTT"]
+    Cache["Regional Cache<br/>us-east-1<br/>+0.5ms"]
+
+    User -->|"DNS lookup"| DNS
+    DNS -->|"Nearest edge"| CDN
+    CDN -->|"Cache MISS"| Origin
+    Origin -->|"Cache HIT"| Cache
+    Origin -->|"Cache MISS"| DB_Primary
+    DB_Primary -->|"Cross-region read"| DB_Replica
+
+    style User fill:#e1f5fe
+    style CDN fill:#c8e6c9
+    style Origin fill:#fff9c4
+    style DB_Primary fill:#ffccbc
+    style DB_Replica fill:#ffccbc
+    style Cache fill:#c8e6c9
+```
+
+> **Cross-reference:** See F05 Scalability for tail latency budgeting and retry budget accounting. See F07 Distributed Systems for CRDT-based multi-region write strategies.
+
+---
+
+## 3.10 Service-to-Service Identity and mTLS at Scale
+
+### 3.10.1 Why Service-to-Service Auth Matters (Zero Trust)
+
+In a zero-trust network model, no service trusts any other service based on network location alone. Every service-to-service call must be authenticated and authorized. This is a fundamental shift from perimeter-based security where "inside the VPC" was considered safe.
+
+**Threats that mTLS addresses:**
+- Compromised container making lateral calls to other services
+- Network-level man-in-the-middle attacks within the data center
+- Unauthorized services impersonating legitimate ones
+- Data exfiltration through unauthorized service communication
+
+### 3.10.2 How mTLS Works
+
+In standard TLS, only the server presents a certificate. In mutual TLS (mTLS), both client and server present certificates and verify each other's identity.
+
+```mermaid
+sequenceDiagram
+    participant A as Service A (Client)
+    participant CA as Certificate Authority
+    participant B as Service B (Server)
+
+    Note over A,B: mTLS Handshake
+
+    A->>B: ClientHello (supported cipher suites)
+    B->>A: ServerHello + Server Certificate + CertificateRequest
+    Note over A: Verify Server cert against CA
+    A->>B: Client Certificate + KeyExchange + CertificateVerify
+    Note over B: Verify Client cert against CA
+    B->>A: Finished (handshake complete)
+
+    rect rgb(235, 255, 235)
+    Note over A,B: Encrypted + Mutually Authenticated Channel
+    A->>B: Encrypted Request (Service A identity verified)
+    B->>A: Encrypted Response (Service B identity verified)
+    end
+```
+
+### 3.10.3 Certificate Management Challenges at Scale
+
+| Challenge | Impact | Solution |
+|---|---|---|
+| Certificate provisioning for 1000+ services | Manual cert management is impossible | Automated PKI (Vault PKI, AWS Private CA, SPIFFE) |
+| Certificate rotation without downtime | Expired certs cause outages | Short-lived certs (24h) with automatic rotation |
+| Cross-cluster identity | Services in different clusters need mutual trust | Federated trust roots (SPIFFE federation) |
+| Certificate revocation at scale | CRL/OCSP adds latency to every request | Short-lived certificates (no need to revoke) |
+| Private key security | Compromised key breaks all trust | In-memory keys, hardware-backed storage, no key export |
+| Observability | Hard to debug cert-related failures | Cert expiry monitoring, handshake failure metrics |
+
+### 3.10.4 SPIFFE/SPIRE for Workload Identity
+
+SPIFFE (Secure Production Identity Framework For Everyone) provides a standard for service identity:
+
+- **SPIFFE ID**: A URI that uniquely identifies a workload: `spiffe://trust-domain/path` (e.g., `spiffe://prod.example.com/payments/api`)
+- **SVID (SPIFFE Verifiable Identity Document)**: An X.509 certificate or JWT that encodes the SPIFFE ID
+- **SPIRE**: The reference implementation that automates SVID issuance and rotation
+
+**How SPIRE works:**
+1. SPIRE Agent runs on each node, attests workload identity using kernel-level information (PID, cgroups, Kubernetes pod identity)
+2. SPIRE Server issues short-lived SVIDs (certificates valid for 1-24 hours)
+3. Workloads use SVIDs for mTLS — no application code changes needed if using a sidecar/mesh
+4. Automatic rotation before expiry — zero downtime
+
+### 3.10.5 Service Mesh mTLS vs Application-Level mTLS
+
+| Aspect | Service Mesh mTLS (Istio/Linkerd) | Application-Level mTLS |
+|---|---|---|
+| **Implementation** | Sidecar proxy handles all TLS | Application code manages TLS connections |
+| **Code changes** | None — transparent to application | Significant — cert loading, TLS config, rotation logic |
+| **Certificate management** | Mesh control plane automates issuance/rotation | Application must integrate with CA or Vault |
+| **Performance** | Extra hop through sidecar (~0.5-1ms) | Direct connection, lower latency |
+| **Observability** | Built-in metrics (handshake failures, cert expiry) | Must instrument manually |
+| **Policy enforcement** | Declarative (YAML) — AuthorizationPolicy in Istio | Code-level — harder to audit and enforce |
+| **Best for** | Microservices at scale (50+ services) | Small deployments, non-mesh environments, performance-critical paths |
+
+### 3.10.6 Certificate Rotation Without Downtime
+
+The key to zero-downtime certificate rotation is dual-cert support:
+
+1. **Before rotation**: Service holds Certificate A (current)
+2. **Rotation starts**: Service loads Certificate B (new) alongside Certificate A
+3. **Overlap period**: Service presents Certificate B to new connections, accepts both A and B from clients
+4. **Rotation complete**: Certificate A expires or is removed; only Certificate B remains
+5. **Monitoring**: Alert if any service still presents the old certificate after the overlap window
+
+**Service mesh automation:** Istio and Linkerd handle this automatically. Citadel (Istio) or Identity (Linkerd) rotates certificates before expiry with configurable overlap periods. Default in Istio: certificates are valid for 24 hours, rotated at 50% lifetime (every 12 hours).
+
+---
+
+## 3.11 Timeouts and Retries as Network Policy
+
+Timeouts are not optional configuration — they are network policy decisions that determine how your system behaves under degradation. Every network call without an explicit timeout is a potential resource leak and cascading failure vector.
+
+### 3.11.1 Timeout Taxonomy
+
+| Timeout Type | What It Controls | Typical Value | If Too Short | If Too Long |
+|---|---|---|---|---|
+| **Connection timeout** | Time to establish TCP/TLS connection | 1-5s | Reject during DNS/network blips | Threads blocked on unreachable hosts |
+| **Read timeout** | Time waiting for first byte of response | 5-30s | Fail on slow but valid queries | Threads blocked on hung servers |
+| **Write timeout** | Time to send the request body | 5-15s | Fail on large uploads over slow links | Stalled connections consume resources |
+| **Idle timeout** | Time a connection sits unused before closure | 30-120s | Excessive connection churn (re-establish overhead) | Wasted resources on stale connections |
+| **Request timeout** | End-to-end time for complete request lifecycle | 10-60s | Fail valid complex operations | Users wait too long, resources consumed |
+
+### 3.11.2 Timeout Propagation and Deadline Budgets
+
+In a service chain, timeouts must propagate to prevent upstream services from waiting longer than the original caller's deadline.
+
+**The deadline budget pattern:**
+
+```
+Client sets deadline: 500ms
+
+Gateway receives request
+  Remaining budget: 500ms - 5ms (network) = 495ms
+  Gateway processing: 10ms
+  Remaining: 485ms
+
+Service A receives request
+  Remaining budget: 485ms - 3ms (network) = 482ms
+  Service A processing: 20ms
+  Remaining: 462ms
+
+Service B receives request
+  Remaining budget: 462ms - 3ms (network) = 459ms
+  Service B must complete within: 459ms
+  If Service B needs to call Service C, it passes: 459ms - processing_time
+```
+
+**Critical rule:** Every downstream call should set its timeout to min(own_timeout, remaining_deadline_budget). If the remaining budget is less than the minimum useful timeout, fail fast without making the call.
+
+```mermaid
+graph LR
+    Client["Client<br/>Deadline: 500ms"]
+    Gateway["API Gateway<br/>Budget: 495ms<br/>Uses: 10ms"]
+    SvcA["Service A<br/>Budget: 482ms<br/>Uses: 20ms"]
+    SvcB["Service B<br/>Budget: 459ms<br/>Uses: 50ms"]
+    SvcC["Service C<br/>Budget: 406ms"]
+
+    Client -->|"5ms network"| Gateway
+    Gateway -->|"3ms network"| SvcA
+    SvcA -->|"3ms network"| SvcB
+    SvcB -->|"3ms network"| SvcC
+
+    style Client fill:#e1f5fe
+    style Gateway fill:#fff9c4
+    style SvcA fill:#fff9c4
+    style SvcB fill:#fff9c4
+    style SvcC fill:#ffccbc
+```
+
+### 3.11.3 Retry Classification
+
+Not all errors are retryable. Retrying non-retryable errors wastes resources and can cause duplicate side effects.
+
+| Error | Retryable? | Reason |
+|---|---|---|
+| **503 Service Unavailable** | Yes | Server is temporarily overloaded |
+| **429 Too Many Requests** | Yes (with backoff) | Rate limited — respect Retry-After header |
+| **Connection timeout** | Yes | Network or server unreachable temporarily |
+| **Connection refused** | Yes (limited) | Server process not running — may recover after restart |
+| **Connection reset** | Yes | Server dropped connection — may be transient |
+| **500 Internal Server Error** | Maybe | Could be transient; limit retries to 1-2 |
+| **400 Bad Request** | No | Client error — retrying sends the same bad request |
+| **401 Unauthorized** | No | Invalid credentials — retry will not fix auth |
+| **403 Forbidden** | No | Permission denied — retry will not grant access |
+| **404 Not Found** | No | Resource does not exist |
+| **409 Conflict** | No (usually) | State conflict — retry may worsen the situation |
+
+### 3.11.4 Exponential Backoff with Jitter
+
+Exponential backoff prevents retry storms. Jitter prevents thundering herd when many clients retry simultaneously.
+
+**Formula:**
+
+```
+wait_time = min(base_delay * 2^attempt + random(0, jitter_range), max_delay)
+
+Example with base_delay=100ms, jitter_range=100ms, max_delay=30s:
+  Attempt 1: 100ms * 2^1 + random(0,100) = 200-300ms
+  Attempt 2: 100ms * 2^2 + random(0,100) = 400-500ms
+  Attempt 3: 100ms * 2^3 + random(0,100) = 800-900ms
+  Attempt 4: 100ms * 2^4 + random(0,100) = 1600-1700ms
+  ...capped at 30s
+```
+
+**Full jitter (recommended by AWS):**
+
+```
+wait_time = random(0, min(base_delay * 2^attempt, max_delay))
+```
+
+Full jitter provides the broadest spread of retry times, minimizing correlated retries across clients.
+
+### 3.11.5 Circuit Breaker Integration
+
+Retries and circuit breakers work together. The circuit breaker prevents retries when a downstream service is known to be failing:
+
+| Circuit State | Retry Behavior | Timeout Behavior |
+|---|---|---|
+| **Closed** (healthy) | Normal retries with backoff | Normal timeouts |
+| **Open** (failing) | No retries — fail immediately | No connection attempt — return cached/fallback |
+| **Half-Open** (testing) | Single probe request | Shorter timeout to detect recovery quickly |
+
+**Transition thresholds (example):**
+- Closed → Open: 5 failures in 30 seconds
+- Open → Half-Open: After 30-second cooldown
+- Half-Open → Closed: 3 consecutive successes
+- Half-Open → Open: 1 failure
+
+### 3.11.6 Timeout Cascade Through a Service Chain
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant GW as API Gateway
+    participant A as Service A
+    participant B as Service B
+    participant DB as Database
+
+    Note over C,DB: Deadline Budget: 2000ms
+
+    C->>GW: Request (deadline: 2000ms)
+    Note over GW: Budget: 1990ms, uses 50ms
+    GW->>A: Forward (deadline: 1940ms)
+    Note over A: Budget: 1930ms, uses 100ms
+    A->>B: Call (deadline: 1830ms)
+    Note over B: Budget: 1820ms, uses 50ms
+    B->>DB: Query (deadline: 1770ms)
+
+    Note over DB: DB takes 2500ms (overloaded!)
+
+    DB--xB: Read timeout at 1770ms!
+    B--xA: 504 Gateway Timeout
+    Note over A: Retry? Budget remaining: 1830ms - 1770ms = 60ms
+    Note over A: 60ms < min useful timeout (500ms) → fail fast
+    A--xGW: 504 Gateway Timeout
+    GW--xC: 504 Gateway Timeout (total: 1950ms)
+```
+
+> **Cross-reference:** See F05 Scalability for retry budget accounting — total retry traffic should be capped at 10-20% of normal traffic to prevent retry storms from amplifying failures.
+
+---
+
+## 3.12 Modern Edge Stack
+
+Every user request traverses multiple layers of infrastructure before reaching application code. Understanding the full edge stack — each layer's role, latency contribution, and failure mode — is essential for system design.
+
+### 3.12.1 Full Request Path: Client to Origin
+
+```mermaid
+graph TD
+    Client["Client<br/>(Browser/Mobile App)"]
+    DNS["DNS Resolution<br/>+2-50ms<br/>Failure: NXDOMAIN, timeout"]
+    Anycast["Anycast CDN Edge<br/>(Cloudflare/Fastly/CloudFront)<br/>+1-5ms<br/>Failure: edge POP down"]
+    WAF["WAF<br/>(Web Application Firewall)<br/>+1-3ms<br/>Failure: false positive blocks"]
+    DDoS["DDoS Mitigation<br/>+0-2ms (inline)<br/>Failure: volume overwhelms capacity"]
+    APIGW["API Gateway<br/>+2-10ms<br/>Failure: rate limit, auth failure"]
+    LB["Load Balancer<br/>(L7 ALB/NLB)<br/>+1-3ms<br/>Failure: health check flap"]
+    Mesh["Service Mesh Sidecar<br/>(Envoy/Linkerd-proxy)<br/>+0.5-1ms<br/>Failure: sidecar crash"]
+    App["Application<br/>+variable<br/>Failure: application error"]
+
+    Client --> DNS
+    DNS --> Anycast
+    Anycast --> WAF
+    WAF --> DDoS
+    DDoS --> APIGW
+    APIGW --> LB
+    LB --> Mesh
+    Mesh --> App
+
+    style Client fill:#e1f5fe
+    style DNS fill:#e8eaf6
+    style Anycast fill:#c8e6c9
+    style WAF fill:#fff9c4
+    style DDoS fill:#fff9c4
+    style APIGW fill:#ffe0b2
+    style LB fill:#ffe0b2
+    style Mesh fill:#f3e5f5
+    style App fill:#ffccbc
+```
+
+### 3.12.2 Edge Layer Responsibilities
+
+| Layer | Role | Latency Added | Failure Mode | Recovery |
+|---|---|---|---|---|
+| **DNS** | Name resolution, geographic routing | 2-50ms (cached: 0ms) | NXDOMAIN, timeout, poisoning | Multiple providers, low TTL during changes |
+| **Anycast CDN** | Cache static/dynamic content at the edge | 1-5ms (cache hit: serves directly) | Edge POP failure | Automatic failover to next-nearest POP |
+| **WAF** | Block SQL injection, XSS, malicious payloads | 1-3ms | False positive blocks legitimate traffic | Tunable rules, audit mode before enforcement |
+| **DDoS Mitigation** | Absorb volumetric and protocol attacks | 0-2ms (inline) | Attack exceeds capacity | Scrubbing centers, upstream blackholing |
+| **API Gateway** | Authentication, rate limiting, request routing | 2-10ms | Auth service down, rate limiter misconfigured | Circuit breaker on auth, cached tokens |
+| **Load Balancer** | Distribute traffic, health checks, SSL termination | 1-3ms | Health check flapping, algorithm imbalance | Slow-start, dampened health checks |
+| **Service Mesh** | mTLS, observability, traffic management | 0.5-1ms | Sidecar crash, control plane down | Data plane continues with last-known config |
+| **Application** | Business logic | Variable | Application error, OOM, deadlock | Autoscaling, health checks, graceful degradation |
+
+**Total edge overhead (typical):** 8-75ms added before application code runs. Optimize by collapsing layers (e.g., CDN with built-in WAF and DDoS) and using keep-alive connections between layers.
+
+### 3.12.3 CDN Provider Architecture Comparison
+
+| Feature | Cloudflare | Fastly | AWS CloudFront |
+|---|---|---|---|
+| **Network** | Anycast, 300+ cities | Anycast, 90+ POPs | 400+ edge locations, 13 regional caches |
+| **Edge compute** | Workers (V8 isolates, 0ms cold start) | Compute@Edge (Wasm) | Lambda@Edge (Node/Python, cold start ~100ms) |
+| **WAF** | Integrated (managed + custom rules) | Signal Sciences (acquired) | AWS WAF (separate service) |
+| **DDoS** | Always-on, unlimited (included) | Always-on (included) | Shield Standard (free) / Advanced ($3k/mo) |
+| **TLS termination** | Edge (automatic certs) | Edge (automatic certs) | Edge (ACM integration) |
+| **Cache invalidation** | Instant (~150ms global) | Instant (~150ms global) | 1-10 minutes (batch invalidation) |
+| **Origin protocol** | HTTP/1.1, HTTP/2, gRPC | HTTP/1.1, HTTP/2 | HTTP/1.1, HTTP/2 |
+| **Pricing model** | Flat (unlimited bandwidth) | Usage-based (requests + bandwidth) | Usage-based (requests + bandwidth per region) |
+| **Best for** | Full-stack security + performance | Low-latency API caching, Wasm compute | AWS-native workloads, tight IAM integration |
+
+---
+
+## 3.13 Network Debugging Toolkit
+
+While Section 3.4 covers network debugging tools in depth, this section provides a structured troubleshooting methodology — a decision-tree approach to diagnosing the most common production network issues.
+
+### 3.13.1 Essential Tool Quick Reference
+
+| Tool | Purpose | Key Command |
+|---|---|---|
+| **traceroute / mtr** | Path analysis, hop-by-hop latency | `mtr --report example.com` |
+| **dig** | DNS resolution debugging | `dig +trace example.com` |
+| **curl timing** | HTTP request latency breakdown | `curl -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total}\n' -o /dev/null -s https://example.com` |
+| **tcpdump** | Packet-level capture | `tcpdump -i any host 10.0.1.5 -nn -c 100` |
+| **Wireshark** | Deep packet inspection (GUI) | Open pcap from tcpdump, filter: `tcp.analysis.retransmission` |
+| **ss / netstat** | Socket state and connection info | `ss -tnp state time-wait \| wc -l` |
+| **openssl s_client** | TLS handshake debugging | `openssl s_client -connect example.com:443 -servername example.com` |
+| **nmap** | Port scanning, service detection | `nmap -sT -p 443,8080 10.0.1.5` |
+
+### 3.13.2 Common Network Issues and Diagnosis Steps
+
+**DNS Resolution Failure**
+
+Symptoms: `could not resolve host`, NXDOMAIN errors, intermittent name resolution failures.
+
+Diagnosis:
+1. `dig example.com @8.8.8.8` — Test with public DNS to isolate if issue is local resolver
+2. `dig +trace example.com` — Walk the full resolution chain to find where it breaks
+3. `dig example.com @$(cat /etc/resolv.conf | grep nameserver | head -1 | awk '{print $2}')` — Test with configured resolver
+4. Check: Is the DNS record TTL expired? Is the authoritative nameserver responding?
+
+**TLS Handshake Timeout**
+
+Symptoms: Connection hangs after TCP established, `SSL handshake timeout`, slow first requests.
+
+Diagnosis:
+1. `openssl s_client -connect example.com:443 -servername example.com` — Test TLS handshake directly
+2. `curl -v --tlsv1.3 https://example.com` — Check if specific TLS version works
+3. `tcpdump -i any port 443 -nn` — Look for incomplete handshake (ClientHello sent but no ServerHello)
+4. Check: Is the server overwhelmed? Is a firewall blocking TLS but allowing TCP? OCSP stapling timeout?
+
+**Connection Reset (RST)**
+
+Symptoms: `connection reset by peer`, intermittent failures, works on retry.
+
+Diagnosis:
+1. `tcpdump 'tcp[tcpflags] & (tcp-rst) != 0'` — Capture RST packets to identify source
+2. Check load balancer idle timeout vs application keep-alive timeout (mismatch is the #1 cause)
+3. Check: Is a WAF/firewall terminating connections? Is the server hitting max connection limits?
+
+**High Latency**
+
+Symptoms: Slow responses, high P99 latency, intermittent slowness.
+
+Diagnosis:
+1. `curl -w 'dns:%{time_namelookup} tcp:%{time_connect} tls:%{time_appconnect} ttfb:%{time_starttransfer} total:%{time_total}\n' -o /dev/null -s https://example.com` — Identify which phase is slow
+2. `mtr --report --report-cycles 50 example.com` — Check for lossy hops
+3. `ss -tnp | grep ESTABLISHED | wc -l` — Check connection count (exhaustion?)
+4. Check: DNS slow? TLS handshake slow? Server processing slow? Response transfer slow?
+
+**Packet Loss**
+
+Symptoms: Retransmissions, intermittent timeouts, degraded throughput.
+
+Diagnosis:
+1. `mtr --report --report-cycles 200 example.com` — Identify lossy hop (look for Loss% > 0)
+2. `tcpdump -i any -nn` then Wireshark filter: `tcp.analysis.retransmission` — Count retransmissions
+3. `ethtool -S eth0 | grep -i error` — Check NIC-level errors
+4. Check: Is the lossy hop in your network or upstream? Is it congestion-related (time-of-day pattern)?
+
+### 3.13.3 Troubleshooting Decision Tree
+
+```mermaid
+graph TD
+    Start["Network Issue<br/>Reported"]
+    CanResolve{"Can DNS<br/>resolve?"}
+    DNSFix["DNS Issue<br/>→ dig +trace<br/>→ Check NS records<br/>→ Verify /etc/resolv.conf"]
+    CanConnect{"TCP connect<br/>succeeds?"}
+    ConnFix["Connection Issue<br/>→ telnet host port<br/>→ Check firewall/SG<br/>→ Check port listening"]
+    TLSWorks{"TLS handshake<br/>completes?"}
+    TLSFix["TLS Issue<br/>→ openssl s_client<br/>→ Check cert expiry<br/>→ Verify TLS version<br/>→ Check OCSP"]
+    ResponseOK{"Response<br/>received?"}
+    TimeoutFix["Timeout Issue<br/>→ curl timing breakdown<br/>→ Check server health<br/>→ Check LB health checks"]
+    LatencyOK{"Latency<br/>acceptable?"}
+    LatencyFix["Latency Issue<br/>→ mtr for path analysis<br/>→ curl timing phases<br/>→ Check packet loss<br/>→ Check congestion"]
+    StatusOK{"Status code<br/>2xx/3xx?"}
+    StatusFix["Application Error<br/>→ Check response body<br/>→ Check server logs<br/>→ Check upstream deps"]
+    Resolved["Issue Resolved<br/>→ Document root cause<br/>→ Add monitoring"]
+
+    Start --> CanResolve
+    CanResolve -->|No| DNSFix
+    CanResolve -->|Yes| CanConnect
+    DNSFix --> Resolved
+    CanConnect -->|No| ConnFix
+    CanConnect -->|Yes| TLSWorks
+    ConnFix --> Resolved
+    TLSWorks -->|No| TLSFix
+    TLSWorks -->|Yes| ResponseOK
+    TLSFix --> Resolved
+    ResponseOK -->|No| TimeoutFix
+    ResponseOK -->|Yes| LatencyOK
+    TimeoutFix --> Resolved
+    LatencyOK -->|No| LatencyFix
+    LatencyOK -->|Yes| StatusOK
+    LatencyFix --> Resolved
+    StatusOK -->|No| StatusFix
+    StatusOK -->|Yes| Resolved
+    StatusFix --> Resolved
+
+    style Start fill:#e1f5fe
+    style Resolved fill:#c8e6c9
+    style DNSFix fill:#ffccbc
+    style ConnFix fill:#ffccbc
+    style TLSFix fill:#ffccbc
+    style TimeoutFix fill:#ffccbc
+    style LatencyFix fill:#ffccbc
+    style StatusFix fill:#ffccbc
+```
+
+> **Cross-reference:** See F10 Observability for distributed tracing integration — network-level debugging should be correlated with application-level traces using span annotations (`net.peer.ip`, `dns.resolution_time`, `tls.handshake_time`).
 
 ---
 
