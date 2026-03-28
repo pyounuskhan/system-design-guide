@@ -4012,6 +4012,114 @@ SERVER-AUTHORITATIVE WITH CLIENT PREDICTION (modern standard):
 
 
 
+## Game State Consistency and Sync Strategies
+
+| Strategy | How It Works | Latency | Consistency | Best For |
+|----------|-------------|---------|------------|----------|
+| **Server-authoritative** | Server owns all state; clients send inputs, receive state | ~50-100ms RTT | Strong (server is truth) | Competitive FPS, esports (anti-cheat critical) |
+| **Client-side prediction** | Client predicts locally, server validates and corrects | ~0ms perceived | Eventual (corrections visible as "rubber-banding") | Fast-paced action games (Overwatch, Rocket League) |
+| **Lockstep** | All clients advance together; deterministic simulation | Wait for slowest client | Strong (all clients identical) | RTS games, fighting games |
+| **State interpolation** | Client renders between two known server states | ~50-100ms behind real-time | Eventual (smooth but slightly delayed) | Most multiplayer games for visual smoothness |
+| **Dead reckoning** | Predict entity position based on velocity/direction; correct on update | ~0ms perceived | Approximate | MMOs, vehicle games (large world, many entities) |
+
+### Tick Rate and Bandwidth
+
+| Game Type | Server Tick Rate | Client Update Rate | Bandwidth/Player | Typical Protocol |
+|-----------|-----------------|-------------------|-----------------|-----------------|
+| Competitive FPS | 64-128 Hz | 64-128 Hz | 5-15 KB/s | UDP (custom reliable layer) |
+| Battle Royale | 20-30 Hz | 60 Hz (client-predicted) | 3-10 KB/s | UDP |
+| MMO | 10-20 Hz | 30-60 Hz (interpolated) | 2-5 KB/s | TCP or UDP hybrid |
+| Turn-based | On action | On action | < 1 KB/s | TCP / WebSocket |
+| Mobile casual | 10-20 Hz | 30 Hz | 1-3 KB/s | WebSocket or TCP |
+
+---
+
+## Latency Budget — Competitive Multiplayer
+
+```
+Total budget: < 150ms (player action → visible on opponent's screen)
+
+  Client input processing:     5ms
+  Network to server:           20-40ms (RTT/2, regional datacenter)
+  Server tick processing:      8-16ms (at 64-128 Hz)
+  Game logic + validation:     2-5ms
+  Network to opponent:         20-40ms (RTT/2)
+  Client rendering:            8-16ms (at 60-120 FPS)
+  Total:                       ~65-120ms (within budget for regional)
+
+  Cross-region (US→EU):        +70-150ms → exceeds budget
+  → Must use regional game servers; matchmake by region
+```
+
+### Edge Compute for Latency
+
+| Approach | Latency Benefit | Complexity | Use Case |
+|----------|----------------|-----------|----------|
+| **Regional game servers** | Players connect to nearest region (20-40ms) | Low (standard multi-region) | Default for all multiplayer |
+| **Edge PoP game servers** | < 10ms for major metros (Cloudflare Workers, AWS Local Zones) | Medium | Esports, competitive ranked |
+| **Player-hosted (P2P with relay)** | Variable; depends on player locations | High (NAT traversal, cheat risk) | Casual games, cost-sensitive |
+
+---
+
+## Anti-Cheat Threat Model
+
+| Cheat Type | How It Works | Detection | Mitigation |
+|-----------|-------------|-----------|-----------|
+| **Aimbot** | Software assists targeting | Statistical analysis (inhuman accuracy/reaction) | Server-side hit validation; behavioral ML |
+| **Wallhack** | See through walls/obstacles | Server only sends visible entity data (fog of war) | Interest management: don't send data client shouldn't know |
+| **Speed hack** | Client moves faster than allowed | Server validates all movement against physics | Server-authoritative position; reject invalid moves |
+| **Packet manipulation** | Modify network packets (teleport, damage) | Server validates all state transitions | Never trust client-reported damage/position |
+| **Bot farming** | Automated play for resources/currency | CAPTCHA; behavioral analysis; reporting system | Rate limits on resource acquisition; human verification |
+| **DDoS (opponent)** | Crash opponent's connection for competitive advantage | IP privacy (relay servers); DDoS protection | Dedicated relay infrastructure; player IP never exposed |
+
+### Anti-Cheat Architecture Principle
+
+```
+NEVER TRUST THE CLIENT.
+
+Client sends: "I pressed fire at position (x,y) facing direction (d)"
+Server validates: "Is that position reachable? Is that target visible? Is rate of fire within weapon spec?"
+Server decides: hit or miss, damage amount, state change
+Server broadcasts: authoritative result to all clients
+```
+
+---
+
+## Player Experience Monitoring
+
+| Metric | What It Measures | SLO | Alert Threshold |
+|--------|-----------------|-----|----------------|
+| **Ping (RTT)** | Network latency to game server | < 60ms (p95) for regional | > 100ms sustained |
+| **Packet loss** | % of packets lost in transit | < 1% | > 3% |
+| **Server tick time** | Time to process one simulation tick | < tick interval (e.g., < 16ms at 64 Hz) | > 80% of tick interval |
+| **Matchmaking time** | Time from queue to match found | < 60 seconds (p95) | > 3 minutes |
+| **Rubber-banding rate** | Server corrections visible to player | < 1 per minute | > 5 per minute |
+| **Disconnect rate** | % of sessions ending with disconnect | < 2% | > 5% |
+| **Client FPS** | Frames per second on player device | > 30 FPS (p10 of sessions) | > 20% of sessions below 30 |
+| **Match fairness** | Skill rating difference between teams | < 200 MMR difference | > 500 MMR |
+
+### Real-Time Telemetry Pipeline
+
+```
+Game client → UDP telemetry events (every 10s: ping, FPS, packet loss, position)
+  → Regional collector (Kafka / Kinesis)
+    → Real-time: Flink aggregation → Grafana dashboard (per-region, per-game-mode)
+    → Batch: daily player experience report → game team
+    → Alerting: packet loss > 3% in region → investigate ISP routing or server health
+```
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| UDP vs TCP for real-time | Ch 4: Networking Fundamentals |
+| Matchmaking as optimization | Ch 23: On-Demand Services (matching algorithms) |
+| Event streaming for telemetry | Ch 8: Message Queues; Ch 16: EDA |
+| DDoS protection | Ch 28: Security Systems |
+| Edge compute and CDN | Ch 26: Cloud Infrastructure |
+
+---
+
 ## Navigation
 - Previous: [Content & Knowledge Systems](29-content-knowledge-systems.md)
 - Next: [Healthcare Systems](31-healthcare-systems.md)

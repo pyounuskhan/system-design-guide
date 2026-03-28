@@ -76,7 +76,7 @@ Key business constraints:
 - **Revenue loss from downtime**: Every minute of checkout downtime costs thousands of dollars.
 - **Overselling destroys trust**: Confirming an order and then cancelling due to stock-out is worse than showing "out of stock" upfront.
 - **Promotions drive traffic spikes**: Flash sales can produce 10-50x normal traffic within seconds.
-- **Fraud eats margin**: Card fraud, coupon abuse, and fake returns can consume 1-3% of gross merchandise value.
+- **Fraud eats margin**: Card fraud, coupon abuse, and fake returns can consume 1-3% of gross merchandise value *(illustrative industry range; actual varies by vertical, geography, and fraud controls — see Nilson Report for card fraud benchmarks)*.
 - **Regulatory pressure**: PCI-DSS for payments, GDPR/CCPA for customer data, sales tax nexus rules, and consumer protection laws.
 
 ### System Boundaries
@@ -1785,6 +1785,147 @@ sequenceDiagram
 | Price display | **Eventual** (< 30s lag) | Price re-validated at cart/checkout |
 | Cart state | **Strong** (per user) | User expects consistent cart across devices |
 | Analytics | **Eventual** (minutes to hours) | Batch processing acceptable |
+
+## SLO Targets and Error Budgets
+
+Every e-commerce workflow should have explicit SLOs. These targets drive architecture decisions and operational priorities.
+
+### Per-Workflow SLOs
+
+| Workflow | SLI | SLO Target | Error Budget (30 days) | Architecture Implication |
+|----------|-----|-----------|----------------------|--------------------------|
+| Product search | p99 latency | < 200ms | 43 min downtime | Elasticsearch with Redis query cache; CDN for facets |
+| PDP load | p99 latency | < 300ms | 43 min downtime | Pre-assembled cache; partial response on dependency failure |
+| Cart operations | Availability | 99.95% | 21.6 min downtime | Redis with persistence; fallback to DB if Redis fails |
+| Checkout completion | Availability | 99.99% | 4.3 min downtime | Multi-PSP failover; circuit breakers on every dependency |
+| Payment authorization | Correctness | 0 double-charges | N/A | Idempotency keys; reconciliation jobs |
+| Order status update | Freshness | < 30 seconds | N/A | Event-driven via Kafka; push notifications |
+| Inventory accuracy | Correctness | < 0.1% oversell rate | N/A | Strong consistency; reservation locks; reconciliation |
+| Search index freshness | Freshness | < 60 seconds | N/A | CDC from catalog DB → Elasticsearch |
+
+### Deployment Gating by Error Budget
+
+| Budget Remaining | Checkout Changes | Catalog Changes | Marketing Changes |
+|-----------------|-----------------|----------------|-------------------|
+| > 75% | All risk levels | All risk levels | All risk levels |
+| 50-75% | Medium + Low only | All | All |
+| 25-50% | Low only (bug fixes) | Low + Medium | Low only |
+| < 25% | Emergency fixes only | Emergency fixes only | Deployment freeze |
+
+---
+
+## Checkout Failure Scenarios — Sequence Diagrams
+
+### Scenario 1: Payment Gateway Timeout
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer
+    participant C as Checkout
+    participant I as Inventory
+    participant P as Payment (PSP-A)
+    participant P2 as Payment (PSP-B)
+
+    B->>C: Submit checkout
+    C->>I: Reserve inventory
+    I-->>C: Reserved (idempotency_key=chk-123)
+    C->>P: Authorize payment (idempotency_key=chk-123)
+    Note over P: PSP-A timeout (5s)
+    P--xC: Timeout
+    C->>C: Circuit breaker: PSP-A open
+    C->>P2: Failover to PSP-B (same idempotency_key)
+    P2-->>C: Authorized
+    C->>C: Create order
+    C-->>B: Order confirmed
+```
+
+### Scenario 2: Inventory Exhausted Mid-Checkout
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer
+    participant C as Checkout
+    participant I as Inventory
+    participant P as Payment
+
+    B->>C: Submit checkout
+    C->>I: Reserve inventory
+    I-->>C: INSUFFICIENT_STOCK (SKU-456)
+    C-->>B: "Sorry, item is no longer available"
+    Note over C: No payment attempted
+    Note over C: No compensation needed (reservation failed)
+    C->>C: Log: checkout_failure, reason=stock_exhausted
+```
+
+### Scenario 3: Order Creation Fails After Payment
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer
+    participant C as Checkout
+    participant I as Inventory
+    participant P as Payment
+    participant O as OMS
+
+    B->>C: Submit checkout
+    C->>I: Reserve inventory
+    I-->>C: Reserved
+    C->>P: Authorize payment
+    P-->>C: Authorized (auth_ref=pay-789)
+    C->>O: Create order
+    O--xC: 500 Internal Server Error
+    Note over C: Saga compensation triggered
+    C->>P: Void authorization (auth_ref=pay-789)
+    P-->>C: Voided
+    C->>I: Release reservation
+    I-->>C: Released
+    C-->>B: "Order failed — no charge applied. Please retry."
+    C->>C: Log: checkout_failure, reason=order_creation_error, compensated=true
+```
+
+---
+
+## Checkout Resilience Pattern Catalog
+
+| Pattern | Where Applied | Configuration | What It Prevents |
+|---------|-------------|--------------|-----------------|
+| **Timeout** | Every external call (PSP, tax, shipping estimate) | PSP: 5s; Tax: 2s; Shipping: 3s | Thread/connection exhaustion from slow dependencies |
+| **Retry with backoff** | PSP authorization (idempotent via key) | Max 2 retries, 1s/2s backoff, jitter | Transient PSP errors; amplification prevented by budget |
+| **Circuit breaker** | Per-PSP, per-carrier, per-tax-provider | 5 failures / 30s → open; 30s cooldown | Cascading failure; allows dependency recovery |
+| **Multi-PSP failover** | Payment authorization | PSP-A primary → PSP-B secondary (same idempotency key) | Single-PSP outage doesn't block all checkouts |
+| **Idempotency key** | Payment auth, inventory reservation, order creation | `checkout:{session_id}:{step}` | Double-charge, double-reservation, duplicate orders |
+| **Saga compensation** | Checkout orchestrator | Reserve → Authorize → Create; compensate in reverse | Partial failure leaves consistent state |
+| **Load shedding** | API gateway during flash sales | Priority: checkout > cart > browse; shed analytics | Checkout path protected during overload |
+| **Graceful degradation** | PDP, cart, checkout | PDP: hide reviews if review service slow; Cart: show cached prices | User journey continues even with partial service failure |
+| **Bulkhead** | Thread pools for payment vs catalog vs search | Payment: 50 threads; Search: 100 threads | Payment failure doesn't consume search capacity |
+
+### Retry Budget for Checkout Path
+
+```
+Normal checkout traffic: 500 req/sec
+Maximum retry budget: 10% → 50 additional req/sec from retries
+Total max load on dependencies: 550 req/sec
+
+If retry traffic exceeds 10%, circuit breaker opens and
+retries stop until dependency recovers.
+```
+
+---
+
+## Data Consistency Per Workflow
+
+This table extends the consistency model above with workflow-level detail showing where strong consistency is enforced, where eventual consistency is acceptable, and the mechanism used.
+
+| Workflow Step | Data | Consistency | Mechanism | If Violated |
+|-------------|------|-----------|-----------|-------------|
+| Add to cart | Cart items | Strong (per user) | Redis with AOF persistence | User sees wrong cart contents |
+| Checkout: reserve inventory | Stock count | Strong (linearizable) | `SELECT ... FOR UPDATE` or Redis `DECR` with check | Oversell (the worst e-commerce bug) |
+| Checkout: authorize payment | Payment state | Strong (per transaction) | PSP idempotency key ensures at-most-once charge | Double-charge → refund + trust damage |
+| Checkout: create order | Order record | Strong | Single DB write with saga coordination | Missing order record → reconciliation required |
+| Post-order: send confirmation email | Notification state | Eventual (at-least-once) | Kafka event → email consumer (idempotent) | Duplicate email (annoying but not harmful) |
+| Post-order: update analytics | Analytics counters | Eventual (minutes OK) | Kafka → analytics pipeline | Slightly delayed dashboards (acceptable) |
+| Post-order: update search index | Product availability | Eventual (< 60s) | CDC → Elasticsearch | Recently sold-out item still appears in search briefly |
+| Return: process refund | Refund state | Strong (per return) | Ledger entry + PSP refund call (idempotent) | Money lost or stuck → reconciliation |
 
 ---
 

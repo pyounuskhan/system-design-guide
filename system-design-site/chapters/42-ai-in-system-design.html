@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chapter 42 · AI in System Design · System Design Mastery</title>
+  <title>Chapter A10 · AI in System Design · System Design Mastery</title>
   <meta name="description" content="AI now influences system design in two important ways. First, architects use AI tools to accelerate analysis, documentation, and design exploration. Second, many products now include AI components directly: retrieval-augmented generation, copilots, recommendation systems, classification pipelines, and agent-style workflows. Both uses require disciplined system thinking.">
   <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/css/styles.css">
@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -984,13 +984,13 @@
         <span>/</span>
         <a href="../index.html#part-6">Advanced Architecture</a>
         <span>/</span>
-        <span>Chapter 42</span>
+        <span>Chapter A10</span>
       </div>
 
       <article class="chapter-article">
         <header class="chapter-hero part-6">
           <div class="chapter-hero-top">
-            <span class="chapter-kicker">Chapter 42 of 60</span>
+            <span class="chapter-kicker">Chapter A10 — Advanced Architecture</span>
             <span class="part-badge">Advanced Architecture</span>
           </div>
           <h1>AI in System Design</h1>
@@ -1014,7 +1014,8 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 6 - Advanced Architecture<br>
-<strong>Position:</strong> Chapter 42 of 60
+<strong>Position:</strong> Chapter A10 (Advanced Architecture — AI in System Design)<br>
+<strong>Complements:</strong> F12 §7.7 (AI-Era Topics) covers interview-oriented LLM/RAG patterns.<br>
 <strong>Why this part exists:</strong> This final section expands classical system design into the emerging world of AI-assisted engineering and AI-native product architectures.<br>
 <strong>This chapter builds toward:</strong> AI-assisted architecture, LLM system design, retrieval pipelines, evaluation loops, and new trade-offs around latency, safety, and cost</p>
 <h2 id="overview">Overview</h2>
@@ -1145,6 +1146,119 @@
 <li>Constrain model actions with policy, validation, and scoped tool permissions.</li>
 <li>Balance model quality, latency, and cost at the system level rather than optimizing one dimension blindly.</li>
 </ul>
+<h2 id="llm-blueprint">Canonical LLM System Blueprint</h2>
+<pre><code>INGESTION PIPELINE
+  Sources: Wiki, Confluence, Slack, PDFs
+  Steps: Extract → Clean → Chunk (512 tok, 64 overlap) → Embed → Upsert
+  Refresh: Webhook (wiki); 15-min poll (Slack)
+        ↓
+VECTOR DATABASE (pgvector / Pinecone / Weaviate)
+  Index: HNSW, metadata: source, title, tenant_id
+        ↓ top-k retrieval
+QUERY ORCHESTRATOR
+  1. Embed query → 2. Hybrid search (semantic + BM25)
+  3. Re-rank (cross-encoder, +50ms) → 4. Assemble prompt
+  5. Call LLM → 6. Validate output → 7. Return + citations
+        ↓
+LLM LAYER
+  Primary: GPT-4o / Claude / Llama (self-hosted)
+  Fallback: smaller model for simple queries (10-50x cheaper)
+  Cache: semantic cache for similar queries
+  Streaming: token-by-token for perceived latency
+        ↓
+GUARDRAILS
+  Input: prompt injection filter, PII redaction
+  Output: hallucination check, policy filter, schema validation
+  Fallback: "I don't know" &gt; hallucinated answer
+        ↓
+EVALUATION + OBSERVABILITY
+  Offline: benchmark eval set (500+ Q&amp;A pairs)
+  Online: thumbs up/down, correction rate
+  Metrics: latency, token cost, retrieval hit rate, hallucination rate
+  Drift: weekly eval; alert on regression</code></pre>
+<hr>
+<h2 id="cost-latency-patterns">LLM Cost and Latency Patterns</h2>
+<h3 id="cost-levers">Cost Levers</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Lever</th><th>How It Helps</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td><strong>Model cascade</strong></td><td>Cheap model for simple; expensive for complex</td><td>60-80% cost reduction</td></tr>
+<tr><td><strong>Semantic cache</strong></td><td>Cache responses for similar queries</td><td>20-40% fewer LLM calls</td></tr>
+<tr><td><strong>Context trimming</strong></td><td>Fewer/shorter retrieved chunks</td><td>30-50% fewer input tokens</td></tr>
+<tr><td><strong>Streaming</strong></td><td>Return tokens as generated</td><td>3-5x perceived latency improvement</td></tr>
+<tr><td><strong>Batch API</strong></td><td>Non-real-time bulk processing</td><td>50% cost reduction</td></tr>
+</tbody>
+</table></div>
+<h3 id="model-pricing">Model Pricing Reference</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Tier</th><th>Input $/M tokens</th><th>Output $/M tokens</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td>Small (GPT-4o mini, Haiku)</td><td>$0.15</td><td>$0.60</td><td>Classification, routing, simple Q&amp;A</td></tr>
+<tr><td>Medium (GPT-4o, Sonnet)</td><td>$2.50</td><td>$10.00</td><td>RAG answers, summarization</td></tr>
+<tr><td>Large (o1, Opus)</td><td>$15.00</td><td>$60.00</td><td>Complex reasoning, multi-step planning</td></tr>
+</tbody>
+</table></div>
+<h3 id="rag-latency">RAG Latency Budget (&lt; 3s target)</h3>
+<pre><code>Query embedding: 50ms | Vector search: 30ms | Re-rank: 50ms | Prompt: 10ms
+LLM TTFT: 300ms | Generation: 1,000ms (200 tok) | Guardrails: 50ms | Network: 100ms
+Total: ~1,600ms ✓  |  With streaming: first token at ~500ms</code></pre>
+<hr>
+<h2 id="ai-security-privacy">AI Security and Privacy</h2>
+<h3 id="prompt-injection">Prompt Injection Defense</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Attack</th><th>Example</th><th>Defense</th></tr></thead>
+<tbody>
+<tr><td><strong>Direct injection</strong></td><td>"Ignore previous instructions..."</td><td>Input sanitization; system prompt isolation</td></tr>
+<tr><td><strong>Indirect injection</strong></td><td>Malicious text in retrieved document</td><td>Content screening on retrieved docs; treat as untrusted</td></tr>
+<tr><td><strong>Tool-use abuse</strong></td><td>Attacker-controlled tool parameters</td><td>Strict schemas; parameter validation; read-only scopes</td></tr>
+<tr><td><strong>Exfiltration</strong></td><td>Model leaks sensitive data in response</td><td>Output PII filtering; data access scoping</td></tr>
+</tbody>
+</table></div>
+<h3 id="ai-privacy">Privacy Architecture</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>PII in prompts</td><td>Redact before sending to external LLM APIs</td></tr>
+<tr><td>Data residency</td><td>Region-specific LLM endpoints; vector DB residency</td></tr>
+<tr><td>Tenant isolation</td><td>Filter vector search by tenant_id metadata</td></tr>
+<tr><td>Audit trail</td><td>Log query + context + response (redacted) for compliance</td></tr>
+<tr><td>Model provenance</td><td>Track model version in every response metadata</td></tr>
+</tbody>
+</table></div>
+<h3 id="eval-harness">LLM Evaluation Harness</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Type</th><th>Measures</th><th>When</th></tr></thead>
+<tbody>
+<tr><td>Benchmark eval set</td><td>Correctness (precision, recall, F1)</td><td>Every model/prompt change (CI)</td></tr>
+<tr><td>Hallucination rate</td><td>% claims not in retrieved context</td><td>Weekly automated</td></tr>
+<tr><td>Citation accuracy</td><td>% citations matching source</td><td>Weekly automated</td></tr>
+<tr><td>User feedback</td><td>Thumbs up/down, correction rate</td><td>Continuous (production)</td></tr>
+<tr><td>A/B test</td><td>Model/prompt version comparison</td><td>When testing changes</td></tr>
+<tr><td>Adversarial eval</td><td>Injection resistance, PII leakage</td><td>Monthly red-team</td></tr>
+</tbody>
+</table></div>
+<h3 id="model-governance">Model Governance Checklist</h3>
+<ul>
+<li>Model version tracked in every response</li>
+<li>Eval suite runs on every prompt/model change before deploy</li>
+<li>Fallback to previous model version (canary deployment)</li>
+<li>Cost per query monitored and alerted</li>
+<li>PII redaction verified in external API prompts</li>
+<li>Prompt injection filters tested with adversarial inputs</li>
+<li>Data access scoped per tenant</li>
+<li>Human review queue for low-confidence responses</li>
+</ul>
+<h3 id="ai-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>RAG interview reference</td><td><a href="F12-system-design-interview-thinking.html">F12 §7.7</a></td></tr>
+<tr><td>RAG mock interview</td><td><a href="F12-system-design-interview-thinking.html">F12 §6.4</a></td></tr>
+<tr><td>Observability for AI</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+<tr><td>Supply-chain for ML models</td><td><a href="F11-deployment-devops.html">F11 §1.5</a></td></tr>
+<tr><td>Cost optimization for tokens</td><td><a href="41-cost-optimization.html">Ch A9: Cost</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Treating a model API call as if it were the whole system.</li>
@@ -1270,6 +1384,9 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#llm-blueprint">LLM System Blueprint</a></li>
+<li><a href="#cost-latency-patterns">Cost &amp; Latency Patterns</a></li>
+<li><a href="#ai-security-privacy">AI Security &amp; Privacy</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

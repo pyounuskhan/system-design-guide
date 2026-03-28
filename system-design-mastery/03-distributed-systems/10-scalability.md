@@ -123,6 +123,169 @@ Black Friday is a classic scalability case because the challenge is not only tot
 - Use elasticity to match cost to demand, but do not mistake automation for architectural correctness.
 - Plan for partial failure while scaling, not only for happy-path growth.
 
+## Scalability Toolbox
+
+Every scalability problem maps to one or more proven patterns. This table indexes the patterns by the bottleneck they solve and links to the chapter that covers each in depth.
+
+| Bottleneck | Pattern | How It Helps | Chapter |
+|-----------|---------|-------------|---------|
+| **Read-heavy database** | Caching (Redis, Memcached) | Absorb repeated reads; reduce DB query load | Ch 6: Caching Systems |
+| **Read-heavy database** | Read replicas | Offload reads to replicas; keep primary for writes | Ch 5: Databases Deep Dive |
+| **Write-heavy database** | Sharding / partitioning | Distribute writes across multiple DB nodes by partition key | F7: Data Partitioning |
+| **Write-heavy database** | Async writes (queue + worker) | Move writes off the critical path; batch and buffer | Ch 8: Message Queues |
+| **Compute-heavy API** | Horizontal scaling + LB | Add stateless instances behind load balancer | Ch 7: Load Balancing |
+| **Compute-heavy API** | CDN for static/cacheable responses | Offload edge-servable responses from origin | Ch 9: Storage Systems |
+| **Fan-out heavy** | Event streaming (Kafka, Pulsar) | Decouple producer from consumers; parallelize consumption | Ch 8: Message Queues |
+| **Latency-sensitive global** | Multi-region deployment | Serve users from nearest region; reduce round-trip | Ch 4: Networking; Ch 7: Load Balancing |
+| **Storage growth** | Lifecycle tiering (hot → cold → archive) | Move aging data to cheaper tiers automatically | Ch 9: Storage Systems |
+| **Coordinated state** | Distributed consensus (Raft, Paxos) | Maintain agreement across replicas for critical state | F4: Consensus & Coordination |
+| **All-or-nothing scaling** | Feature flags + traffic shaping | Selectively enable features; shed load on non-critical paths | F11: Deployment & DevOps |
+| **Cost scaling linearly with traffic** | Caching + async + right-sizing | Ensure cost grows sub-linearly with traffic | Ch 3: Estimation; Ch 6: Caching |
+
+### How to Use the Toolbox in Interviews
+
+When the interviewer asks "how does this scale?":
+
+1. **Identify the bottleneck** — "The database is the first bottleneck because reads are 100x writes."
+2. **Pick the pattern** — "I would add a Redis cache for hot read paths (cache-aside) to reduce DB load by 90%."
+3. **Project the limit** — "This buys us 10x growth. At 100x, we would need to shard the database by user_id."
+4. **Reference the cost** — "Caching costs ~$500/month vs. scaling the database vertically at ~$5,000/month."
+
+---
+
+## Scaling Anti-Patterns
+
+These are the most common ways scaling efforts backfire. Recognizing them early prevents wasted effort and cascading failures.
+
+### Hot Partitions
+
+**What happens:** Traffic or data is unevenly distributed across partitions, overloading one while others sit idle. A system with 10 shards but all celebrity traffic hitting shard 3 has not actually scaled.
+
+**Causes:**
+- Low-cardinality partition key (e.g., `country` with 80% of traffic in one country)
+- Sequential keys (e.g., auto-increment IDs route all recent data to the latest partition)
+- Celebrity/viral content (one user or item generates disproportionate traffic)
+
+**Fixes:**
+- Choose high-cardinality, well-distributed partition keys (e.g., `user_id`, `hash(entity_id)`)
+- Add a jitter suffix for known hot keys (`celebrity_user_id:shard_N`)
+- Use separate handling for known hot entities (dedicated cache, separate processing path)
+- Monitor per-partition metrics, not just aggregate throughput
+
+### Thundering Herd
+
+**What happens:** A single event (cache expiry, failover, service restart) causes all clients to simultaneously request the same resource, overwhelming the backend.
+
+**Common triggers:**
+- Popular cache key expires → thousands of concurrent cache misses
+- Load balancer adds backend → all pending requests flood the new instance
+- Database failover completes → connection storms from all application instances
+
+**Fixes:**
+- Cache: jittered TTLs, request coalescing (singleflight), stale-while-revalidate
+- LB: gradual ramp-up for new backends (slow-start weight)
+- DB: connection pool with max limit; queue overflow rather than crash
+
+### Retry Storms
+
+**What happens:** A downstream service becomes slow or fails. Clients retry, adding 2-3x load. The retries make the problem worse, creating a positive feedback loop that prevents recovery.
+
+**Fixes:**
+- Exponential backoff with jitter on all retries
+- Retry budgets: limit total retries to 10-20% of normal traffic
+- Circuit breakers: stop calling a failing dependency after N consecutive failures
+- Deadline propagation: if the caller's deadline has passed, don't retry
+
+### Premature Optimization
+
+**What happens:** The team adds sharding, microservices, or distributed caching before the system needs it. The added complexity slows development, increases operational burden, and may not address the actual bottleneck.
+
+**Signals you've over-scaled:**
+- The database is at 5% utilization but you're running 3 shards
+- You have a service mesh for 3 services
+- Cache hit rate is 99.9% but you're investigating cache performance
+- The team spends more time on infrastructure than on product features
+
+**Fix:** Start simple. Measure. Scale the bottleneck. Repeat.
+
+---
+
+## Multi-Tenant Scaling
+
+SaaS platforms must scale not just for total traffic, but for diverse tenant workloads. One large tenant can consume disproportionate resources and degrade the experience for all others ("noisy neighbor").
+
+### Multi-Tenant Scaling Challenges
+
+| Challenge | What Happens | Mitigation |
+|-----------|-------------|-----------|
+| **Noisy neighbor** | One tenant's bulk import saturates shared DB connections | Per-tenant connection pool limits; per-tenant rate limiting |
+| **Uneven growth** | 5% of tenants generate 80% of traffic | Tier tenants by size; dedicated infrastructure for largest tenants |
+| **Data skew** | One tenant has 100M rows; most have 10K | Shard by tenant_id; monitor per-tenant data volume |
+| **Isolation failures** | One tenant's slow query blocks others | Query timeout enforcement; separate read replicas for large tenants |
+| **Cost attribution** | Cannot determine which tenant drives which cost | Tag resources by tenant; per-tenant metering of compute/storage/bandwidth |
+
+### Tenant Scaling Tiers
+
+| Tier | Tenant Size | Infrastructure | Isolation | Cost Model |
+|------|-----------|---------------|-----------|-----------|
+| **Free / Small** | < 1K requests/day | Shared everything (multi-tenant DB, shared compute) | Application-level (tenant_id filter) | Included / freemium |
+| **Mid-tier** | 1K-100K requests/day | Shared compute, dedicated DB schema or connection pool | Schema-level or resource limits | Per-seat or per-usage |
+| **Enterprise** | > 100K requests/day | Dedicated compute cluster, dedicated DB instance | Full infrastructure isolation | Custom contract |
+
+---
+
+## Saturation Monitoring and Capacity Planning Loops
+
+Scaling is not a one-time decision — it is a continuous feedback loop. The loop connects monitoring signals to capacity decisions to SLO compliance to cost control.
+
+### The Capacity Planning Loop
+
+```
+Monitor saturation signals
+        │
+        ▼
+Forecast growth (traffic trends + business events)
+        │
+        ▼
+Compare forecast to current headroom
+        │
+        ▼
+If headroom < threshold → scale (add capacity)
+If headroom > 2x threshold → right-size (reduce waste)
+        │
+        ▼
+Validate SLOs after scaling
+        │
+        ▼
+Review cost impact
+        │
+        ▼
+Repeat (weekly / monthly / quarterly)
+```
+
+### Saturation Signals by Layer
+
+| Layer | Saturation Signal | Threshold | Action When Exceeded |
+|-------|------------------|-----------|---------------------|
+| API / Compute | CPU utilization | > 70% sustained | Scale out (add instances) or scale up |
+| API / Compute | Request queue depth | > 100 pending | Scale out; investigate slow endpoints |
+| Database | Connection pool utilization | > 80% | Increase pool size; add read replicas; optimize queries |
+| Database | Disk IOPS | > 80% of provisioned | Upgrade storage tier; add read replicas |
+| Cache | Memory utilization | > 85% | Scale cache cluster; evict low-value keys |
+| Cache | Eviction rate | Trending up while hit rate drops | Increase cache size; review TTL strategy |
+| Queue | Consumer lag | Growing over time | Scale consumer fleet; investigate slow consumers |
+| Storage | Disk utilization | > 80% | Enable lifecycle tiering; archive cold data |
+
+### Tying Scaling to SLOs and Cost
+
+| SLO Status | Capacity Action | Cost Implication |
+|-----------|----------------|------------------|
+| SLO healthy, headroom > 50% | Right-size: reduce overprovisioned resources | Save money |
+| SLO healthy, headroom 20-50% | Maintain current capacity | Stable cost |
+| SLO healthy, headroom < 20% | Proactive scale-up before SLO is threatened | Invest in reliability |
+| SLO degraded (burn rate > 1x) | Immediate scale-up; incident investigation | Cost increase justified by SLO |
+| SLO breached (budget exhausted) | Emergency scaling + deployment freeze | Cost secondary to reliability |
+
 ## Common Mistakes
 - Calling a system scalable because only the web tier can scale while the real bottleneck cannot.
 - Using average traffic instead of peak traffic to justify capacity.

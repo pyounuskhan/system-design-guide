@@ -1,9 +1,10 @@
-# 38. Observability
+# A6. Observability
 
 ## Part Context
-**Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 38 of 60
-**Why this part exists:** This section moves from designing systems that work in theory to operating systems that remain understandable, safe, and economical in production.  
+**Part:** Part 6 - Advanced Architecture
+**Position:** Chapter A6 (Advanced Architecture — Observability Primer)
+**Complements:** F10: Observability & Operations (deep chapter) covers the full observability stack in production depth. This chapter provides the conceptual primer for the Advanced Architecture sequence.
+**Why this part exists:** This section moves from designing systems that work in theory to operating systems that remain understandable, safe, and economical in production.
 **This chapter builds toward:** production visibility, telemetry design, SLO thinking, and debuggability at scale
 
 ## Overview
@@ -134,6 +135,95 @@ Imagine an e-commerce platform whose checkout p95 latency jumps from 400 ms to 2
 - Define SLOs in user terms so engineering effort stays aligned with impact.
 - Treat telemetry cost and signal quality as design constraints, not clean-up tasks.
 - Make every important request path traceable across services and queues.
+
+## Burn-Rate Alerting
+
+Traditional threshold alerts ("error rate > 5%") fire on instantaneous spikes that may be transient. Burn-rate alerting answers a better question: "at this rate, will we exhaust our error budget before the SLO window ends?"
+
+### How Burn Rate Works
+
+```
+Burn rate = actual_error_rate / allowed_error_rate
+
+Example:
+  SLO = 99.9% (allowed error rate = 0.1%)
+  Current error rate = 0.5%
+  Burn rate = 0.5% / 0.1% = 5x
+  → At 5x, a 30-day error budget exhausts in 6 days
+```
+
+### Multi-Window Burn-Rate Alerts (Google SRE Recommendation)
+
+| Alert | Short Window | Long Window | Burn Rate | Severity | Action |
+|-------|-------------|-------------|-----------|----------|--------|
+| Page immediately | 5 minutes | 1 hour | 14.4x | P0 | Wake on-call; budget consumed in ~2 hours |
+| Page | 30 minutes | 6 hours | 6x | P1 | Page on-call; budget consumed in ~5 days |
+| Ticket | 2 hours | 1 day | 3x | P2 | Create ticket; review within 24 hours |
+| Review | 6 hours | 3 days | 1x | P3 | Add to weekly review; steady depletion |
+
+**Why multi-window?** A short window catches spikes but creates false positives for transients. A long window catches sustained issues but is slow. Requiring both eliminates both problems.
+
+**Cross-reference:** For full Prometheus alerting rules, SLO templates, and error budget policies, see **F10: Observability & Operations** §2.2.
+
+---
+
+## Incident Lifecycle — From Detection to Learning
+
+Observability is not complete without a defined incident lifecycle. Detection is only the first step; the system must also support response, recovery, and organizational learning.
+
+### The Five Phases
+
+| Phase | What Happens | Observability Role |
+|-------|-------------|-------------------|
+| **1. Detection** | Alert fires based on SLO burn rate or symptom metric | Burn-rate alerts, anomaly detection, synthetic monitors |
+| **2. Response** | On-call acknowledges; incident commander (IC) declared | Alert routing (PagerDuty/OpsGenie), war room setup |
+| **3. Diagnosis** | Team investigates root cause using dashboards, traces, logs | Correlated dashboards, distributed tracing, log search with trace_id |
+| **4. Mitigation** | Fix applied (rollback, config change, scale-up) | Deployment markers on dashboards, canary metrics, real-time SLO check |
+| **5. Learning** | Postmortem written; action items tracked | Incident timeline reconstruction from telemetry, SLO budget impact report |
+
+### Postmortem Connection
+
+Every P0/P1 incident should produce a blameless postmortem within 5 business days. The postmortem template (see F10 §2.3.6) uses observability data for:
+- **Timeline reconstruction** — alert timestamps, metric graphs, trace IDs
+- **Impact quantification** — error budget consumed, users affected, revenue impact
+- **Detection quality** — was the alert fast enough? Was the right team paged?
+- **Action items** — monitoring gaps, missing runbooks, alerting thresholds to tune
+
+---
+
+## Canonical References and Further Exploration
+
+### SRE Golden Signals
+
+The four golden signals (from Google's SRE book) provide a universal starting point for service monitoring:
+
+| Signal | What It Measures | Metric Example |
+|--------|-----------------|---------------|
+| **Latency** | Time to serve a request (distinguish success vs error latency) | `http_request_duration_seconds` histogram |
+| **Traffic** | Volume of demand on the system | `http_requests_total` counter |
+| **Errors** | Rate of failed requests (explicit 5xx + implicit timeout/wrong-result) | `http_requests_total{status=~"5.."}` |
+| **Saturation** | How "full" the system is (CPU, memory, queue depth, connection pool) | `container_cpu_usage_seconds_total`, `db_connections_in_use` |
+
+### Key References
+
+| Resource | What You'll Learn |
+|----------|------------------|
+| **Google SRE Book** (free online) — Chapter 6: Monitoring Distributed Systems | Golden signals, symptoms vs causes, alerting philosophy |
+| **Google SRE Workbook** — Chapter 5: Alerting on SLOs | Multi-window burn-rate alerting, error budget policy |
+| **OpenTelemetry Specification** (opentelemetry.io/docs/specs) | Vendor-neutral API for logs, metrics, and traces; W3C TraceContext propagation |
+| **Designing Data-Intensive Applications** — Chapter 1, 4 | Reliability, observability, and operational concerns |
+| **F10: Observability & Operations** (this site) | Full production-depth treatment: SLO templates, instrumentation blueprint, postmortem template, cost-as-budget framework |
+
+### Cross-Links to Deep Content
+
+| Topic | Where to Go |
+|-------|-------------|
+| SLO templates by service type (API, pipeline, batch, streaming) | F10 §2.2.7 |
+| Instrumentation blueprint for new services | F10: Instrumentation Blueprint |
+| Observability cost as a managed budget | F10: Cost as Budget |
+| Postmortem template (reusable form) | F10 §2.3.6 |
+| Alert fatigue maturity model + health metrics | F10 §2.1.5 |
+| Deployment observability (canary metrics, rollback triggers) | F11: Deployment & DevOps |
 
 ## Common Mistakes
 - Collecting huge volumes of telemetry without clear operator value.

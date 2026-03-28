@@ -3577,6 +3577,564 @@ graph TD
 
 ---
 
+# Microservices Readiness Checklist
+
+Before embarking on a microservices migration, teams must honestly assess whether they have the organizational maturity, technical infrastructure, and domain clarity to succeed. Microservices amplify both the strengths and weaknesses of your engineering organization. If your foundations are weak, microservices will make everything worse, not better.
+
+**Scoring instructions:** Rate each item from 0 (not present) to 3 (fully mature). Total your score and use the thresholds below to guide your architecture decision.
+
+## Organizational Readiness
+
+| # | Criterion | 0 (Not Present) | 1 (Beginning) | 2 (Developing) | 3 (Mature) |
+|---|-----------|-----------------|---------------|-----------------|------------|
+| O1 | **Team size** | < 5 engineers total | 5-10 engineers, 1 team | 10-25 engineers, 2-3 teams | 25+ engineers, 4+ autonomous teams |
+| O2 | **DevOps maturity** | Ops team handles all deployments | Developers deploy with ops approval | Developers deploy independently with guardrails | Full self-service deployment with automated rollback |
+| O3 | **On-call culture** | No on-call rotation | On-call exists but response is ad hoc | On-call with runbooks and escalation paths | On-call with SLO-driven alerting, blameless postmortems |
+| O4 | **Team autonomy** | Centralized decision-making for all changes | Teams propose, leadership approves | Teams decide within architectural guidelines | Teams own services end-to-end, including production |
+| O5 | **Communication overhead** | All coordination is synchronous (meetings) | Mix of sync and async coordination | Async-first with documented ADRs | Self-service with platform abstractions eliminating most coordination |
+
+## Technical Readiness
+
+| # | Criterion | 0 (Not Present) | 1 (Beginning) | 2 (Developing) | 3 (Mature) |
+|---|-----------|-----------------|---------------|-----------------|------------|
+| T1 | **CI/CD pipeline** | Manual builds and deployments | Automated builds, manual deployments | Full CI/CD with automated testing | CI/CD with canary deployments and automated rollback |
+| T2 | **Container orchestration** | No containers | Docker in dev, manual in prod | Kubernetes in production, basic config | K8s with auto-scaling, resource quotas, namespace isolation |
+| T3 | **Observability stack** | printf debugging, manual log grep | Centralized logging (ELK/Datadog) | Logging + metrics + basic dashboards | Full observability: logs, metrics, traces, SLO dashboards |
+| T4 | **Infrastructure as Code** | Manual server configuration | Partial automation (some Terraform) | Full IaC for infrastructure | IaC + GitOps for both infra and application config |
+| T5 | **Automated testing** | Manual testing only | Unit tests, manual integration | Unit + integration + contract tests | Full pyramid: unit, integration, contract, E2E, chaos |
+
+## Domain Readiness
+
+| # | Criterion | 0 (Not Present) | 1 (Beginning) | 2 (Developing) | 3 (Mature) |
+|---|-----------|-----------------|---------------|-----------------|------------|
+| D1 | **Bounded context clarity** | Monolith with entangled domains | Some domains identified informally | Bounded contexts documented and agreed upon | Contexts validated through event storming, stable for 6+ months |
+| D2 | **Domain model stability** | Core model changes weekly | Model changes monthly, breaking changes common | Model stable, changes are additive | Mature domain model with versioned APIs |
+| D3 | **Data ownership** | Single shared database, unclear ownership | Some tables have informal owners | Each domain has designated data owners | Strict data ownership with published data contracts |
+| D4 | **API contracts** | No formal API definitions | Some OpenAPI/protobuf specs | All APIs have formal contracts | Contract testing in CI, backward compatibility enforced |
+
+## Operational Readiness
+
+| # | Criterion | 0 (Not Present) | 1 (Beginning) | 2 (Developing) | 3 (Mature) |
+|---|-----------|-----------------|---------------|-----------------|------------|
+| P1 | **Distributed tracing** | No tracing | Basic request IDs propagated | Jaeger/Zipkin deployed, traces searchable | Full distributed tracing with auto-instrumentation and trace-based alerting |
+| P2 | **Centralized logging** | Logs on individual servers | Logs forwarded to central store | Structured logging with correlation IDs | Structured logs with auto-correlation, log-based metrics, anomaly detection |
+| P3 | **Alerting and SLOs** | No alerting, reactive firefighting | Basic uptime alerts | SLO-based alerting with error budgets | Multi-signal alerting, burn-rate alerts, automated incident response |
+| P4 | **Incident response** | No process, ad hoc debugging | Documented escalation path | Runbooks, war rooms, postmortems | Automated diagnostics, chaos engineering, game days |
+
+## Scoring Thresholds
+
+| Total Score | Recommendation | Rationale |
+|------------|---------------|-----------|
+| **0 - 14** | **Stay with the monolith** | Your organization lacks the foundations. Microservices will create operational chaos. Focus on CI/CD, observability, and team structure first. |
+| **15 - 24** | **Adopt a modular monolith** | You have some foundations but gaps remain. Extract modules with clear interfaces inside a single deployable. Build the missing capabilities. |
+| **25 - 35** | **Selective extraction** | Extract 1-3 high-value services while keeping the monolith for the rest. Prove the operational model before expanding. |
+| **36 - 51** | **Ready for microservices** | Your organization has the maturity to operate a distributed system. Proceed with a clear migration strategy and invest in platform engineering. |
+
+> **Interview insight:** When an interviewer asks "Would you use microservices for this system?", walk through these dimensions out loud. Saying "It depends on team size, domain clarity, and operational maturity" — and then scoring the scenario — demonstrates the kind of pragmatic thinking that distinguishes senior engineers from those who cargo-cult architecture patterns.
+
+---
+
+# When NOT to Split: Microservices Anti-Decision Guide
+
+Microservices are not a goal — they are a tool for managing complexity at scale. Adopting microservices prematurely is one of the most expensive architectural mistakes a team can make. This section provides explicit guardrails.
+
+## Hard Stops: Do Not Adopt Microservices If...
+
+| Condition | Why It Blocks Microservices | What to Do Instead |
+|-----------|---------------------------|-------------------|
+| **Team < 10 engineers** | You cannot staff independent teams to own independent services. One person will own 5 services and become a bottleneck. | Modular monolith with clear module boundaries. |
+| **No CI/CD pipeline** | Without automated build, test, and deploy, each microservice multiplies manual deployment effort by N. | Build CI/CD first. Microservices is a deployment strategy — you need the deployment infrastructure. |
+| **No container orchestration** | Running 20 services on bare VMs with manual port management is operational suicide. | Adopt Kubernetes (or equivalent) before decomposing. |
+| **Unclear domain boundaries** | If you don't know where to draw the lines, you will draw them wrong. Refactoring service boundaries is 10x harder than refactoring module boundaries. | Run event storming workshops. Build a modular monolith. Let boundaries emerge from production usage. |
+| **Shared database with tight coupling** | If services share tables with foreign keys and joins across domains, splitting into services creates a distributed monolith. | Untangle data ownership inside the monolith first. Each module should own its tables exclusively. |
+| **No observability stack** | Debugging a distributed system without distributed tracing, centralized logging, and metrics is like flying blind in a storm. | Deploy observability tooling (Datadog, Grafana, Jaeger) and practice with the monolith. |
+| **Startup in product-market-fit phase** | Your domain model will change radically and frequently. Microservices make pivots extremely expensive because you must coordinate changes across multiple services. | Monolith or modular monolith. Optimize for iteration speed. Split when the domain stabilizes and the team grows. |
+
+## Decision Flowchart: Should You Adopt Microservices?
+
+```mermaid
+graph TD
+    Start["Considering microservices?"] --> Q1["Team > 10 engineers?"]
+    Q1 -->|No| Stay1["STAY: Modular monolith<br/>Team too small for service ownership"]
+    Q1 -->|Yes| Q2["CI/CD pipeline exists?"]
+    Q2 -->|No| Stay2["STOP: Build CI/CD first<br/>Microservices multiply deployment complexity"]
+    Q2 -->|Yes| Q3["Container orchestration<br/>(K8s or equivalent)?"]
+    Q3 -->|No| Stay3["STOP: Adopt K8s first<br/>Manual service management is unsustainable"]
+    Q3 -->|Yes| Q4["Clear bounded contexts?<br/>(validated via event storming)"]
+    Q4 -->|No| Stay4["WAIT: Run event storming<br/>Build modular monolith first"]
+    Q4 -->|Yes| Q5["Observability stack deployed?<br/>(tracing, logging, metrics)"]
+    Q5 -->|No| Stay5["STOP: Deploy observability<br/>You cannot debug what you cannot see"]
+    Q5 -->|Yes| Q6["Domain model stable?<br/>(not pivoting frequently)"]
+    Q6 -->|No| Stay6["WAIT: Domain still evolving<br/>Microservices make pivots expensive"]
+    Q6 -->|Yes| Q7["Readiness score >= 25?"]
+    Q7 -->|No| Modular["RECOMMENDATION:<br/>Modular monolith with<br/>async module communication"]
+    Q7 -->|Yes| Ready["PROCEED: Start with<br/>selective extraction<br/>(1-3 services)"]
+
+    style Stay1 fill:#ff6b6b,color:#fff
+    style Stay2 fill:#ff6b6b,color:#fff
+    style Stay3 fill:#ff6b6b,color:#fff
+    style Stay4 fill:#ffa07a,color:#fff
+    style Stay5 fill:#ff6b6b,color:#fff
+    style Stay6 fill:#ffa07a,color:#fff
+    style Modular fill:#4ecdc4,color:#fff
+    style Ready fill:#45b7d1,color:#fff
+```
+
+> **Key principle:** "Microservices are an optimization for organizational scaling, not a default architecture. The burden of proof is on the team to show they need microservices, not on the team to justify staying monolithic."
+
+---
+
+# Migration Path: Modular Monolith to Microservices
+
+Successful microservices adoption is a multi-phase journey, not a big-bang rewrite. This section provides a concrete, phased migration strategy with real-world examples.
+
+## The Five-Phase Migration
+
+```mermaid
+graph LR
+    P1["Phase 1<br/>Identify Bounded<br/>Contexts"] --> P2["Phase 2<br/>Extract Modules<br/>(In-Process)"]
+    P2 --> P3["Phase 3<br/>Add Async<br/>Communication"]
+    P3 --> P4["Phase 4<br/>Extract First<br/>Service"]
+    P4 --> P5["Phase 5<br/>Strangler Fig<br/>Remaining Modules"]
+
+    style P1 fill:#667eea,color:#fff
+    style P2 fill:#764ba2,color:#fff
+    style P3 fill:#f093fb,color:#fff
+    style P4 fill:#4ecdc4,color:#fff
+    style P5 fill:#45b7d1,color:#fff
+```
+
+### Phase 1: Identify Bounded Contexts Within the Monolith
+
+**Goal:** Map the domain into cohesive contexts without changing any code.
+
+**Activities:**
+- Run event storming workshops with domain experts and engineers
+- Map all domain events, commands, and aggregates
+- Identify context boundaries: where does one domain's language end and another's begin?
+- Document data ownership: which context is the source of truth for each entity?
+- Identify coupling hotspots: which parts of the codebase are most entangled?
+
+**Output:** A context map showing bounded contexts, their relationships (shared kernel, customer/supplier, anticorruption layer), and data ownership.
+
+**Duration:** 2-4 weeks for a medium-sized monolith.
+
+**Real-world example:** Shopify ran extensive event storming in 2016-2018 to identify bounded contexts before beginning their modular monolith journey. They identified contexts like Checkout, Inventory, Payments, and Shipping — each with distinct domain language and data ownership.
+
+### Phase 2: Extract Modules with Clear Interfaces (In-Process)
+
+**Goal:** Restructure the monolith codebase into modules that align with bounded contexts, communicating through explicit interfaces rather than direct database access.
+
+**Activities:**
+- Create module boundaries in the codebase (packages, namespaces, or build modules)
+- Define explicit public APIs for each module (interface classes, service facades)
+- Eliminate cross-module database access — each module owns its tables
+- Replace cross-module method calls with module API calls (still in-process)
+- Enforce module boundaries with build tooling (ArchUnit, dependency rules)
+
+**Key constraint:** All communication between modules goes through defined interfaces. No module directly reads another module's database tables.
+
+```
+// BEFORE: Entangled code
+class OrderService {
+  void createOrder(OrderRequest req) {
+    // Direct DB access to inventory tables
+    db.query("UPDATE inventory SET stock = stock - ? WHERE sku = ?", qty, sku);
+    // Direct call to deeply nested payment code
+    PaymentProcessor.charge(req.card, req.amount);
+  }
+}
+
+// AFTER: Module interfaces
+class OrderService {
+  void createOrder(OrderRequest req) {
+    // Call through module interface (still in-process)
+    inventoryModule.reserve(sku, qty);
+    paymentModule.authorize(req.card, req.amount);
+  }
+}
+```
+
+**Duration:** 2-6 months depending on monolith size and coupling.
+
+### Phase 3: Add Async Communication Between Modules
+
+**Goal:** Replace synchronous inter-module calls with asynchronous events where possible, reducing temporal coupling and preparing for network boundaries.
+
+**Activities:**
+- Introduce an in-process event bus (or lightweight message broker)
+- Identify which inter-module calls can be async (commands that don't need immediate response)
+- Publish domain events from each module (OrderCreated, PaymentAuthorized, InventoryReserved)
+- Replace synchronous calls with event-driven patterns for non-critical paths
+- Keep synchronous calls for queries and operations requiring immediate consistency
+
+**Key principle:** If the caller doesn't need the result to continue, make it async.
+
+**Duration:** 1-3 months.
+
+### Phase 4: Extract the First Service (Lowest Risk, Highest Value)
+
+**Goal:** Extract one module into a standalone, independently deployed service to prove the operational model.
+
+**Selection criteria for the first service:**
+- **Lowest risk:** Not on the critical path (order creation, payment processing). Good candidates: notifications, analytics, search indexing.
+- **Highest value:** Will benefit significantly from independent scaling or technology choice.
+- **Clearest boundary:** Already communicates with the monolith primarily through async events.
+- **Smallest blast radius:** If it fails, the user experience degrades gracefully.
+
+**Activities:**
+- Deploy the extracted module as a separate service with its own database
+- Replace in-process event bus with a real message broker (Kafka, RabbitMQ)
+- Implement the Strangler Fig pattern: route traffic to the new service while keeping the monolith code as fallback
+- Build operational tooling: health checks, dashboards, alerts, runbooks
+- Validate: independent deployment, independent scaling, independent failure
+
+**Real-world example:** Amazon's service extraction began with their catalog service in the early 2000s. They chose it because it had high read traffic (benefiting from independent scaling) and relatively clear boundaries. The team built all the deployment and monitoring infrastructure around this first service before extracting others.
+
+**Duration:** 1-2 months for extraction, 1-2 months for operational validation.
+
+### Phase 5: Strangler Fig Pattern for Remaining Modules
+
+**Goal:** Systematically extract remaining modules using the operational model proven in Phase 4.
+
+**The Strangler Fig approach:**
+1. For each module, create a new service that implements the same interface
+2. Route a percentage of traffic to the new service (start at 1%, ramp to 100%)
+3. Monitor error rates, latency, and correctness during the ramp
+4. When the new service handles 100% of traffic, decommission the monolith module
+5. Repeat for the next module
+
+**Prioritization for extraction order:**
+1. Services that need independent scaling (high traffic variance)
+2. Services that benefit from different technology (ML model serving, search)
+3. Services owned by distinct teams (organizational alignment)
+4. Services with the clearest boundaries (lowest extraction risk)
+
+**Duration:** 6-18 months for a medium-sized monolith, ongoing for larger systems.
+
+> **Real-world example:** Shopify chose the modular monolith as their long-term architecture, extracting only a few services where independently scaling was critical (e.g., Storefront Renderer). Their monolith serves over 10% of all e-commerce traffic. This is a reminder that full microservices extraction is not always the end goal.
+
+---
+
+# Service Mesh Patterns (Deep Dive)
+
+The earlier "Service Mesh Integration" section covered which patterns the mesh handles versus application code. This section goes deeper into specific service mesh patterns, when a mesh is worth the complexity, and how to choose between implementations.
+
+## mTLS: Zero-Trust Networking Between Services
+
+In a microservices environment, services communicate over the network — which means any compromised service or network segment can intercept traffic. Mutual TLS (mTLS) solves this by requiring both the client and server to present certificates, establishing encrypted and authenticated communication.
+
+**How it works in a service mesh:**
+- The mesh control plane acts as a certificate authority (CA)
+- Each sidecar proxy receives a short-lived certificate (typically 24h rotation)
+- All inter-service traffic is encrypted and authenticated at the proxy level
+- Application code is unaware of TLS — it sends plain HTTP to localhost
+- Certificate rotation is automatic with zero downtime
+
+**When mTLS matters:**
+- Multi-tenant environments where services from different teams share infrastructure
+- Compliance requirements (SOC 2, PCI-DSS, HIPAA) mandating encryption in transit
+- Zero-trust security models where network perimeter is not trusted
+
+## Traffic Shifting: Canary and Blue-Green via Mesh
+
+Service meshes provide fine-grained traffic control at the proxy level, enabling deployment strategies without application changes.
+
+**Canary deployments:** Route a small percentage of traffic (1-5%) to the new version while monitoring error rates and latency. Gradually increase to 100% if metrics are healthy.
+
+**Blue-green deployments:** Run two full environments (blue = current, green = new). Switch all traffic at once via mesh routing rules.
+
+**Traffic mirroring (dark launching):** Copy production traffic to a new version without serving responses to users. Compare responses for correctness.
+
+```
+# Istio VirtualService for canary deployment
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: order-service
+spec:
+  hosts:
+    - order-service
+  http:
+    - route:
+        - destination:
+            host: order-service
+            subset: stable
+          weight: 95
+        - destination:
+            host: order-service
+            subset: canary
+          weight: 5
+```
+
+## Circuit Breaking at Mesh Level vs Application Level
+
+| Aspect | Mesh-Level Circuit Breaking | Application-Level Circuit Breaking |
+|--------|---------------------------|-----------------------------------|
+| **What it detects** | Connection failures, 5xx responses, request timeouts | Business logic failures (invalid state, domain errors) |
+| **Granularity** | Per-host or per-service | Per-operation, per-tenant, per-resource |
+| **Configuration** | Mesh config (YAML), applies uniformly | Code (Resilience4j, Polly), context-aware |
+| **Fallback behavior** | Return error immediately | Return cached data, default values, degraded response |
+| **Best for** | Infrastructure-level protection | Business-level degradation strategies |
+
+**Recommendation:** Use both. Mesh circuit breaking as the safety net; application circuit breaking for intelligent degradation.
+
+## Sidecar Proxy Pattern
+
+```mermaid
+graph TB
+    subgraph "Pod (Kubernetes)"
+        App["Application Container<br/>(business logic)"]
+        Sidecar["Sidecar Proxy<br/>(Envoy / Linkerd-proxy)"]
+    end
+
+    App -->|"Plain HTTP<br/>to localhost:8080"| Sidecar
+    Sidecar -->|"mTLS encrypted<br/>to remote proxy"| Remote["Remote Service Proxy"]
+
+    subgraph "Sidecar Responsibilities"
+        R1["mTLS termination"]
+        R2["Load balancing"]
+        R3["Circuit breaking"]
+        R4["Retry with backoff"]
+        R5["Metrics emission"]
+        R6["Distributed tracing spans"]
+        R7["Rate limiting"]
+    end
+
+    Sidecar --- R1
+    Sidecar --- R2
+    Sidecar --- R3
+    Sidecar --- R4
+    Sidecar --- R5
+    Sidecar --- R6
+    Sidecar --- R7
+
+    style App fill:#4ecdc4,color:#fff
+    style Sidecar fill:#45b7d1,color:#fff
+    style Remote fill:#667eea,color:#fff
+```
+
+**How the sidecar intercepts traffic:**
+1. Kubernetes init container configures iptables rules to redirect all inbound/outbound traffic through the sidecar proxy
+2. Application sends plain HTTP to the destination service hostname
+3. Sidecar intercepts the outbound request, applies policies (retry, timeout, circuit breaking), encrypts with mTLS, and forwards to the remote sidecar
+4. Remote sidecar decrypts, applies inbound policies, and forwards to the application container
+
+## Istio vs Linkerd Comparison
+
+| Feature | Istio | Linkerd |
+|---------|-------|---------|
+| **Proxy** | Envoy (C++, feature-rich, complex) | linkerd2-proxy (Rust, lightweight, simple) |
+| **Resource overhead** | ~50-100 MB per sidecar | ~10-20 MB per sidecar |
+| **Latency overhead** | ~2-5ms p99 added | ~1-2ms p99 added |
+| **Complexity** | High — many CRDs, steep learning curve | Low — opinionated defaults, fewer knobs |
+| **Traffic management** | Advanced (fault injection, mirroring, header-based routing) | Basic (traffic splitting, retries) |
+| **Multi-cluster** | Mature support | Supported but simpler |
+| **mTLS** | Manual opt-in (or mesh-wide policy) | On by default, zero config |
+| **Best for** | Large orgs needing fine-grained control | Teams wanting simplicity and low overhead |
+| **Ecosystem** | Huge (Kiali, Jaeger, Prometheus integrations) | Focused (built-in dashboard, Prometheus) |
+
+## When Service Mesh Is Worth It vs Overkill
+
+**Worth it when:**
+- 20+ services in production
+- Multiple teams deploying independently
+- Compliance requirements mandate mTLS
+- Need canary deployments without application changes
+- Debugging latency requires automatic distributed tracing
+
+**Overkill when:**
+- Fewer than 10 services
+- Single team manages all services
+- Already using a cloud-native service (AWS App Mesh is simpler but less feature-rich)
+- Application-level libraries (Resilience4j, gRPC interceptors) already handle resilience
+
+---
+
+# Platform Engineering and Internal Developer Platforms
+
+As microservices scale, the operational burden shifts from "Can we build services?" to "Can we operate services without every team reinventing the wheel?" Platform engineering solves this by providing an Internal Developer Platform (IDP) — a self-service layer that abstracts infrastructure complexity.
+
+## Why Microservices Need Platform Engineering
+
+Without a platform, each team must independently solve:
+- Service scaffolding (boilerplate, project structure, CI/CD config)
+- Infrastructure provisioning (databases, message queues, caches)
+- Observability setup (logging, metrics, tracing)
+- Security compliance (secrets management, mTLS, scanning)
+- Deployment pipelines (build, test, canary, rollback)
+
+With 5 teams and 20 services, this creates enormous duplication and inconsistency. Platform engineering provides shared, opinionated solutions.
+
+## Platform Layers
+
+```mermaid
+graph TB
+    subgraph "Developer Experience Layer"
+        Portal["Service Catalog<br/>(Backstage / Port)"]
+        Templates["Golden Path Templates<br/>(Cookiecutter / Yeoman)"]
+        Docs["API Documentation<br/>(Auto-generated)"]
+    end
+
+    subgraph "Platform Orchestration Layer"
+        IaC["Infrastructure as Code<br/>(Terraform / Crossplane)"]
+        GitOps["GitOps Controller<br/>(ArgoCD / Flux)"]
+        Secrets["Secrets Management<br/>(Vault / AWS Secrets Manager)"]
+    end
+
+    subgraph "Infrastructure Layer"
+        K8s["Kubernetes Clusters"]
+        DB["Managed Databases"]
+        MQ["Message Brokers"]
+        Cache["Cache Clusters"]
+        Mesh["Service Mesh"]
+    end
+
+    Portal --> Templates
+    Portal --> Docs
+    Templates --> IaC
+    IaC --> GitOps
+    GitOps --> K8s
+    GitOps --> DB
+    GitOps --> MQ
+    Secrets --> K8s
+
+    style Portal fill:#667eea,color:#fff
+    style Templates fill:#764ba2,color:#fff
+    style Docs fill:#f093fb,color:#fff
+    style IaC fill:#4ecdc4,color:#fff
+    style GitOps fill:#45b7d1,color:#fff
+    style Secrets fill:#ffa07a,color:#fff
+    style K8s fill:#ff6b6b,color:#fff
+    style DB fill:#ff6b6b,color:#fff
+    style MQ fill:#ff6b6b,color:#fff
+    style Cache fill:#ff6b6b,color:#fff
+    style Mesh fill:#ff6b6b,color:#fff
+```
+
+## Golden Paths: Standardized Service Templates
+
+A golden path is a pre-built, opinionated template that encodes best practices for creating a new service. Teams can diverge from the golden path, but the default should be production-ready.
+
+**What a golden path includes:**
+- Service skeleton (HTTP server, health checks, graceful shutdown)
+- CI/CD pipeline configuration (build, test, security scan, deploy)
+- Observability setup (structured logging, metrics endpoint, tracing middleware)
+- Dockerfile and Kubernetes manifests (resource limits, liveness/readiness probes)
+- Database migration tooling (Flyway, Alembic)
+- Contract testing setup (Pact, Protovalidate)
+- README template with runbook sections
+
+**Benefit:** A new team can go from "we need a new service" to "deployed in staging with full observability" in less than a day instead of two weeks.
+
+## Developer Experience Metrics (DORA)
+
+The DORA (DevOps Research and Assessment) metrics measure the effectiveness of your platform and delivery process:
+
+| Metric | Elite | High | Medium | Low |
+|--------|-------|------|--------|-----|
+| **Deployment Frequency** | On-demand (multiple/day) | Weekly to monthly | Monthly to every 6 months | Every 6 months+ |
+| **Lead Time for Changes** | < 1 hour | 1 day to 1 week | 1 week to 1 month | 1 month to 6 months |
+| **Change Failure Rate** | 0-15% | 16-30% | 16-30% | 46-60% |
+| **Mean Time to Recovery** | < 1 hour | < 1 day | 1 day to 1 week | 1 week to 1 month |
+
+**How platform engineering improves DORA metrics:**
+- **Deployment frequency increases** because golden paths eliminate setup overhead
+- **Lead time decreases** because self-service provisioning removes tickets and waiting
+- **Change failure rate drops** because templates encode best practices (testing, canary deployments)
+- **MTTR improves** because standardized observability makes diagnosis faster
+
+## Platform Catalog Tools
+
+| Tool | Type | Key Features | Best For |
+|------|------|-------------|----------|
+| **Backstage** (Spotify) | Open-source service catalog | Plugin ecosystem, TechDocs, scaffolding, Kubernetes integration | Organizations wanting full customization |
+| **Port** | Commercial IDP | Self-service actions, scorecards, no-code workflows | Teams wanting fast time-to-value |
+| **Cortex** | Commercial IDP | Service maturity scorecards, CTO dashboards | Engineering leadership visibility |
+| **OpsLevel** | Commercial IDP | Service ownership, maturity rubrics, checks | Compliance-focused organizations |
+
+> **Interview insight:** When discussing microservices in an interview, mentioning platform engineering demonstrates that you understand the operational reality beyond the architecture diagrams. Saying "We would need a platform team to provide golden paths, self-service provisioning, and standardized observability" shows production maturity.
+
+---
+
+# Team Topology and Service Ownership
+
+The most common microservices failure is not technical — it is organizational. Services are split along technical layers (frontend service, backend service, database service) instead of business domains, or services are created without teams to own them. Team topology determines service topology.
+
+## Conway's Law and the Inverse Conway Maneuver
+
+**Conway's Law:** "Any organization that designs a system will produce a design whose structure is a copy of the organization's communication structure."
+
+This means if your organization has a frontend team, a backend team, and a database team, you will build a three-tier architecture regardless of whether that is the right design. The system mirrors the org chart.
+
+**Inverse Conway Maneuver:** Deliberately structure teams to match the architecture you want. If you want independently deployable services around business domains, create teams organized around business domains — not technical layers.
+
+> **Callout: Don't split services without splitting teams.** If a single team owns 8 services, you don't have microservices — you have a distributed monolith operated by an overworked team. Every service must have a clear owning team with the autonomy and capacity to develop, deploy, and operate it independently.
+
+## Team Topologies (Skelton & Pais Model)
+
+| Team Type | Purpose | Service Ownership Pattern | Example |
+|-----------|---------|--------------------------|---------|
+| **Stream-aligned** | Delivers value along a business domain stream | Owns 1-3 services end-to-end (dev, deploy, operate) | Checkout team owns Checkout Service, Payment Service |
+| **Platform** | Provides shared infrastructure and tooling as a service | Owns platform services consumed by stream teams | Platform team owns API Gateway, Service Mesh config, CI/CD pipelines |
+| **Enabling** | Helps stream teams adopt new capabilities | Does not own services long-term; coaches and hands off | SRE enablement team helps stream teams adopt observability practices |
+| **Complicated-subsystem** | Manages areas requiring deep specialist expertise | Owns services requiring niche expertise | ML team owns Recommendation Engine, Fraud Detection Model |
+
+## Mapping Team Types to Service Ownership
+
+```
+Stream-aligned teams (the majority of teams)
+├── Own business domain services
+├── Full ownership: design, build, deploy, operate, on-call
+├── Minimize dependencies on other teams
+└── Target: 1-3 services per team (the "cognitive load" principle)
+
+Platform teams (1-2 per organization)
+├── Provide self-service infrastructure
+├── Own platform services (API Gateway, Service Mesh, CI/CD)
+├── Success metric: stream teams can ship without filing tickets
+└── Build golden paths and developer experience tooling
+
+Enabling teams (temporary engagements)
+├── Help stream teams adopt new practices
+├── Example: help Team X adopt event-driven patterns
+├── Engagement model: weeks to months, not permanent
+└── Measure success by team self-sufficiency
+
+Complicated-subsystem teams (only where needed)
+├── Own technically deep services (ML, search, video encoding)
+├── Provide APIs consumed by stream teams
+├── Justified only when expertise cost > coordination cost
+└── Should be rare — most services don't need this
+```
+
+## Service Count Should Follow Team Count
+
+A common anti-pattern is creating more services than teams can support. Use this heuristic:
+
+| Team Size | Recommended Max Services | Rationale |
+|-----------|------------------------|-----------|
+| 1-2 engineers | 1 service (monolith or module) | Cannot sustain on-call for multiple services |
+| 3-5 engineers | 1-2 services | Sufficient for primary service + one extraction |
+| 5-8 engineers | 2-4 services | Two-pizza team can handle a bounded context |
+| 8-12 engineers | 3-6 services | Consider splitting into two stream-aligned teams |
+| 12+ engineers | Split into multiple teams | Each sub-team owns 2-4 services |
+
+> **Key principle:** "The number of services should not significantly exceed the number of teams multiplied by three. If it does, teams are spread too thin and services become under-maintained."
+
+## The Cognitive Load Test
+
+Before adding a new service, apply the cognitive load test:
+
+1. **Can the owning team explain the service's domain in 5 minutes?** If not, the bounded context may be too large or poorly defined.
+2. **Can the owning team deploy the service without coordinating with other teams?** If not, you have a distributed monolith.
+3. **Can the owning team debug a production issue within 30 minutes?** If not, the service may be too complex or observability is insufficient.
+4. **Does the team own fewer than 5 services?** If not, they are spread too thin.
+
+If any answer is "no", reconsider the service boundary or team structure.
+
+---
+
 # Summary
 
 This chapter covered the four pillars of microservices architecture:

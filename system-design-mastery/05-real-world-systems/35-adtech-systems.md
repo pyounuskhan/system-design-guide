@@ -3493,6 +3493,89 @@ Cross features (computed inline):
 - Study how The Trade Desk's Unified ID 2.0 and LiveRamp's RampID work as post-cookie identity solutions and their trade-offs versus probabilistic matching.
 - Investigate the emerging audio advertising ecosystem (Spotify, podcasts) and how it differs architecturally from display and video in terms of measurement, targeting, and auction mechanics.
 
+## Bid Request Latency Budget
+
+```
+Total budget: < 100ms (exchange timeout for bid response)
+
+  Receive bid request:           2ms
+  Parse + validate:              3ms
+  User lookup (cookie/ID):       5ms (Redis)
+  Audience matching:             10ms (pre-computed segments)
+  Budget + pacing check:         5ms (Redis atomic counter)
+  Bid calculation (ML model):    20ms (feature lookup + inference)
+  Response serialization:        3ms
+  Network to exchange:           20-40ms
+  Total:                         ~70-90ms (within 100ms budget)
+
+  If ANY step exceeds budget → return no-bid (miss the auction, but don't timeout)
+```
+
+---
+
+## Ad Fraud Detection Blueprint
+
+```
+LAYER 1: PRE-BID (< 5ms)
+  IP blocklist check; known bot user-agent; datacenter IP detection
+  → Block or deprioritize
+
+LAYER 2: POST-IMPRESSION (real-time)
+  Click velocity (> 10 clicks/min from same user → fraud)
+  Impression-to-click timing (< 100ms = bot click)
+  Device fingerprint consistency
+
+LAYER 3: BATCH ANALYSIS (daily)
+  Click-through rate anomalies per publisher
+  Conversion attribution validation
+  Coordinated click patterns (graph analysis)
+  → Clawback fraudulent spend; blocklist publishers
+```
+
+### Fraud Metrics
+
+| Metric | Target | Alert |
+|--------|--------|-------|
+| Invalid traffic (IVT) rate | < 5% of impressions | > 8% |
+| Bot detection rate | > 95% recall | < 90% |
+| Click fraud rate | < 2% of clicks | > 4% |
+| Attribution fraud | < 1% of conversions | > 2% |
+
+---
+
+## Privacy and Data Governance
+
+*Privacy regulations are evolving rapidly. This is an architectural reference — verify against current law.*
+
+| Concern | Implementation | Regulation |
+|---------|---------------|-----------|
+| **User consent for tracking** | Consent management platform (CMP); honor TCF signals | GDPR, CCPA, ePrivacy |
+| **Cookie deprecation** | Support Topics API, Attribution Reporting API (Privacy Sandbox) | Chrome Privacy Sandbox (timeline subject to change) |
+| **Data retention** | Impression/click logs: 90 days; aggregated: 2 years; PII: 30 days or consent-scoped | GDPR Art. 5(1)(e) |
+| **Right to erasure** | Delete user data within 30 days of request; propagate to all downstream | GDPR Art. 17 |
+| **Data minimization** | Collect only what's needed for auction + attribution; no profile enrichment beyond consent | GDPR Art. 5(1)(c) |
+| **Cross-border transfers** | Standard contractual clauses (SCCs); data residency for EU users | GDPR Ch. V |
+
+### Privacy-Preserving Attribution
+
+| Approach | How | Privacy Level |
+|----------|-----|-------------|
+| **Server-side attribution** | First-party data + server signals; no third-party cookies | Medium-High |
+| **Aggregated reporting** | Only report aggregated conversions (k-anonymity) | High |
+| **Attribution Reporting API** | Browser-mediated attribution with noise | High (Privacy Sandbox) |
+| **Data clean rooms** | Encrypted match between advertiser + publisher data | High |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Low-latency serving | Ch 6: Caching; Ch 7: Load Balancing |
+| Event streaming (impression/click) | Ch 8: Message Queues; Ch 16: EDA |
+| ML model serving (bid scoring) | Ch 27: ML & AI Systems |
+| Fraud detection patterns | Ch 19: Fintech & Payments |
+| Privacy requirements | Ch 2: Requirements; Ch A8: Security |
+| Cost optimization for high QPS | Ch A9: Cost Optimization |
+
 ---
 
 ## Navigation

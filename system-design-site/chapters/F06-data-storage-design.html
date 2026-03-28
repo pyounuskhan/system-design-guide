@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>65 min read</small>
+                      <small>76 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>46 min read</small>
+                      <small>61 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>62 min read</small>
+                      <small>68 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>58 min read</small>
+                      <small>70 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>91 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>66 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>73 min read</small>
+                      <small>86 min read</small>
                     </span>
                   </a>
                 </li>
@@ -998,7 +998,7 @@
           <div class="chapter-meta-strip">
             <div class="summary-pill">
               <span class="summary-label">Reading time</span>
-              <strong>58 min read</strong>
+              <strong>70 min read</strong>
             </div>
             <div class="summary-pill">
               <span class="summary-label">Focus</span>
@@ -1019,7 +1019,7 @@
 <hr>
 <h2 id="overview">Overview</h2>
 <p>Every software system is, at its core, a machine for <strong>storing, transforming, and retrieving data</strong>. The choice of data store shapes every layer above it: API design, service boundaries, consistency guarantees, deployment topology, and operational runbooks. A poor storage choice made in month one can become a multi-quarter migration project in year three.</p>
-<p>This chapter performs a deep-dive into <strong>three foundational areas</strong> of data and storage design:</p>
+<p>This chapter performs a deep-dive into <strong>four major areas</strong> of data and storage design:</p>
 <h3 id="section-1-database-types">Section 1 — Database Types</h3>
 <p>A comprehensive tour of every major database paradigm used in modern systems:</p>
 <ol>
@@ -1050,6 +1050,16 @@
 <li><strong>CAP Theorem</strong> — deep dive with proofs, PACELC extension.</li>
 <li><strong>Consistency Levels</strong> — per-operation tunable consistency, quorum reads/writes.</li>
 <li><strong>Session Guarantees</strong> — read-your-writes, monotonic reads, causal consistency.</li>
+</ol>
+<h3 id="section-4-advanced-data-patterns">Section 4 — Advanced Data Patterns</h3>
+<p>Modern patterns for production data architectures:</p>
+<ol>
+<li><strong>CRDTs and Local-First Architecture</strong> — conflict-free replicated data types, offline-first design, collaborative editing.</li>
+<li><strong>CDC, Outbox, and Event Sourcing</strong> — change data capture, transactional outbox, event-sourced systems, decision matrix.</li>
+<li><strong>Multi-Tenant Data Isolation</strong> — shared schema (RLS), separate schemas, separate databases, hybrid models.</li>
+<li><strong>Data Residency and Sovereignty</strong> — GDPR, PIPL, DPDP Act, compliance checklist.</li>
+<li><strong>Data Architecture Decision Records</strong> — reusable ADR template for data/storage decisions with worked examples.</li>
+<li><strong>Analytical vs Operational Stores</strong> — OLTP/OLAP separation, ETL/ELT/CDC, Lambda/Kappa architecture, data lakehouse.</li>
 </ol>
 <p>Every section is written to serve learners building mental models, engineers designing production systems, and candidates preparing for system design interviews.</p>
 <hr>
@@ -3573,13 +3583,955 @@ class ReadYourWritesProxy:
 - Distinguish between session-level guarantees and global consistency.
 - Know that causal consistency is the strongest session guarantee and captures all others.</p>
 <hr>
+<h1 id="section-4-advanced-data-patterns_1">Section 4: Advanced Data Patterns</h1>
+<h2 id="41-crdts-and-local-first-architecture">4.1 CRDTs and Local-First Architecture</h2>
+<h3 id="what-are-crdts">What Are CRDTs?</h3>
+<p><strong>Conflict-free Replicated Data Types (CRDTs)</strong> are data structures that can be replicated across multiple nodes, updated independently and concurrently without coordination, and always converge to a consistent state when merged. They achieve <strong>strong eventual consistency</strong> without requiring consensus protocols.</p>
+<p>CRDTs solve the fundamental tension between availability and consistency in distributed systems by making conflict resolution automatic and mathematically guaranteed.</p>
+<h3 id="core-crdt-types">Core CRDT Types</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>CRDT Type</th>
+<th>Description</th>
+<th>Operations</th>
+<th>Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>G-Counter</strong></td>
+<td>Grow-only counter; each node maintains its own count, total = sum of all nodes</td>
+<td>Increment</td>
+<td>View counts, like counts, download counters</td>
+</tr>
+<tr>
+<td><strong>PN-Counter</strong></td>
+<td>Pair of G-Counters (positive + negative); supports both increment and decrement</td>
+<td>Increment, Decrement</td>
+<td>Inventory counts, vote tallies, bidirectional counters</td>
+</tr>
+<tr>
+<td><strong>OR-Set</strong> (Observed-Remove Set)</td>
+<td>Set where adds and removes can happen concurrently; add wins over concurrent remove</td>
+<td>Add, Remove</td>
+<td>Shopping carts, tag sets, collaborative lists</td>
+</tr>
+<tr>
+<td><strong>LWW-Register</strong> (Last-Writer-Wins)</td>
+<td>Single value where concurrent writes are resolved by timestamp</td>
+<td>Set</td>
+<td>User profile fields, settings, single-value state</td>
+</tr>
+<tr>
+<td><strong>LWW-Map</strong></td>
+<td>Map of LWW-Registers; each key resolves independently</td>
+<td>Set key, Remove key</td>
+<td>Document properties, key-value configuration</td>
+</tr>
+<tr>
+<td><strong>RGA</strong> (Replicated Growable Array)</td>
+<td>Ordered list supporting insert and delete at any position</td>
+<td>Insert, Delete</td>
+<td>Collaborative text editing, ordered task lists</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="how-crdt-merge-works">How CRDT Merge Works</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-26.svg" alt="Diagram 26 for Data &amp; Storage Design" loading="lazy"></figure>
+<h3 id="local-first-software">Local-First Software</h3>
+<p><strong>Local-first</strong> software stores data primarily on the user's device and syncs with peers or a server when connectivity is available. This inverts the traditional client-server model:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Cloud-First</th>
+<th>Local-First</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Data location</strong></td>
+<td>Server is source of truth</td>
+<td>Device is source of truth</td>
+</tr>
+<tr>
+<td><strong>Offline support</strong></td>
+<td>Degraded or none</td>
+<td>Full functionality</td>
+</tr>
+<tr>
+<td><strong>Latency</strong></td>
+<td>Network round-trip (50-200ms)</td>
+<td>Instant (&lt;1ms)</td>
+</tr>
+<tr>
+<td><strong>Collaboration</strong></td>
+<td>Server mediates all changes</td>
+<td>Peer-to-peer sync via CRDTs</td>
+</tr>
+<tr>
+<td><strong>Data ownership</strong></td>
+<td>Cloud provider holds data</td>
+<td>User owns their data</td>
+</tr>
+<tr>
+<td><strong>Server dependency</strong></td>
+<td>App unusable without server</td>
+<td>App works indefinitely offline</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="when-to-use-crdts-local-first">When to Use CRDTs / Local-First</h3>
+<ul>
+<li><strong>Collaborative editing</strong>: Multiple users editing the same document (Google Docs-style)</li>
+<li><strong>Offline-first mobile apps</strong>: Field service apps, note-taking, task management</li>
+<li><strong>Multi-region writes</strong>: Avoiding cross-region coordination latency</li>
+<li><strong>Edge computing</strong>: IoT devices that must operate autonomously</li>
+<li><strong>Distributed counters</strong>: Like counts, view counts across CDN edges</li>
+</ul>
+<h3 id="when-not-to-use_7">When NOT to Use</h3>
+<ul>
+<li><strong>Strong consistency required</strong>: Financial transactions, inventory reservations (a brief overcount is unacceptable)</li>
+<li><strong>Total ordering required</strong>: Sequential ID generation, auction bidding</li>
+<li><strong>Complex transactions</strong>: Multi-entity ACID operations that cannot be decomposed</li>
+<li><strong>Storage-constrained devices</strong>: CRDTs can have higher memory overhead due to metadata</li>
+</ul>
+<h3 id="trade-offs_11">Trade-Offs</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>CRDTs / Local-First</th>
+<th>Server-Authoritative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Consistency</strong></td>
+<td>Strong eventual (converges)</td>
+<td>Strong (linearizable)</td>
+</tr>
+<tr>
+<td><strong>Availability</strong></td>
+<td>Always available (offline works)</td>
+<td>Unavailable when disconnected</td>
+</tr>
+<tr>
+<td><strong>Offline capability</strong></td>
+<td>Full functionality</td>
+<td>None or degraded</td>
+</tr>
+<tr>
+<td><strong>Latency</strong></td>
+<td>Local speed (&lt;1ms)</td>
+<td>Network-bound (50-500ms)</td>
+</tr>
+<tr>
+<td><strong>Conflict resolution</strong></td>
+<td>Automatic (math-based)</td>
+<td>Manual or last-write-wins</td>
+</tr>
+<tr>
+<td><strong>Complexity</strong></td>
+<td>Higher (CRDT logic, sync protocol)</td>
+<td>Lower (standard client-server)</td>
+</tr>
+<tr>
+<td><strong>Storage overhead</strong></td>
+<td>Higher (tombstones, vector clocks)</td>
+<td>Lower (single copy)</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="real-world-examples">Real-World Examples</h3>
+<ul>
+<li><strong>Figma</strong>: Uses CRDTs for real-time multiplayer design editing. Each operation (move, resize, color change) is a CRDT update that merges automatically across collaborators.</li>
+<li><strong>Linear</strong>: Local-first issue tracker. All data lives on-device; sync happens in the background. App feels instant because every operation is local.</li>
+<li><strong>Notion</strong>: Hybrid approach with CRDT-like operational transforms for real-time collaboration while maintaining a server-authoritative model for persistence.</li>
+<li><strong>Apple Notes</strong>: Uses CRDTs for cross-device sync without a central server mediating every edit.</li>
+<li><strong>Automerge / Yjs</strong>: Open-source CRDT libraries used by dozens of collaborative apps.</li>
+</ul>
+<hr>
+<h2 id="42-cdc-outbox-pattern-and-event-sourcing">4.2 CDC, Outbox Pattern, and Event Sourcing</h2>
+<h3 id="overview_1">Overview</h3>
+<p>When a service writes to its database, other services often need to know about that change. Three patterns address this <strong>data change propagation</strong> problem with different trade-offs:</p>
+<ol>
+<li><strong>Change Data Capture (CDC)</strong>: Read the database's write-ahead log and publish changes</li>
+<li><strong>Transactional Outbox</strong>: Write events to an outbox table atomically with business data</li>
+<li><strong>Event Sourcing</strong>: Store events as the source of truth; derive current state via projections</li>
+</ol>
+<h3 id="change-data-capture-cdc">Change Data Capture (CDC)</h3>
+<p>CDC captures row-level changes from the database's <strong>Write-Ahead Log (WAL)</strong> and publishes them as events to a message broker. The application code does not change; CDC operates at the database level.</p>
+<p><strong>How it works</strong>: Database writes go to the WAL. A CDC connector (e.g., Debezium) tails the WAL, converts each change into a structured event, and publishes to Kafka.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-27.svg" alt="Diagram 27 for Data &amp; Storage Design" loading="lazy"></figure>
+<p><strong>Key characteristics</strong>:
+- <strong>Low intrusion</strong>: No application code changes required
+- <strong>Schema-coupled</strong>: Consumers depend on the database schema; schema changes can break downstream
+- <strong>At-least-once delivery</strong>: CDC guarantees at-least-once; consumers must be idempotent
+- <strong>Low latency</strong>: Changes propagate within seconds of the commit</p>
+<h3 id="transactional-outbox-pattern">Transactional Outbox Pattern</h3>
+<p>The application writes business data and an event to an <strong>outbox table</strong> in the same database transaction. A separate relay process reads the outbox and publishes events to the message broker.</p>
+<pre><code class="language-sql">-- Single atomic transaction
+BEGIN;
+
+-- Business write
+INSERT INTO orders (order_id, user_id, total, status)
+VALUES ('ord_123', 'usr_456', 99.99, 'created');
+
+-- Outbox write (same transaction)
+INSERT INTO outbox (event_id, aggregate_type, aggregate_id, event_type, payload)
+VALUES (
+    gen_random_uuid(),
+    'Order',
+    'ord_123',
+    'OrderCreated',
+    '{&quot;order_id&quot;:&quot;ord_123&quot;,&quot;user_id&quot;:&quot;usr_456&quot;,&quot;total&quot;:99.99}'
+);
+
+COMMIT;
+</code></pre>
+<p>A relay process (polling or CDC on the outbox table) reads new outbox rows and publishes them to Kafka, then marks them as published.</p>
+<p><strong>Key characteristics</strong>:
+- <strong>Atomic with business data</strong>: Event is guaranteed to exist if and only if the business write succeeded
+- <strong>Schema-independent</strong>: Event payload is explicitly designed; not coupled to table schema
+- <strong>More application code</strong>: Developer must write events to the outbox in every write path
+- <strong>Explicit contracts</strong>: Event schema is a deliberate API, not an accidental exposure of internal schema</p>
+<h3 id="event-sourcing">Event Sourcing</h3>
+<p>Instead of storing current state, <strong>event sourcing</strong> stores an immutable append-only log of events as the source of truth. Current state is derived by replaying events (projections).</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-28.svg" alt="Diagram 28 for Data &amp; Storage Design" loading="lazy"></figure>
+<p><strong>Key characteristics</strong>:
+- <strong>Complete audit trail</strong>: Every state transition is recorded forever
+- <strong>Temporal queries</strong>: "What was the order state at 3pm Tuesday?"
+- <strong>Complex read path</strong>: Queries require projections (materialized views of event streams)
+- <strong>Event versioning</strong>: Events are immutable; schema evolution requires upcasting</p>
+<h3 id="decision-matrix-when-to-use-each-pattern">Decision Matrix: When to Use Each Pattern</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th>CDC</th>
+<th>Transactional Outbox</th>
+<th>Event Sourcing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Code changes required</strong></td>
+<td>None (infra only)</td>
+<td>Moderate (outbox writes)</td>
+<td>Extensive (new paradigm)</td>
+</tr>
+<tr>
+<td><strong>Schema coupling</strong></td>
+<td>High (tied to DB schema)</td>
+<td>Low (explicit event payload)</td>
+<td>None (events ARE the schema)</td>
+</tr>
+<tr>
+<td><strong>Consistency</strong></td>
+<td>At-least-once from WAL</td>
+<td>Exactly-once with business write</td>
+<td>Events are the truth</td>
+</tr>
+<tr>
+<td><strong>Audit trail</strong></td>
+<td>Partial (captures changes)</td>
+<td>Partial (captures events)</td>
+<td>Complete (all history)</td>
+</tr>
+<tr>
+<td><strong>Temporal queries</strong></td>
+<td>No</td>
+<td>No</td>
+<td>Yes (replay to any point)</td>
+</tr>
+<tr>
+<td><strong>Operational complexity</strong></td>
+<td>Medium (CDC connector)</td>
+<td>Low (polling or CDC relay)</td>
+<td>High (projections, snapshots)</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Brownfield systems, analytics sync</td>
+<td>Microservice event publishing</td>
+<td>Domains requiring full audit</td>
+</tr>
+<tr>
+<td><strong>Real-world examples</strong></td>
+<td>LinkedIn (Databus), Airbnb</td>
+<td>Shopify, Uber</td>
+<td>Banking (LMAX), Evento</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="trade-offs-summary">Trade-Offs Summary</h3>
+<ul>
+<li><strong>CDC</strong>: Low code investment, but consumers are coupled to your database schema. Schema migration becomes a cross-team coordination problem.</li>
+<li><strong>Outbox</strong>: Explicit event contracts decouple consumers from your schema, but every write path must remember to publish. Best balance for most microservice architectures.</li>
+<li><strong>Event Sourcing</strong>: Complete audit history and temporal queries, but reads become complex (projections) and the learning curve is steep. Reserve for domains where the audit trail is a business requirement (finance, healthcare, legal).</li>
+</ul>
+<hr>
+<h2 id="43-multi-tenant-data-isolation-patterns">4.3 Multi-Tenant Data Isolation Patterns</h2>
+<h3 id="overview_2">Overview</h3>
+<p>Multi-tenancy is the architectural approach where a single software instance serves multiple customers (tenants). The data isolation strategy is one of the most consequential decisions in SaaS architecture, affecting security, compliance, performance, cost, and operational complexity.</p>
+<h3 id="the-three-fundamental-approaches">The Three Fundamental Approaches</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-29.svg" alt="Diagram 29 for Data &amp; Storage Design" loading="lazy"></figure>
+<h3 id="pattern-1-shared-database-shared-schema-row-level-security">Pattern 1: Shared Database, Shared Schema (Row-Level Security)</h3>
+<p>All tenants share the same tables. Every table has a <code>tenant_id</code> column. Access is enforced through <strong>Row-Level Security (RLS)</strong> policies.</p>
+<pre><code class="language-sql">-- Enable RLS
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+
+-- Policy: tenants can only see their own rows
+CREATE POLICY tenant_isolation ON orders
+    USING (tenant_id = current_setting('app.current_tenant')::uuid);
+
+-- Set tenant context at connection time
+SET app.current_tenant = 'tenant_abc_123';
+
+-- This query automatically filters to the current tenant
+SELECT * FROM orders WHERE status = 'active';
+-- Internally becomes: SELECT * FROM orders WHERE status = 'active' AND tenant_id = 'tenant_abc_123'
+</code></pre>
+<h3 id="pattern-2-shared-database-separate-schemas">Pattern 2: Shared Database, Separate Schemas</h3>
+<p>Each tenant gets their own PostgreSQL <strong>schema</strong> within the same database. Tables are identical across schemas but data is physically separated.</p>
+<pre><code class="language-sql">-- Create schema for new tenant
+CREATE SCHEMA tenant_acme;
+
+-- Create tables within tenant schema
+CREATE TABLE tenant_acme.orders (
+    order_id UUID PRIMARY KEY,
+    total NUMERIC NOT NULL,
+    status TEXT NOT NULL
+);
+
+-- Route queries by setting search_path
+SET search_path = 'tenant_acme';
+SELECT * FROM orders;  -- queries tenant_acme.orders
+</code></pre>
+<h3 id="pattern-3-separate-databases-per-tenant">Pattern 3: Separate Databases Per Tenant</h3>
+<p>Each tenant gets a dedicated database instance. Full physical isolation.</p>
+<h3 id="comparison-table">Comparison Table</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th>Shared Schema (RLS)</th>
+<th>Separate Schemas</th>
+<th>Separate Databases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Isolation</strong></td>
+<td>Logical (row-level)</td>
+<td>Logical (schema-level)</td>
+<td>Physical (full)</td>
+</tr>
+<tr>
+<td><strong>Cost per tenant</strong></td>
+<td>Lowest</td>
+<td>Low-Medium</td>
+<td>Highest</td>
+</tr>
+<tr>
+<td><strong>Operational complexity</strong></td>
+<td>Lowest (one DB to manage)</td>
+<td>Medium (schema migrations x N)</td>
+<td>Highest (N databases to manage)</td>
+</tr>
+<tr>
+<td><strong>Compliance suitability</strong></td>
+<td>Basic (SOC2)</td>
+<td>Moderate (SOC2, some HIPAA)</td>
+<td>Highest (HIPAA, FedRAMP, PCI)</td>
+</tr>
+<tr>
+<td><strong>Noisy neighbor risk</strong></td>
+<td>Highest (shared resources)</td>
+<td>Medium (shared DB resources)</td>
+<td>None (dedicated resources)</td>
+</tr>
+<tr>
+<td><strong>Schema customization</strong></td>
+<td>None (shared tables)</td>
+<td>Per-tenant schema variations</td>
+<td>Full customization</td>
+</tr>
+<tr>
+<td><strong>Cross-tenant queries</strong></td>
+<td>Easy (same tables)</td>
+<td>Possible (cross-schema joins)</td>
+<td>Hard (requires federation)</td>
+</tr>
+<tr>
+<td><strong>Backup/restore granularity</strong></td>
+<td>Tenant-level is complex</td>
+<td>Per-schema possible</td>
+<td>Per-database (simple)</td>
+</tr>
+<tr>
+<td><strong>Max tenants</strong></td>
+<td>100,000+</td>
+<td>1,000-10,000</td>
+<td>100-1,000</td>
+</tr>
+<tr>
+<td><strong>When to use</strong></td>
+<td>High-volume, low-touch SaaS</td>
+<td>Mid-market SaaS</td>
+<td>Enterprise, regulated industries</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="hybrid-approach">Hybrid Approach</h3>
+<p>Most mature SaaS platforms use a <strong>hybrid model</strong>:</p>
+<ul>
+<li><strong>Free/small tenants</strong>: Shared schema with RLS (cost-efficient at scale)</li>
+<li><strong>Mid-tier tenants</strong>: Separate schemas (better isolation, moderate cost)</li>
+<li><strong>Enterprise tenants</strong>: Dedicated databases (full isolation, compliance, custom SLAs)</li>
+</ul>
+<p>A <strong>tenant routing layer</strong> maps each request to the correct database/schema based on the tenant's tier.</p>
+<h3 id="real-world-examples_1">Real-World Examples</h3>
+<ul>
+<li><strong>Salesforce</strong>: Shared schema with extensive RLS and Organization ID on every table. Serves 150K+ tenants from shared infrastructure.</li>
+<li><strong>Slack</strong>: Separate database shards per workspace for performance isolation. Large workspaces get dedicated resources.</li>
+<li><strong>Shopify</strong>: Hybrid approach. Small merchants share infrastructure; Shopify Plus merchants get dedicated pods with isolated databases.</li>
+</ul>
+<hr>
+<h2 id="44-data-residency-and-sovereignty-checklist">4.4 Data Residency and Sovereignty Checklist</h2>
+<h3 id="overview_3">Overview</h3>
+<p>Data residency laws require that certain categories of data (especially PII and PHI) be stored and processed within specific geographic boundaries. Violating these requirements can result in fines up to 4% of global revenue (GDPR), service bans, or criminal liability.</p>
+<h3 id="key-regulations">Key Regulations</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Regulation</th>
+<th>Region</th>
+<th>Key Requirement</th>
+<th>Penalty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>GDPR</strong> (General Data Protection Regulation)</td>
+<td>EU/EEA</td>
+<td>Personal data of EU residents must be processed lawfully; transfers outside EU require adequacy decisions or SCCs</td>
+<td>Up to 4% of global annual revenue or EUR 20M</td>
+</tr>
+<tr>
+<td><strong>China PIPL</strong> (Personal Information Protection Law)</td>
+<td>China</td>
+<td>Personal data collected in China must be stored in China; cross-border transfers require security assessment</td>
+<td>Up to CNY 50M or 5% of annual revenue</td>
+</tr>
+<tr>
+<td><strong>India DPDP Act</strong> (Digital Personal Data Protection)</td>
+<td>India</td>
+<td>Certain categories of personal data must be stored in India; critical data cannot leave India</td>
+<td>Up to INR 250 crore (~USD 30M)</td>
+</tr>
+<tr>
+<td><strong>Russia Federal Law 242-FZ</strong></td>
+<td>Russia</td>
+<td>Personal data of Russian citizens must be stored on servers located in Russia</td>
+<td>Service blocking, fines</td>
+</tr>
+<tr>
+<td><strong>Brazil LGPD</strong></td>
+<td>Brazil</td>
+<td>Personal data must be processed in compliance with Brazilian law; international transfers require adequacy or SCCs</td>
+<td>Up to 2% of revenue in Brazil, capped at BRL 50M</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="cross-border-transfer-mechanisms">Cross-Border Transfer Mechanisms</h3>
+<ul>
+<li><strong>Adequacy Decisions</strong>: EU Commission has ruled certain countries' data protection laws are adequate (e.g., Japan, UK, Canada). No additional safeguards needed.</li>
+<li><strong>Standard Contractual Clauses (SCCs)</strong>: Pre-approved contract terms for data transfers. Must include supplementary technical measures (encryption, pseudonymization).</li>
+<li><strong>Binding Corporate Rules (BCRs)</strong>: For intra-group transfers within multinational corporations. Requires DPA approval.</li>
+<li><strong>Data Processing Agreements (DPAs)</strong>: Contractual agreements between data controllers and processors defining data handling obligations.</li>
+</ul>
+<h3 id="practical-compliance-checklist">Practical Compliance Checklist</h3>
+<pre><code>Data Residency Implementation Checklist
+========================================
+
+[ ] 1. IDENTIFY all PII/PHI data fields across all services
+       - User profiles, payment data, health records, location data
+       - Derived data (analytics, ML features) that contains PII
+
+[ ] 2. CLASSIFY data by sensitivity and applicable regulation
+       - Public, Internal, Confidential, Restricted
+       - Map each class to applicable regulations (GDPR, PIPL, DPDP)
+
+[ ] 3. MAP data flows across regions
+       - Where is data collected? (user geography)
+       - Where is data processed? (compute regions)
+       - Where is data stored? (database regions)
+       - Where is data backed up? (backup regions)
+
+[ ] 4. CHOOSE storage regions per data classification
+       - EU user PII → eu-west-1 / europe-west1
+       - China user PII → cn-north-1 / cn-northwest-1
+       - India critical data → ap-south-1
+
+[ ] 5. IMPLEMENT data routing by user geography
+       - Geo-DNS routing at the edge
+       - Tenant-aware database routing layer
+       - Regional API gateways that enforce data boundaries
+
+[ ] 6. CONFIGURE cross-region replication with sovereignty constraints
+       - Replicas must respect residency boundaries
+       - Encryption keys must be region-specific (per-region KMS)
+       - Backup and DR sites must comply with same residency rules
+
+[ ] 7. IMPLEMENT data access controls
+       - Role-based access scoped by region
+       - Admin access from outside the region requires justification and audit
+       - Break-glass procedures for emergency cross-region access
+
+[ ] 8. SET UP audit logging for compliance evidence
+       - Log all cross-region data access
+       - Log all data export operations
+       - Retain logs per regulation requirements (GDPR: duration of processing + 1yr)
+
+[ ] 9. AUTOMATE compliance validation
+       - Infrastructure-as-code policies (OPA, AWS SCP, Azure Policy)
+       - Automated scanning for PII in non-compliant regions
+       - CI/CD gates that block deployments violating residency rules
+
+[ ] 10. DOCUMENT and maintain records of processing activities (ROPA)
+        - Required by GDPR Article 30
+        - Must include: purpose, categories, recipients, transfers, retention
+</code></pre>
+<h3 id="cloud-provider-guidance">Cloud Provider Guidance</h3>
+<ul>
+<li><strong>AWS</strong>: <a href="https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/data-residency.html">Well-Architected Framework — Data Residency</a> — Use AWS Organizations SCPs to restrict regions, S3 Object Lock for retention, and AWS Config rules for compliance monitoring.</li>
+<li><strong>GCP</strong>: <a href="https://cloud.google.com/architecture/framework/security/data-residency">Data Residency, Operational Transparency</a> — Use VPC Service Controls, organization policy constraints for region restriction, and Assured Workloads for regulated environments.</li>
+<li><strong>Azure</strong>: <a href="https://azure.microsoft.com/en-us/explore/global-infrastructure/data-residency/">Data Residency in Azure</a> — Use Azure Policy for region enforcement, Customer Lockbox for access control, and Azure Confidential Computing for processing-in-use protection.</li>
+</ul>
+<hr>
+<h2 id="45-data-architecture-decision-record-template">4.5 Data Architecture Decision Record Template</h2>
+<h3 id="why-data-adrs">Why Data ADRs?</h3>
+<p>Data and storage decisions have the longest lifespan and highest migration cost of any architectural choice. A dedicated <strong>Architecture Decision Record (ADR)</strong> template for data decisions ensures that the rationale, trade-offs, and revisit triggers are captured before the team moves on.</p>
+<h3 id="template">Template</h3>
+<pre><code>================================================================
+DATA ARCHITECTURE DECISION RECORD
+================================================================
+
+Title:       [Short descriptive title]
+Date:        [YYYY-MM-DD]
+Status:      [Proposed | Accepted | Superseded by ADR-XXX]
+Authors:     [Names]
+Reviewers:   [Names]
+
+DECISION
+--------
+What storage technology, data pattern, or modeling approach are we choosing?
+
+CONTEXT
+-------
+What data characteristics drove this decision?
+- Volume: How much data? Growth rate?
+- Velocity: Write/read throughput requirements?
+- Variety: Structured, semi-structured, unstructured?
+- Access patterns: Point lookups, range scans, full-text search, graph traversals?
+- Consistency requirements: Strong, eventual, causal?
+- Regulatory: GDPR, HIPAA, PCI-DSS, data residency?
+
+OPTIONS CONSIDERED
+------------------
+| Option | Pros | Cons |
+|--------|------|------|
+| Option A | ... | ... |
+| Option B | ... | ... |
+| Option C | ... | ... |
+
+CHOSEN OPTION
+-------------
+[Selected option and brief statement]
+
+WHY THIS OPTION
+---------------
+Specific reasons tied to data requirements (not generic &quot;it's popular&quot;).
+
+DATA MODEL IMPACT
+-----------------
+How does this affect schema, indexing, partitioning, and denormalization?
+
+MIGRATION PATH
+--------------
+How do we get from current state to the chosen state?
+- Dual-write period?
+- Backfill strategy?
+- Rollback plan?
+
+CONSISTENCY IMPACT
+------------------
+What consistency guarantees change? How does this affect user experience?
+
+COST IMPACT
+-----------
+- Storage cost ($/GB/month)
+- Compute cost ($/hour)
+- Operational cost (team hours/month)
+- Migration cost (one-time)
+
+REVISIT WHEN
+-------------
+What conditions would make us reconsider this decision?
+- Data volume exceeds X TB
+- Write throughput exceeds Y ops/sec
+- New compliance requirement
+- Cost exceeds $Z/month
+
+================================================================
+</code></pre>
+<h3 id="example-adr-1-choose-dynamodb-for-session-store">Example ADR 1: Choose DynamoDB for Session Store</h3>
+<pre><code>================================================================
+DATA ARCHITECTURE DECISION RECORD
+================================================================
+
+Title:       Use DynamoDB for user session storage
+Date:        2025-09-15
+Status:      Accepted
+Authors:     Platform Team
+Reviewers:   Security, SRE
+
+DECISION
+--------
+Replace Redis-based session storage with DynamoDB for all user sessions.
+
+CONTEXT
+-------
+- Volume: 50M active sessions, ~2KB each = 100GB
+- Velocity: 200K reads/sec, 50K writes/sec at peak
+- Access pattern: Point lookups by session_id (100%), no scans
+- Consistency: Eventual consistency acceptable (session data is soft state)
+- Current problem: Redis cluster requires manual scaling; failover causes session loss
+
+OPTIONS CONSIDERED
+------------------
+| Option | Pros | Cons |
+|--------|------|------|
+| Redis Cluster (current) | Sub-ms latency, rich data types | Manual scaling, data loss on failover |
+| DynamoDB | Auto-scaling, durable, TTL built-in | Higher p99 latency (~5ms vs &lt;1ms) |
+| ElastiCache Serverless | Managed Redis, auto-scaling | Higher cost, still Redis complexity |
+
+CHOSEN OPTION
+-------------
+DynamoDB with on-demand capacity mode.
+
+WHY THIS OPTION
+---------------
+- Point-lookup-only access pattern is ideal for DynamoDB
+- Built-in TTL eliminates custom session expiry logic
+- Auto-scaling eliminates capacity planning overhead
+- Durable storage means no session loss during failover
+- 5ms p99 latency is acceptable for session lookups
+
+DATA MODEL IMPACT
+-----------------
+- Partition key: session_id (UUID, uniform distribution)
+- TTL attribute: expires_at (epoch seconds)
+- No secondary indexes needed
+- Session data stored as a single JSON attribute
+
+MIGRATION PATH
+--------------
+1. Deploy dual-write (Redis + DynamoDB) for 1 week
+2. Switch reads to DynamoDB, Redis as fallback
+3. Monitor for 1 week
+4. Decommission Redis cluster
+5. Rollback: re-enable Redis reads (data still being written)
+
+CONSISTENCY IMPACT
+------------------
+No change. Sessions were already eventually consistent in Redis.
+
+COST IMPACT
+-----------
+- DynamoDB on-demand: ~$3,500/month (vs Redis r6g.xlarge cluster: ~$4,800/month)
+- Net savings: ~$1,300/month + elimination of Redis operational overhead
+- Migration cost: ~2 engineer-weeks
+
+REVISIT WHEN
+-------------
+- Need sub-millisecond latency for sessions
+- Session data model needs Redis data structures (sorted sets, lists)
+- DynamoDB cost exceeds $10K/month
+================================================================
+</code></pre>
+<h3 id="example-adr-2-add-read-replica-for-analytics-queries">Example ADR 2: Add Read Replica for Analytics Queries</h3>
+<pre><code>================================================================
+DATA ARCHITECTURE DECISION RECORD
+================================================================
+
+Title:       Add PostgreSQL read replica dedicated to analytics queries
+Date:        2025-11-02
+Status:      Accepted
+Authors:     Data Engineering
+Reviewers:   Platform, Finance
+
+DECISION
+--------
+Create a dedicated PostgreSQL read replica for analytics and reporting queries,
+isolated from the production OLTP workload.
+
+CONTEXT
+-------
+- Production PostgreSQL (r6g.2xlarge) running at 78% CPU during business hours
+- Analytics queries (Metabase dashboards) cause CPU spikes to 95%+
+- Three slow analytics queries scan 100M+ rows with GROUP BY
+- Business team needs dashboards refreshed every 15 minutes
+- Cannot tolerate production latency impact from reporting queries
+
+OPTIONS CONSIDERED
+------------------
+| Option | Pros | Cons |
+|--------|------|------|
+| Read replica (dedicated) | Simple, same SQL, minimal code changes | Replication lag, doubles storage cost |
+| Data warehouse (Redshift) | Optimized for analytics, columnar | ETL pipeline, SQL dialect differences |
+| Materialized views | No additional infra | Still runs on primary, refresh blocks |
+
+CHOSEN OPTION
+-------------
+Dedicated read replica (r6g.2xlarge) with analytics queries routed via connection string.
+
+WHY THIS OPTION
+---------------
+- Simplest migration path: analytics tools just change their connection string
+- Same SQL dialect means zero query rewriting
+- Replication lag of &lt;1 second is acceptable for 15-minute dashboard refresh
+- Avoids building and maintaining an ETL pipeline (option B)
+- Can be promoted to primary in disaster recovery scenarios
+
+DATA MODEL IMPACT
+-----------------
+- No schema changes
+- Add analytics-specific indexes on the replica only (won't slow production writes)
+- Consider partial indexes for common dashboard date ranges
+
+MIGRATION PATH
+--------------
+1. Create replica from production snapshot (2 hours)
+2. Configure streaming replication
+3. Update Metabase connection to point at replica
+4. Add analytics-specific indexes on replica
+5. Monitor production CPU (should drop 15-20%)
+
+CONSISTENCY IMPACT
+------------------
+Analytics queries may see data up to ~1 second stale. Acceptable for dashboards.
+
+COST IMPACT
+-----------
+- Additional r6g.2xlarge: ~$850/month
+- Storage (gp3, 500GB): ~$40/month
+- Total: ~$890/month
+- ROI: Prevents need to upgrade production to r6g.4xlarge ($1,700/month savings)
+
+REVISIT WHEN
+-------------
+- Analytics query volume outgrows single replica
+- Need real-time analytics (sub-second freshness)
+- Data volume exceeds 2TB (consider move to data warehouse)
+================================================================
+</code></pre>
+<hr>
+<h2 id="46-analytical-vs-operational-store">4.6 Analytical vs Operational Store</h2>
+<h3 id="oltp-vs-olap-characteristics">OLTP vs OLAP Characteristics</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Characteristic</th>
+<th>OLTP (Operational)</th>
+<th>OLAP (Analytical)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Primary purpose</strong></td>
+<td>Process transactions</td>
+<td>Analyze data for insights</td>
+</tr>
+<tr>
+<td><strong>Query pattern</strong></td>
+<td>Point lookups, short transactions</td>
+<td>Full scans, aggregations, joins across large datasets</td>
+</tr>
+<tr>
+<td><strong>Data model</strong></td>
+<td>Normalized (3NF+)</td>
+<td>Denormalized (star/snowflake schema)</td>
+</tr>
+<tr>
+<td><strong>Row count per query</strong></td>
+<td>1-100 rows</td>
+<td>Millions to billions of rows</td>
+</tr>
+<tr>
+<td><strong>Latency requirement</strong></td>
+<td>&lt;10ms p99</td>
+<td>Seconds to minutes acceptable</td>
+</tr>
+<tr>
+<td><strong>Concurrency</strong></td>
+<td>Thousands of concurrent users</td>
+<td>Tens of concurrent analysts</td>
+</tr>
+<tr>
+<td><strong>Data freshness</strong></td>
+<td>Real-time (current state)</td>
+<td>Near-real-time to daily batch</td>
+</tr>
+<tr>
+<td><strong>Write pattern</strong></td>
+<td>Many small writes (INSERT/UPDATE)</td>
+<td>Bulk loads (ETL/ELT)</td>
+</tr>
+<tr>
+<td><strong>Storage format</strong></td>
+<td>Row-oriented (PostgreSQL, MySQL)</td>
+<td>Columnar (Parquet, ORC, Redshift)</td>
+</tr>
+<tr>
+<td><strong>Optimization target</strong></td>
+<td>Write throughput, transaction latency</td>
+<td>Scan speed, compression ratio</td>
+</tr>
+<tr>
+<td><strong>Index strategy</strong></td>
+<td>B-tree on primary/foreign keys</td>
+<td>Columnar min/max statistics, zone maps</td>
+</tr>
+<tr>
+<td><strong>Examples</strong></td>
+<td>PostgreSQL, MySQL, DynamoDB</td>
+<td>Snowflake, BigQuery, ClickHouse, Redshift</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="when-to-separate-operational-and-analytical-stores">When to Separate Operational and Analytical Stores</h3>
+<p><strong>Signals that you need a separate analytical store:</strong></p>
+<ol>
+<li><strong>Reporting queries slow down production</strong>: Dashboard queries cause CPU spikes on your OLTP database</li>
+<li><strong>Analysts need joins across multiple services</strong>: Analytics requires combining data from orders, payments, inventory, and user services</li>
+<li><strong>Data retention diverges</strong>: Operations needs 90 days; analytics needs 3 years</li>
+<li><strong>Query patterns are fundamentally different</strong>: OLTP optimizes for point lookups; OLAP optimizes for full-table scans</li>
+<li><strong>Compliance requires separation</strong>: Audit queries on historical data should not touch production systems</li>
+</ol>
+<h3 id="data-pipeline-patterns">Data Pipeline Patterns</h3>
+<h4 id="etl-extract-transform-load">ETL (Extract, Transform, Load)</h4>
+<p>Transform data <strong>before</strong> loading into the warehouse. Traditional approach.</p>
+<ul>
+<li><strong>Extract</strong>: Pull data from source systems (APIs, database dumps)</li>
+<li><strong>Transform</strong>: Clean, normalize, aggregate in a staging area</li>
+<li><strong>Load</strong>: Write transformed data into the warehouse</li>
+</ul>
+<p><strong>Pros</strong>: Clean data in warehouse, lower warehouse compute costs.
+<strong>Cons</strong>: Rigid; schema changes require pipeline changes. Slower iteration.</p>
+<h4 id="elt-extract-load-transform">ELT (Extract, Load, Transform)</h4>
+<p>Load raw data <strong>first</strong>, then transform inside the warehouse. Modern approach enabled by cheap warehouse compute.</p>
+<ul>
+<li><strong>Extract</strong>: Pull raw data from source systems</li>
+<li><strong>Load</strong>: Dump raw data into the warehouse staging tables</li>
+<li><strong>Transform</strong>: Use SQL/dbt inside the warehouse to clean and model</li>
+</ul>
+<p><strong>Pros</strong>: Flexible; raw data is always available for re-transformation. Faster iteration.
+<strong>Cons</strong>: Higher warehouse compute costs. Raw data can be messy.</p>
+<h4 id="cdc-change-data-capture-for-feeding-analytics">CDC (Change Data Capture) for Feeding Analytics</h4>
+<p>Capture real-time changes from OLTP databases and stream them to the analytical store. Combines low latency with low impact on source systems.</p>
+<h3 id="analytical-pipeline-architecture">Analytical Pipeline Architecture</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-30.svg" alt="Diagram 30 for Data &amp; Storage Design" loading="lazy"></figure>
+<h3 id="lambda-vs-kappa-architecture">Lambda vs Kappa Architecture</h3>
+<p>These are the two dominant architectures for systems that need both <strong>real-time</strong> and <strong>historical</strong> analytics.</p>
+<h4 id="lambda-architecture">Lambda Architecture</h4>
+<p>Maintains two parallel pipelines:
+- <strong>Batch layer</strong>: Processes complete historical data periodically (hourly/daily). Source of truth.
+- <strong>Speed layer</strong>: Processes real-time stream for low-latency results. Approximate.
+- <strong>Serving layer</strong>: Merges batch and speed results for queries.</p>
+<pre><code>                    ┌──────────────────────────────────────┐
+                    │          Batch Layer (Spark)          │
+  Raw Data ────────►│   Full recompute every N hours       │──────┐
+       │            │   Accurate, complete, high latency   │      │
+       │            └──────────────────────────────────────┘      ▼
+       │                                                    ┌───────────┐
+       │                                                    │  Serving  │──► Queries
+       │                                                    │   Layer   │
+       │            ┌──────────────────────────────────────┐│  (merge)  │
+       └───────────►│          Speed Layer (Flink)         │├───────────┘
+                    │   Real-time, approximate, low latency│──────┘
+                    └──────────────────────────────────────┘
+</code></pre>
+<p><strong>Pros</strong>: Batch layer corrects any real-time errors. Proven at LinkedIn, Twitter.
+<strong>Cons</strong>: Two codebases (batch + stream) doing the same logic. High maintenance burden.</p>
+<h4 id="kappa-architecture">Kappa Architecture</h4>
+<p>Single stream-processing pipeline handles both real-time and historical data:
+- All data enters as a stream (Kafka with long retention)
+- Reprocessing = replay the stream from an earlier offset
+- No separate batch layer</p>
+<p><strong>Pros</strong>: Single codebase. Simpler operations. Lower maintenance.
+<strong>Cons</strong>: Reprocessing very large datasets by replaying streams can be slow. Not all workloads fit a streaming model.</p>
+<h4 id="when-to-choose-which">When to Choose Which</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th>Lambda</th>
+<th>Kappa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Team size</strong></td>
+<td>Large (can maintain 2 pipelines)</td>
+<td>Small to medium</td>
+</tr>
+<tr>
+<td><strong>Correctness requirement</strong></td>
+<td>Batch provides ground truth correction</td>
+<td>Stream must be correct first time</td>
+</tr>
+<tr>
+<td><strong>Historical reprocessing</strong></td>
+<td>Fast (batch jobs on data lake)</td>
+<td>Slower (replay from Kafka)</td>
+</tr>
+<tr>
+<td><strong>Operational complexity</strong></td>
+<td>Higher (2 systems)</td>
+<td>Lower (1 system)</td>
+</tr>
+<tr>
+<td><strong>Data volume</strong></td>
+<td>Petabyte-scale batch OK</td>
+<td>Stream replay at petabyte scale is painful</td>
+</tr>
+<tr>
+<td><strong>Use cases</strong></td>
+<td>Recommendation engines, ad ranking</td>
+<td>Log analytics, real-time dashboards</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="data-lakehouse-the-convergence">Data Lakehouse: The Convergence</h3>
+<p>The <strong>data lakehouse</strong> pattern combines the best of data lakes (cheap storage, open formats) and data warehouses (ACID transactions, SQL performance):</p>
+<ul>
+<li><strong>Storage</strong>: Open columnar formats (Parquet, Delta Lake, Apache Iceberg) on object storage (S3/GCS)</li>
+<li><strong>Compute</strong>: Decoupled query engines (Spark, Trino, Databricks, Snowflake)</li>
+<li><strong>Governance</strong>: ACID transactions on data lake files; schema enforcement; time travel</li>
+</ul>
+<p>This pattern is replacing the traditional "data lake + data warehouse" two-tier architecture in many organizations, offering a single store for both raw and curated data with warehouse-grade query performance.</p>
+<hr>
 <h1 id="architectural-reference-diagrams-ards">Architectural Reference Diagrams (ARDs)</h1>
 <h2 id="ard-1-polyglot-persistence-architecture">ARD 1: Polyglot Persistence Architecture</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-26.svg" alt="Diagram 26 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-31.svg" alt="Diagram 31 for Data &amp; Storage Design" loading="lazy"></figure>
 <h2 id="ard-2-data-replication-and-consistency-architecture">ARD 2: Data Replication and Consistency Architecture</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-27.svg" alt="Diagram 27 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-32.svg" alt="Diagram 32 for Data &amp; Storage Design" loading="lazy"></figure>
 <h2 id="ard-3-data-lifecycle-architecture">ARD 3: Data Lifecycle Architecture</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-28.svg" alt="Diagram 28 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-33.svg" alt="Diagram 33 for Data &amp; Storage Design" loading="lazy"></figure>
 <hr>
 <h1 id="comparison-tables">Comparison Tables</h1>
 <h2 id="database-paradigm-comparison">Database Paradigm Comparison</h2>
@@ -3958,7 +4910,7 @@ USING GIN (to_tsvector('english', notes));
 <hr>
 <h1 id="appendix-a-advanced-replication-topologies">Appendix A: Advanced Replication Topologies</h1>
 <h2 id="single-primary-replication">Single-Primary Replication</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-29.svg" alt="Diagram 29 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-34.svg" alt="Diagram 34 for Data &amp; Storage Design" loading="lazy"></figure>
 <p><strong>How it works</strong>: All writes go to a single primary node. The primary streams changes (WAL in PostgreSQL, binlog in MySQL) to replicas. Replicas are read-only and serve read traffic.</p>
 <p><strong>Failover</strong>: When the primary fails, a replica is promoted. Automated failover tools (Patroni for PostgreSQL, MHA for MySQL) detect failure and promote within seconds. During promotion, there is a brief write outage (typically 5-30 seconds).</p>
 <p><strong>Replication modes</strong>:
@@ -3981,7 +4933,7 @@ SELECT
     EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) AS lag_seconds;
 </code></pre>
 <h2 id="multi-primary-replication">Multi-Primary Replication</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-30.svg" alt="Diagram 30 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-35.svg" alt="Diagram 35 for Data &amp; Storage Design" loading="lazy"></figure>
 <p><strong>How it works</strong>: Multiple nodes accept writes simultaneously. Changes replicate bidirectionally. Conflicts are resolved using configured strategies (LWW, custom resolvers).</p>
 <p><strong>Use cases</strong>: Multi-region deployments where writes must be low-latency in every region. Examples include Cassandra (peer-to-peer), CockroachDB (distributed consensus), and PostgreSQL BDR (bi-directional replication).</p>
 <p><strong>Challenges</strong>:
@@ -3990,20 +4942,20 @@ SELECT
 - Schema changes must be coordinated across all primaries.
 - Debugging is significantly harder than single-primary setups.</p>
 <h2 id="cascading-replication">Cascading Replication</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-31.svg" alt="Diagram 31 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-36.svg" alt="Diagram 36 for Data &amp; Storage Design" loading="lazy"></figure>
 <p><strong>How it works</strong>: Replicas replicate from other replicas instead of directly from the primary. This reduces the replication load on the primary (it only sends changes to a few regional replicas, which then fan out to local replicas).</p>
 <p><strong>Use cases</strong>: Large deployments with many replicas across many regions. The primary cannot sustain dozens of direct replication streams.</p>
 <hr>
 <h1 id="appendix-b-write-ahead-log-wal-and-recovery">Appendix B: Write-Ahead Log (WAL) and Recovery</h1>
 <h2 id="what-is-wal">What is WAL?</h2>
 <p>The Write-Ahead Log is the fundamental mechanism for durability in relational databases. Before any change is applied to the actual data files, it is first written to the WAL (a sequential, append-only log on disk).</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-32.svg" alt="Diagram 32 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-37.svg" alt="Diagram 37 for Data &amp; Storage Design" loading="lazy"></figure>
 <p><strong>Why WAL exists</strong>:
 - Sequential writes are 100x faster than random writes on disk.
 - On crash, the database replays uncommitted WAL entries to recover consistent state (crash recovery).
 - WAL is the source of truth for replication — replicas apply the same WAL entries.</p>
 <h2 id="point-in-time-recovery-pitr">Point-in-Time Recovery (PITR)</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-33.svg" alt="Diagram 33 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-38.svg" alt="Diagram 38 for Data &amp; Storage Design" loading="lazy"></figure>
 <p><strong>How PITR works</strong>:
 1. Take periodic base backups (full copy of the data directory).
 2. Continuously archive WAL segments to durable storage (S3).
@@ -4027,7 +4979,7 @@ For a 16-core machine with RAID: (16 * 2) + 4 = 36 connections
 </code></pre>
 <p><strong>Common mistake</strong>: Setting the pool size to 100+ because you have 100 app servers. This overwhelms the database with context-switching overhead. Use a connection pooler (PgBouncer) between application servers and the database.</p>
 <h2 id="connection-pooler-architecture">Connection Pooler Architecture</h2>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-34.svg" alt="Diagram 34 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-39.svg" alt="Diagram 39 for Data &amp; Storage Design" loading="lazy"></figure>
 <h2 id="connection-lifecycle">Connection Lifecycle</h2>
 <pre><code>1. Application requests connection from pool
 2. Pool returns an idle connection (or creates one if under max)
@@ -4315,7 +5267,7 @@ LIMIT 50;
 -- Execution Time: 1250ms → TOO SLOW, needs optimization
 </code></pre>
 <h3 id="explain-analyze-decision-tree">EXPLAIN ANALYZE Decision Tree</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-35.svg" alt="Diagram 35 for Data &amp; Storage Design" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F06-data-storage-design-diagram-40.svg" alt="Diagram 40 for Data &amp; Storage Design" loading="lazy"></figure>
 <hr>
 <h1 id="appendix-f-interview-cheat-sheet">Appendix F: Interview Cheat Sheet</h1>
 <h2 id="the-60-second-database-selection-framework">The 60-Second Database Selection Framework</h2>
@@ -4407,6 +5359,7 @@ LIMIT 50;
 <li><a href="#section-1-database-types">Section 1 — Database Types</a></li>
 <li><a href="#section-2-data-modeling">Section 2 — Data Modeling</a></li>
 <li><a href="#section-3-consistency-models">Section 3 — Consistency Models</a></li>
+<li><a href="#section-4-advanced-data-patterns">Section 4 — Advanced Data Patterns</a></li>
 </ul>
 </li>
 <li><a href="#why-data-storage-design-matters-in-real-systems">Why Data &amp; Storage Design Matters in Real Systems</a></li>
@@ -4622,6 +5575,61 @@ LIMIT 50;
 <li><a href="#practical-implementation-read-your-writes-with-redis">Practical Implementation: Read-Your-Writes with Redis</a></li>
 <li><a href="#common-mistakes_16">Common Mistakes</a></li>
 <li><a href="#interview-insights_15">Interview Insights</a></li>
+</ul>
+</li>
+<li><a href="#41-crdts-and-local-first-architecture">4.1 CRDTs and Local-First Architecture</a><ul>
+<li><a href="#what-are-crdts">What Are CRDTs?</a></li>
+<li><a href="#core-crdt-types">Core CRDT Types</a></li>
+<li><a href="#how-crdt-merge-works">How CRDT Merge Works</a></li>
+<li><a href="#local-first-software">Local-First Software</a></li>
+<li><a href="#when-to-use-crdts-local-first">When to Use CRDTs / Local-First</a></li>
+<li><a href="#when-not-to-use_7">When NOT to Use</a></li>
+<li><a href="#trade-offs_11">Trade-Offs</a></li>
+<li><a href="#real-world-examples">Real-World Examples</a></li>
+</ul>
+</li>
+<li><a href="#42-cdc-outbox-pattern-and-event-sourcing">4.2 CDC, Outbox Pattern, and Event Sourcing</a><ul>
+<li><a href="#overview_1">Overview</a></li>
+<li><a href="#change-data-capture-cdc">Change Data Capture (CDC)</a></li>
+<li><a href="#transactional-outbox-pattern">Transactional Outbox Pattern</a></li>
+<li><a href="#event-sourcing">Event Sourcing</a></li>
+<li><a href="#decision-matrix-when-to-use-each-pattern">Decision Matrix: When to Use Each Pattern</a></li>
+<li><a href="#trade-offs-summary">Trade-Offs Summary</a></li>
+</ul>
+</li>
+<li><a href="#43-multi-tenant-data-isolation-patterns">4.3 Multi-Tenant Data Isolation Patterns</a><ul>
+<li><a href="#overview_2">Overview</a></li>
+<li><a href="#the-three-fundamental-approaches">The Three Fundamental Approaches</a></li>
+<li><a href="#pattern-1-shared-database-shared-schema-row-level-security">Pattern 1: Shared Database, Shared Schema (Row-Level Security)</a></li>
+<li><a href="#pattern-2-shared-database-separate-schemas">Pattern 2: Shared Database, Separate Schemas</a></li>
+<li><a href="#pattern-3-separate-databases-per-tenant">Pattern 3: Separate Databases Per Tenant</a></li>
+<li><a href="#comparison-table">Comparison Table</a></li>
+<li><a href="#hybrid-approach">Hybrid Approach</a></li>
+<li><a href="#real-world-examples_1">Real-World Examples</a></li>
+</ul>
+</li>
+<li><a href="#44-data-residency-and-sovereignty-checklist">4.4 Data Residency and Sovereignty Checklist</a><ul>
+<li><a href="#overview_3">Overview</a></li>
+<li><a href="#key-regulations">Key Regulations</a></li>
+<li><a href="#cross-border-transfer-mechanisms">Cross-Border Transfer Mechanisms</a></li>
+<li><a href="#practical-compliance-checklist">Practical Compliance Checklist</a></li>
+<li><a href="#cloud-provider-guidance">Cloud Provider Guidance</a></li>
+</ul>
+</li>
+<li><a href="#45-data-architecture-decision-record-template">4.5 Data Architecture Decision Record Template</a><ul>
+<li><a href="#why-data-adrs">Why Data ADRs?</a></li>
+<li><a href="#template">Template</a></li>
+<li><a href="#example-adr-1-choose-dynamodb-for-session-store">Example ADR 1: Choose DynamoDB for Session Store</a></li>
+<li><a href="#example-adr-2-add-read-replica-for-analytics-queries">Example ADR 2: Add Read Replica for Analytics Queries</a></li>
+</ul>
+</li>
+<li><a href="#46-analytical-vs-operational-store">4.6 Analytical vs Operational Store</a><ul>
+<li><a href="#oltp-vs-olap-characteristics">OLTP vs OLAP Characteristics</a></li>
+<li><a href="#when-to-separate-operational-and-analytical-stores">When to Separate Operational and Analytical Stores</a></li>
+<li><a href="#data-pipeline-patterns">Data Pipeline Patterns</a></li>
+<li><a href="#analytical-pipeline-architecture">Analytical Pipeline Architecture</a></li>
+<li><a href="#lambda-vs-kappa-architecture">Lambda vs Kappa Architecture</a></li>
+<li><a href="#data-lakehouse-the-convergence">Data Lakehouse: The Convergence</a></li>
 </ul>
 </li>
 <li><a href="#ard-1-polyglot-persistence-architecture">ARD 1: Polyglot Persistence Architecture</a></li>

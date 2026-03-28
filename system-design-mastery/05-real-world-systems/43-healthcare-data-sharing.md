@@ -3,6 +3,9 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 43 of 60
+**Last reviewed:** March 2026. Healthcare regulations (HIPAA, GDPR, HITECH) and interoperability standards (FHIR, TEFCA) evolve — verify against current sources.
+
+**⚠️ Disclaimer:** This chapter is an *architectural reference*. It does NOT constitute medical, legal, or compliance advice. Healthcare data systems involve patient safety, privacy regulations, and liability. Production implementations require qualified legal, compliance, and clinical informatics review.
 
 ---
 
@@ -4140,6 +4143,135 @@ The Healthcare Data Sharing Platform represents one of the most complex system d
 7. **No Silver Bullets**: Blockchain is valuable for specific layers (consent, audit) but adds complexity. Use the right tool for each job: databases for storage, search engines for queries, blockchain for trust.
 
 The platform architecture described in this chapter provides a comprehensive blueprint for building a national-scale healthcare data sharing system. The key challenge lies not just in the technology, but in the governance, organizational change management, and patient engagement required to make it successful.
+
+## PHI Data Sharing Threat Model
+
+| Threat | Vector | Impact | Mitigation |
+|--------|--------|--------|-----------|
+| **Unauthorized PHI access** | Overly broad API scopes; missing consent check | Privacy violation; regulatory penalty | Purpose-of-use enforcement per request; consent service as gateway |
+| **Data leakage in transit** | Unencrypted inter-org API calls | Mass PHI exposure | Mutual TLS for all inter-org connections; certificate pinning |
+| **Insider abuse** | Clinician accesses records without treatment relationship | "Snooping" violation | Break-glass audit; anomaly detection; justification required within 24h |
+| **Consent bypass** | System processes data without valid patient consent | HIPAA/GDPR violation | Consent service enforces purpose-of-use before every data release |
+| **Re-identification** | De-identified data combined with external sources | Patient privacy compromise | Expert determination method (HIPAA §164.514); k-anonymity for research datasets |
+| **Partner data breach** | Receiving organization has weaker security | PHI exposed through weakest link | Data sharing agreements (BAA); minimum security standards; audit rights |
+| **Stale consent** | Patient revoked consent but data still shared | Unauthorized processing | Real-time consent check (not cached); event-driven revocation propagation |
+
+---
+
+## Consent Model Architecture
+
+```
+Patient grants consent via portal/app →
+  Consent Service stores:
+    {
+      patient_id, data_category (labs, medications, imaging, all),
+      purpose_of_use (treatment, payment, research, public_health),
+      granted_to (org_id or provider_id),
+      valid_from, valid_until, granularity (record-level or category-level),
+      revocable: true
+    }
+
+Data sharing request arrives →
+  1. Authenticate requesting organization (mTLS + OAuth token)
+  2. Authorize requestor (role: clinician, researcher, payer)
+  3. Check consent:
+     - Does active consent exist for this patient + data_category + purpose + requestor?
+     - Is consent within valid date range?
+     - Has consent been revoked?
+  4. If all pass → release data (minimized to consented scope) + log access
+  5. If consent missing → deny + log denial + offer patient consent prompt
+  6. If emergency → break-glass (release + elevated alert + require justification within 24h)
+```
+
+### Consent Granularity Levels
+
+| Level | What Patient Controls | Example |
+|-------|----------------------|---------|
+| **Blanket consent** | All data shared with all treating providers | "Share everything with my healthcare team" |
+| **Category-level** | Specific data types (labs, meds, imaging) per org | "Share lab results with Dr. Smith's practice only" |
+| **Record-level** | Individual documents/results | "Share my MRI report from Jan 2026 with specialist" |
+| **Purpose-based** | Data shared only for specified purpose | "Share for treatment only, not research" |
+| **Time-limited** | Consent expires after date | "Share for 6 months during this treatment episode" |
+
+---
+
+## Audit Logging for Health Data Sharing
+
+### What Must Be Logged
+
+| Event | Required Fields | Retention | Alert |
+|-------|----------------|-----------|-------|
+| **Data shared** (outbound) | Sending org, receiving org, patient_id, data scope, purpose, consent_ref, timestamp | 6 years (HIPAA) | N/A (normal) |
+| **Data received** (inbound) | Source org, patient_id, data elements, purpose, accessor | 6 years | N/A |
+| **Consent granted/revoked** | Patient_id, scope, purpose, granted_to, action, timestamp | 6 years | Revocation → immediate propagation |
+| **Access denied** | Requestor, patient, reason (no consent, expired, wrong purpose) | 6 years | Repeated denials from same org → investigate |
+| **Break-glass access** | Accessor, patient, justification, timestamp | 6 years | **Immediate P1 alert** to privacy officer |
+| **Bulk data export** | Requestor, scope, record count, purpose | 6 years | > 100 records → requires approval + alert |
+
+### Audit Architecture
+
+```
+All sharing events → Append-only audit log (hash chain for tamper evidence)
+  → Kafka topic (audit_events) → Audit DB (immutable, encrypted)
+  → Real-time alerting: break-glass, bulk export, anomalous access patterns
+  → Patient access portal: "Who has accessed my data" transparency report
+  → Regulatory export: generate compliance reports on demand
+```
+
+---
+
+## Secure Interoperability Patterns
+
+### FHIR-Based Data Exchange
+
+| Pattern | How | Use Case |
+|---------|-----|----------|
+| **FHIR REST API** | Standard RESTful endpoints for patient, observation, medication resources | Point-to-point queries between organizations |
+| **SMART on FHIR** | OAuth 2.0-based app launch framework for third-party apps accessing EHR data | Patient-facing apps; clinical decision support apps |
+| **FHIR Bulk Data** | Async export of large datasets (ndjson format) | Population health; research; payer analytics |
+| **FHIR Subscriptions** | Event-driven notifications when patient data changes | Care coordination; alerts for lab results |
+
+### Federated Identity for Multi-Org Sharing
+
+| Pattern | How | Standard |
+|---------|-----|---------|
+| **SAML federation** | Each org maintains its IdP; trust established via metadata exchange | Legacy; widespread in healthcare |
+| **OIDC federation** | Modern token-based; scoped access per request | SMART on FHIR uses this |
+| **TEFCA (US)** | Trusted Exchange Framework; qualified health information networks (QHINs) | ONC-mandated national framework |
+| **Cross-org mTLS** | Mutual TLS between organization API gateways | Transport-level trust; no user identity |
+
+### Observability with Privacy Constraints
+
+| Signal | What to Monitor | Privacy Constraint |
+|--------|----------------|-------------------|
+| API latency per org | p99 response time for data sharing requests | OK (no PHI in metric) |
+| Data volume per org | Records shared per day per org pair | OK (aggregate, no patient IDs) |
+| Consent check latency | Time to evaluate consent per request | OK (no PHI) |
+| Error rate by type | 403 (no consent) vs 500 (system error) | OK (no PHI in error counts) |
+| Audit log volume | Events per day; break-glass frequency | OK (counts only) |
+| **DO NOT** log in metrics | Patient IDs, diagnoses, provider names in dashboards | PHI must stay in audit log, not observability |
+
+### Authoritative References
+
+| Resource | Scope |
+|----------|-------|
+| **HIPAA Privacy Rule** (45 CFR §164) | PHI use, disclosure, and patient rights |
+| **HIPAA Security Rule** (45 CFR §164.302-318) | Technical safeguards for ePHI |
+| **ONC TEFCA** | Trusted Exchange Framework for US health data sharing |
+| **HL7 FHIR R4** (hl7.org/fhir) | Interoperability standard for health data |
+| **SMART on FHIR** (smarthealthit.org) | App launch framework for EHR integration |
+| **NIST SP 800-66** | HIPAA security rule implementation guide |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Healthcare privacy threat model | Ch 31: Healthcare Systems |
+| Consent and identity federation | Ch 31 (Consent section); Ch A8: Security |
+| Audit logging patterns | Ch 28: Security Systems |
+| FHIR and API design | Ch 15: API Gateway Pattern |
+| Data residency and encryption | Ch 9: Storage Systems |
+| Zero trust architecture | Ch 28: Security Systems |
 
 ---
 

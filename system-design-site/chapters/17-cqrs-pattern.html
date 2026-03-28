@@ -1143,6 +1143,119 @@
 <li>Measure and communicate projection lag explicitly.</li>
 <li>Treat projection rebuilds and data quality as production responsibilities, not edge cases.</li>
 </ul>
+<h2 id="worked-cqrs-example">Worked CQRS Example: E-Commerce Order Dashboard</h2>
+<h3 id="write-side">Write Side (Command Model)</h3>
+<pre><code class="language-sql">-- Normalized: optimized for correctness
+CREATE TABLE orders (id UUID PK, customer_id UUID, status VARCHAR(20), created_at TIMESTAMP);
+CREATE TABLE order_items (id UUID PK, order_id UUID FK, product_id UUID, quantity INT, unit_price DECIMAL);
+CREATE TABLE payments (id UUID PK, order_id UUID FK, amount DECIMAL, status VARCHAR(20));</code></pre>
+<h3 id="event-publication">Event Publication (via Outbox)</h3>
+<pre><code class="language-sql">-- Same transaction as order write
+INSERT INTO outbox (event_type, aggregate_id, payload) VALUES
+  ('order.placed', 'ord-98765', '{"order_id":"ord-98765","items":[...],"total":149.99}');</code></pre>
+<h3 id="read-side">Read Side (Query Model)</h3>
+<pre><code class="language-sql">-- Denormalized: optimized for dashboard (no joins)
+CREATE TABLE order_dashboard_view (
+    order_id UUID PK, customer_name VARCHAR, item_count INT, total_amount DECIMAL,
+    status VARCHAR, payment_status VARCHAR, created_at TIMESTAMP, last_updated TIMESTAMP);
+
+SELECT * FROM order_dashboard_view WHERE status='pending' AND created_at > NOW()-INTERVAL '24h';</code></pre>
+<h3 id="projection-worker">Projection Worker</h3>
+<pre><code class="language-python">def handle_order_placed(event):
+    customer = customer_service.get(event.payload["customer_id"])
+    db.upsert("order_dashboard_view", order_id=event.payload["order_id"],
+              customer_name=customer.name, item_count=len(event.payload["items"]),
+              total_amount=event.payload["total"], status="pending")
+
+def handle_payment_completed(event):
+    db.update("order_dashboard_view", order_id=event.payload["order_id"],
+              payment_status="completed", status="confirmed")</code></pre>
+<h3 id="read-model-rebuild">Read-Model Rebuild</h3>
+<pre><code>1. Create new table (order_dashboard_view_v2)
+2. New consumer group from offset "earliest"
+3. Process all events → v2
+4. Compare v2 vs v1 (sample 1000, verify)
+5. Switch Query API to v2
+6. Decommission v1
+Rebuild time: 100M orders × 0.1ms/event ≈ 3 hours</code></pre>
+<hr>
+<h2 id="cqrs-vs-sourcing">CQRS vs Event Sourcing — When You Need Which</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>CQRS (no Event Sourcing)</th><th>CQRS + Event Sourcing</th></tr></thead>
+<tbody>
+<tr><td><strong>Write model</strong></td><td>Standard database</td><td>Append-only event log</td></tr>
+<tr><td><strong>Source of truth</strong></td><td>Current state in DB</td><td>Complete event history</td></tr>
+<tr><td><strong>Read model fed by</strong></td><td>CDC, outbox, or direct projection</td><td>Replay events from log</td></tr>
+<tr><td><strong>Audit trail</strong></td><td>Must be added separately</td><td>Built-in (events ARE audit)</td></tr>
+<tr><td><strong>State rebuild</strong></td><td>Not possible from events</td><td>Replay to any point in time</td></tr>
+<tr><td><strong>Complexity</strong></td><td>Moderate</td><td>High</td></tr>
+<tr><td><strong>Use when</strong></td><td>Read-write asymmetry; dashboards</td><td>Financial ledgers; compliance; undo/redo</td></tr>
+</tbody>
+</table></div>
+<p><strong>Decision:</strong> Start with CQRS without event sourcing. Add event sourcing only if you need full history as source of truth.</p>
+<h3 id="operational-complexity">Operational Complexity Warning</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Cost</th><th>What It Means</th></tr></thead>
+<tbody>
+<tr><td>Two data stores</td><td>Separate backups, monitoring, capacity planning</td></tr>
+<tr><td>Projection code</td><td>Must be correct, idempotent, and observable</td></tr>
+<tr><td>Lag to communicate</td><td>Product/UX must design for "data may be N seconds stale"</td></tr>
+<tr><td>Rebuild tooling</td><td>You WILL need to rebuild read models; without tooling, multi-day incident</td></tr>
+<tr><td>Debugging</td><td>"Dashboard shows X but order is Y?" requires tracing through projection</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="read-freshness-slos">Read Freshness SLOs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Consumer</th><th>Acceptable Lag</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Customer order status</td><td>&lt; 5 seconds</td><td>User expects immediate visibility</td></tr>
+<tr><td>Operations dashboard</td><td>&lt; 30 seconds</td><td>Near-real-time ops visibility</td></tr>
+<tr><td>Finance reconciliation</td><td>&lt; 5 minutes</td><td>Batch-oriented</td></tr>
+<tr><td>Search index</td><td>&lt; 60 seconds</td><td>New products searchable quickly</td></tr>
+<tr><td>BI dashboard</td><td>&lt; 15 minutes</td><td>Historical analysis</td></tr>
+</tbody>
+</table></div>
+<h3 id="read-after-write">Read-After-Write Workarounds</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Approach</th><th>How</th><th>Trade-off</th></tr></thead>
+<tbody>
+<tr><td><strong>Read from write model</strong></td><td>Route writing user's reads to write DB for N seconds</td><td>Increases write DB load</td></tr>
+<tr><td><strong>Optimistic UI</strong></td><td>Client shows write result locally before server confirms</td><td>May show data that fails validation</td></tr>
+<tr><td><strong>Polling with version</strong></td><td>Client polls with version token; returns when caught up</td><td>Adds polling latency</td></tr>
+<tr><td><strong>Write returns rich response</strong></td><td>Write API includes enough data to display immediately</td><td>Couples write response to read shape</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="projection-lag-playbook">Projection Lag — Operational Playbook</h2>
+<h3 id="lag-monitoring">Monitoring</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>Alert Threshold</th></tr></thead>
+<tbody>
+<tr><td>Kafka consumer lag (offsets)</td><td>Growing for &gt; 5 minutes</td></tr>
+<tr><td>Event-to-projection latency</td><td>&gt; SLO threshold (e.g., 30s)</td></tr>
+<tr><td>Projection error rate</td><td>&gt; 1%</td></tr>
+<tr><td>Dead letter queue depth</td><td>&gt; 0</td></tr>
+</tbody>
+</table></div>
+<h3 id="lag-incident-response">Incident Response</h3>
+<pre><code>Lag detected (SLO breached)
+  ├─ Worker healthy? → NO: Restart; check OOM/crash loops
+  ├─ Processing slowly? → Check slow DB writes, missing indexes, N+1
+  │   → Scale consumer fleet
+  ├─ Source burst? → Expected (sale)? Wait. Unexpected? Investigate upstream
+  ├─ Events failing (DLQ)? → Fix bug; replay failed events
+  └─ Read model corrupted? → Trigger full rebuild</code></pre>
+<h3 id="cqrs-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Event-driven architecture</td><td><a href="16-event-driven-architecture.html">Ch 16</a></td></tr>
+<tr><td>Outbox pattern</td><td><a href="05-databases-deep-dive.html">Ch 5</a>, <a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>Staleness SLOs and replica lag</td><td><a href="11-consistency-cap-theorem.html">Ch 11: Consistency</a></td></tr>
+<tr><td>Async pipeline observability</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Applying CQRS to small systems that do not need it.</li>
@@ -1268,6 +1381,10 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#worked-cqrs-example">Worked CQRS Example</a></li>
+<li><a href="#cqrs-vs-sourcing">CQRS vs Event Sourcing</a></li>
+<li><a href="#read-freshness-slos">Read Freshness SLOs</a></li>
+<li><a href="#projection-lag-playbook">Projection Lag Playbook</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

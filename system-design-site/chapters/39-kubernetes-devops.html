@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chapter 39 · Kubernetes &amp; DevOps · System Design Mastery</title>
+  <title>Chapter A7 · Kubernetes &amp; DevOps · System Design Mastery</title>
   <meta name="description" content="Kubernetes and modern DevOps practices sit at the boundary between application architecture and platform operations. They determine how services are packaged, deployed, discovered, scaled, configured, rolled back, and observed. For many teams, architecture decisions only become real when they survive these delivery mechanics.">
   <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/css/styles.css">
@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -984,13 +984,13 @@
         <span>/</span>
         <a href="../index.html#part-6">Advanced Architecture</a>
         <span>/</span>
-        <span>Chapter 39</span>
+        <span>Chapter A7</span>
       </div>
 
       <article class="chapter-article">
         <header class="chapter-hero part-6">
           <div class="chapter-hero-top">
-            <span class="chapter-kicker">Chapter 39 of 60</span>
+            <span class="chapter-kicker">Chapter A7 — Advanced Architecture</span>
             <span class="part-badge">Advanced Architecture</span>
           </div>
           <h1>Kubernetes &amp; DevOps</h1>
@@ -1014,7 +1014,8 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 6 - Advanced Architecture<br>
-<strong>Position:</strong> Chapter 39 of 60
+<strong>Position:</strong> Chapter A7 (Advanced Architecture — Kubernetes &amp; DevOps Primer)<br>
+<strong>Complements:</strong> F11: Deployment &amp; DevOps (deep chapter) covers CI/CD, supply-chain security, progressive delivery, and release safety in depth. This chapter provides the conceptual primer.<br>
 <strong>Why this part exists:</strong> This section focuses on how systems are actually deployed, operated, and evolved after the architecture diagram is approved.<br>
 <strong>This chapter builds toward:</strong> container orchestration, deployment safety, platform thinking, and operational delivery discipline</p>
 <h2 id="overview">Overview</h2>
@@ -1145,6 +1146,124 @@
 <li>Pair autoscaling with application design that tolerates churn and cold starts.</li>
 <li>Remember that Kubernetes solves deployment mechanics, not poor service boundaries or weak reliability design.</li>
 </ul>
+<h2 id="platform-blueprint">Reference Platform Blueprint</h2>
+<pre><code>Developer Experience Layer
+  • Service templates (Backstage), developer portal, self-service provisioning
+
+CI/CD Layer
+  • Build: GitHub Actions / GitLab CI
+  • Scan: Trivy (images), Semgrep (SAST), Grype (SCA)
+  • Sign: cosign (keyless via OIDC)
+  • Deploy: Argo CD (GitOps reconciliation)
+
+Runtime Layer (Kubernetes)
+  • Ingress: Nginx / Envoy Gateway
+  • Service mesh: Istio / Linkerd (mTLS, retries)
+  • Autoscaling: HPA + Cluster Autoscaler
+  • Secrets: External Secrets Operator + Vault
+  • Policy: Kyverno / OPA Gatekeeper
+
+Observability Layer
+  • Metrics: Prometheus + Grafana
+  • Logs: Loki (or ELK)
+  • Traces: Tempo / Jaeger (via OTel Collector)
+  • Alerting: Alertmanager → PagerDuty</code></pre>
+<h3 id="platform-maturity">Platform Maturity Levels</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Level</th><th>What You Have</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td>L0: Manual</td><td>kubectl apply, no CI</td><td>High risk, slow, inconsistent</td></tr>
+<tr><td>L1: Automated CI/CD</td><td>Build + test + deploy per service</td><td>Consistent, faster</td></tr>
+<tr><td>L2: GitOps + Observability</td><td>Argo CD, Prometheus, structured logs</td><td>Auditable, visible</td></tr>
+<tr><td>L3: Self-Service</td><td>Templates, portal, policy, secrets</td><td>Fast onboarding, absorbed complexity</td></tr>
+<tr><td>L4: Full IDP</td><td>Cost attribution, multi-cluster, progressive delivery</td><td>Engineering efficiency at scale</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="iac-gitops-examples">IaC and GitOps — Concrete Examples</h2>
+<h3 id="terraform-example">IaC: Terraform</h3>
+<pre><code class="language-hcl"># Provision RDS database
+resource "aws_db_instance" "orders_db" {
+  identifier        = "orders-db-prod"
+  engine            = "postgres"
+  instance_class    = "db.r6g.xlarge"
+  allocated_storage = 100
+  storage_encrypted = true
+  multi_az          = true
+  backup_retention_period = 14
+  tags = { Team = "orders", ManagedBy = "terraform" }
+}</code></pre>
+<p><strong>Principles:</strong> All infra in code, versioned in Git. Changes via PR review. <code>terraform plan</code> before <code>apply</code>. Remote state (S3 + DynamoDB).</p>
+<h3 id="argocd-example">GitOps: Argo CD Application</h3>
+<pre><code class="language-yaml">apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orders-service
+spec:
+  source:
+    repoURL: https://github.com/myorg/k8s-config
+    path: environments/production/orders-service
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orders
+  syncPolicy:
+    automated:
+      prune: true      # Remove resources deleted from Git
+      selfHeal: true   # Revert manual kubectl changes</code></pre>
+<p><strong>Principles:</strong> Git = single source of truth. No manual <code>kubectl apply</code> in prod. Rollback = <code>git revert</code>.</p>
+<hr>
+<h2 id="supply-chain-policy">Supply-Chain Security and Policy-as-Code</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Control</th><th>How</th><th>Tool</th></tr></thead>
+<tbody>
+<tr><td>SBOM generation</td><td>Every build produces inventory</td><td>Syft, Trivy</td></tr>
+<tr><td>Image signing</td><td>Cryptographic proof of build origin</td><td>cosign (Sigstore)</td></tr>
+<tr><td>Admission enforcement</td><td>Cluster rejects unsigned images</td><td>Kyverno, OPA Gatekeeper</td></tr>
+<tr><td>Vulnerability scanning</td><td>Block critical CVEs</td><td>Trivy + Kyverno</td></tr>
+<tr><td>SLSA provenance</td><td>Build metadata proves trusted CI</td><td>SLSA GitHub Actions</td></tr>
+</tbody>
+</table></div>
+<h3 id="policy-examples">Policy-as-Code (Kyverno)</h3>
+<pre><code class="language-yaml"># Require resource limits on all pods
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-limits
+      match:
+        any: [{resources: {kinds: ["Pod"]}}]
+      validate:
+        message: "CPU and memory limits required."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits: {memory: "?*", cpu: "?*"}</code></pre>
+<h3 id="multi-cluster">Multi-Cluster Governance</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Single Cluster</th><th>Multi-Cluster</th></tr></thead>
+<tbody>
+<tr><td>Policy</td><td>Kyverno per cluster</td><td>Central repo deployed via GitOps to all</td></tr>
+<tr><td>Secrets</td><td>ESO per cluster</td><td>Vault with per-cluster auth paths</td></tr>
+<tr><td>Observability</td><td>Local Prometheus</td><td>Central Grafana + Mimir/Thanos</td></tr>
+<tr><td>Deployment</td><td>Argo CD per cluster</td><td>ApplicationSet multi-cluster targeting</td></tr>
+</tbody>
+</table></div>
+<h3 id="k8s-cross-refs">Cross-References to Deep Content</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Full CI/CD + supply-chain security</td><td><a href="F11-deployment-devops.html">F11 §1.5</a></td></tr>
+<tr><td>Progressive delivery (Flagger, Argo Rollouts)</td><td><a href="F11-deployment-devops.html">F11: Progressive Delivery</a></td></tr>
+<tr><td>Release safety checklists</td><td><a href="F11-deployment-devops.html">F11: Release Safety</a></td></tr>
+<tr><td>Helm + service mesh</td><td><a href="F11-deployment-devops.html">F11 §3.4-3.5</a></td></tr>
+<tr><td>Observability pipeline</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Treating Kubernetes as a goal instead of an execution environment.</li>
@@ -1271,6 +1390,9 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#platform-blueprint">Reference Platform Blueprint</a></li>
+<li><a href="#iac-gitops-examples">IaC &amp; GitOps Examples</a></li>
+<li><a href="#supply-chain-policy">Supply-Chain Security &amp; Policy-as-Code</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

@@ -131,6 +131,203 @@ A video platform is an excellent storage case because it combines huge binary ob
 - Remember that durability still requires deletion controls, backup thinking, and recovery planning.
 - Use CDN strategy as part of storage architecture, not as an afterthought.
 
+## Storage Decision Matrix
+
+Use this matrix when choosing a storage medium. The right answer depends on access pattern, durability needs, cost sensitivity, and operational model — not on product brand.
+
+| Dimension | Block Storage | File Storage | Object Storage | Archive Storage |
+|-----------|-------------|-------------|---------------|----------------|
+| **Abstraction** | Raw disk volumes | Shared filesystem (NFS, EFS) | HTTP-addressable objects with metadata | Cold object storage with retrieval delay |
+| **Access pattern** | Random read/write, low-latency I/O | Hierarchical path-based, shared access | Write-once-read-many, HTTP GET/PUT | Write-once-read-rarely |
+| **Latency** | Sub-millisecond | Milliseconds | 10-100ms (first byte) | Minutes to hours (retrieval request) |
+| **Typical use cases** | Database engine volumes, OS disks, high-IOPS workloads | Shared config, CMS content, legacy apps, ML training data | Images, videos, logs, backups, static assets | Compliance archives, cold backups, legal hold |
+| **Durability** | Depends on volume replication (EBS: 99.999%) | Depends on provider (EFS: 99.999999999%) | Very high (S3: 11 nines / 99.999999999%) | Very high (same as object storage) |
+| **Scalability** | Limited by volume size (resize required) | Elastic (auto-grows) | Virtually unlimited | Virtually unlimited |
+| **Cost ($/GB/month)** | $0.08-0.10 (gp3) | $0.30 (EFS) | $0.023 (S3 Standard) | $0.001-0.004 (Glacier) |
+| **Cloud examples** | EBS, Azure Disk, GCP Persistent Disk | EFS, Azure Files, GCP Filestore | S3, Azure Blob, GCS | S3 Glacier, Azure Cool/Archive, GCS Coldline |
+
+### Quick Decision Flowchart
+
+```
+What is the data?
+  → Database engine or OS disk? → BLOCK STORAGE
+  → Shared files accessed by path from multiple instances? → FILE STORAGE
+  → Large binary objects accessed via HTTP (images, videos, logs)? → OBJECT STORAGE
+  → Data accessed less than once per month, kept for compliance? → ARCHIVE STORAGE
+```
+
+---
+
+## Durability Math, SLAs, and Backup/Restore Drills
+
+### Understanding Durability Numbers
+
+Durability is the probability that a stored object will not be lost over a year. The numbers are expressed in "nines":
+
+| Durability | Meaning | Expected Loss per 10M Objects/Year |
+|-----------|---------|----------------------------------|
+| 99.9% (3 nines) | 1 in 1,000 objects lost/year | 10,000 objects |
+| 99.99% (4 nines) | 1 in 10,000 lost/year | 1,000 objects |
+| 99.999999999% (11 nines) | 1 in 100 billion lost/year | 0.0001 objects (effectively zero) |
+
+**S3 Standard at 11 nines:** If you store 10 million objects, you can expect to lose one object every 10 million years. This does *not* mean you cannot lose data — accidental deletion, application bugs, and ransomware are not durability failures.
+
+### Durability ≠ Backup
+
+| Concern | Durability Protects Against | Backup Protects Against |
+|---------|---------------------------|------------------------|
+| Hardware failure | ✅ (replication across drives/AZs) | ✅ |
+| Data center failure | ✅ (cross-AZ replication) | ✅ |
+| Accidental deletion | ❌ (deletion is faithfully replicated) | ✅ (point-in-time restore) |
+| Application bug corrupts data | ❌ (corruption is faithfully replicated) | ✅ (restore from before corruption) |
+| Ransomware encrypts objects | ❌ (encrypted objects replace originals) | ✅ (immutable backups survive) |
+| Region-wide outage | ❌ (single-region storage) | ✅ (cross-region backup) |
+
+### Backup Strategy Template
+
+| Data Category | RPO (Recovery Point Objective) | RTO (Recovery Time Objective) | Backup Method | Retention |
+|--------------|-------------------------------|-------------------------------|--------------|-----------|
+| Transactional DB | < 1 hour | < 15 minutes | Continuous WAL archival + automated snapshots | 30 days |
+| User-uploaded media | < 24 hours | < 4 hours | Cross-region replication + versioning | Indefinite (user owns content) |
+| Application config | < 1 hour | < 5 minutes | Git (source of truth) + automated backup | Indefinite |
+| Analytics data | < 24 hours | < 1 day | Daily export to separate bucket/region | 90 days |
+| Audit logs | 0 (no loss acceptable) | < 1 hour | Write-once storage + cross-region replication | 7 years (regulatory) |
+
+### Backup/Restore Drill Guidance
+
+Backups that are never tested are not backups — they are hopes. Schedule restore drills quarterly.
+
+**Drill checklist:**
+
+- [ ] Select a backup from the retention window (not the most recent — test a realistic scenario)
+- [ ] Restore to a non-production environment (never test on prod)
+- [ ] Verify data integrity: row counts, checksums, sample queries match expected state
+- [ ] Measure actual RTO: time from "start restore" to "data is queryable"
+- [ ] Document any gaps: missing tables, incomplete point-in-time, permission issues
+- [ ] Compare actual RTO/RPO to stated targets — if they don't match, fix the backup strategy
+- [ ] Record drill results and publish to the team (treat as a mini-postmortem)
+
+---
+
+## Storage Lifecycle Tiering — With Cost Models
+
+Data access patterns change over time. Hot data becomes warm, warm becomes cold, cold becomes archive. Lifecycle policies automate this transition and dramatically reduce costs.
+
+### Lifecycle Tier Design
+
+| Tier | Age | Access Frequency | Storage Class | Cost ($/GB/month) | Retrieval | Use Case |
+|------|-----|-----------------|--------------|-------------------|-----------|----------|
+| Hot | 0-7 days | Multiple times/day | S3 Standard / gp3 SSD | $0.023 | Instant | Active user uploads, recent logs, current sessions |
+| Warm | 7-30 days | Weekly | S3 Infrequent Access | $0.0125 | Instant (+ retrieval fee) | Recent analytics, older profile images, 30-day logs |
+| Cold | 30-90 days | Monthly or less | S3 Glacier Instant | $0.004 | Milliseconds | Compliance data, quarterly reports, inactive user data |
+| Archive | 90+ days | Yearly or never | S3 Glacier Deep Archive | $0.00099 | 12-48 hours | 7-year audit logs, legal hold, regulatory archives |
+
+### Cost Model: Photo-Sharing Platform (10 PB total)
+
+```
+Without lifecycle tiering (all S3 Standard):
+  10,000 TB × $0.023/GB/month × 1000 GB/TB = $230,000/month
+
+With lifecycle tiering:
+  Hot   (1 PB, 10%):  1,000 TB × $0.023 × 1000 = $23,000
+  Warm  (2 PB, 20%):  2,000 TB × $0.0125 × 1000 = $25,000
+  Cold  (3 PB, 30%):  3,000 TB × $0.004 × 1000 = $12,000
+  Archive (4 PB, 40%): 4,000 TB × $0.00099 × 1000 = $3,960
+  Total: $63,960/month (72% savings)
+```
+
+### Lifecycle Policy Example (S3)
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "Transition to IA after 30 days",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "uploads/" },
+      "Transitions": [
+        { "Days": 30, "StorageClass": "STANDARD_IA" },
+        { "Days": 90, "StorageClass": "GLACIER_IR" },
+        { "Days": 365, "StorageClass": "DEEP_ARCHIVE" }
+      ],
+      "Expiration": { "Days": 2555 }
+    }
+  ]
+}
+```
+
+---
+
+## Object-Store Versioning and Ransomware Resilience
+
+### Object Versioning
+
+Versioning keeps every overwrite and delete as a recoverable version. This protects against accidental deletion and application bugs.
+
+| Feature | Without Versioning | With Versioning |
+|---------|-------------------|----------------|
+| Overwrite | Previous data is permanently lost | Previous version is preserved |
+| Delete | Object is permanently removed | Delete marker added; previous versions remain |
+| Recovery from app bug | Impossible (corrupted data replaces original) | Restore to any previous version |
+| Storage cost | 1x | Increases with number of versions (use lifecycle to expire old versions) |
+
+### Ransomware and Data Protection
+
+| Threat | Protection Mechanism |
+|--------|---------------------|
+| Ransomware encrypts objects | **Object Lock (WORM)**: prevents modification/deletion for a retention period; even the root account cannot override in compliance mode |
+| Attacker deletes all versions | **MFA Delete**: requires MFA token to permanently delete versioned objects |
+| Compromised credentials overwrite data | **Versioning + Object Lock**: overwrites create new versions; originals are immutable |
+| Cross-account attack | **Cross-account backup**: replicate to a separate AWS account with independent credentials |
+
+### Immutable Backup Architecture
+
+```
+Production Account                  Backup Account (separate credentials)
+┌──────────────┐                   ┌──────────────────────────┐
+│ S3 Bucket    │ ──replication──→  │ S3 Bucket                │
+│ (versioned)  │                   │ (versioned + Object Lock │
+│              │                   │  Compliance mode)         │
+└──────────────┘                   └──────────────────────────┘
+                                   • Cannot be deleted by anyone
+                                   • Retention: 30 days minimum
+                                   • Even root account cannot override
+```
+
+---
+
+## Geo-Replication Trade-offs and Data Governance
+
+### Replication Strategy Comparison
+
+| Strategy | Consistency | Latency | Cost | Use Case |
+|----------|-----------|---------|------|----------|
+| **Single-region, multi-AZ** | Strong (synchronous AZ replication) | Low (same region) | 1x storage, no cross-region egress | Most applications; default recommendation |
+| **Cross-region replication (CRR)** | Eventual (async, seconds to minutes lag) | Read from nearest region | 2x storage + egress fees | DR, read latency optimization, data residency |
+| **Multi-region active-active** | Eventual or conflict resolution required | Low everywhere | 2x+ storage + egress + conflict resolution overhead | Global consumer apps requiring local writes |
+
+### Data Governance Checklist
+
+| Concern | Question to Ask | Implementation |
+|---------|----------------|---------------|
+| **Data residency** | Where must this data physically reside? | Region-locked buckets; disable cross-region replication for regulated data |
+| **Access control** | Who can read/write/delete this data? | IAM policies + bucket policies + S3 Access Points per team/tenant |
+| **Encryption** | What encryption is required? | SSE-S3 (default), SSE-KMS (audit trail), or SSE-C (customer-managed keys) |
+| **Retention** | How long must data be kept? What triggers deletion? | Lifecycle rules + legal hold for compliance data |
+| **Audit** | Who accessed what and when? | S3 Server Access Logging + CloudTrail data events |
+| **Classification** | Is this data PII, financial, or public? | Tag objects with classification; enforce policies by tag |
+| **Deletion** | Can data be permanently deleted? By whom? | MFA Delete + Object Lock for compliance; soft-delete with grace period for user data |
+
+### Cross-Reference to Other Chapters
+
+| Topic | Chapter |
+|-------|---------|
+| Lifecycle tiering cost models | Chapter 3: Estimation & Capacity Planning |
+| CDN cache key design and invalidation | Chapter 6: Caching Systems |
+| Database storage engine internals | Chapter 5: Databases Deep Dive |
+| Backup observability and SLO monitoring | F10: Observability & Operations |
+| Storage in deployment pipelines (artifacts) | F11: Deployment & DevOps |
+
 ## Common Mistakes
 - Storing large media blobs in the primary relational database without a strong reason.
 - Ignoring egress cost when planning content-heavy systems.

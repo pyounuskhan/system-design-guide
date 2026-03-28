@@ -3194,6 +3194,159 @@ flowchart LR
     V2 -->|"Bandwidth costs, quality demands, live events"| V3
 ```
 
+## QoE Measurement Blueprint
+
+Quality of Experience (QoE) is the primary measure of a streaming platform's health — not server-side metrics alone.
+
+### QoE Metrics and SLOs
+
+| Metric | What It Measures | SLO Target | Alert Threshold |
+|--------|-----------------|-----------|----------------|
+| **Video Start Time (VST)** | Time from play-press to first frame rendered | < 2 seconds (p95) | > 4 seconds |
+| **Rebuffer Rate** | % of play time spent buffering (excluding initial) | < 0.5% of play time | > 1% |
+| **Rebuffer Frequency** | Rebuffer events per hour of viewing | < 1 event/hour | > 3 events/hour |
+| **Bitrate Stability** | Frequency of quality switches during playback | < 2 switches per session | > 5 switches |
+| **Average Bitrate** | Mean delivered bitrate across sessions | > 4 Mbps (1080p target) | < 2 Mbps sustained |
+| **Playback Failure Rate** | % of play attempts that fail entirely | < 0.1% | > 0.5% |
+| **Time to Quality (TTQ)** | Time from first frame to target resolution (1080p) | < 5 seconds | > 10 seconds |
+
+### QoE → Architecture Feedback Loop
+
+```
+Client player reports QoE metrics every 30 seconds →
+  Ingestion: Kafka topic (qoe_events) →
+    Real-time: Flink aggregation → Grafana dashboard (per-region, per-ISP, per-device)
+    Alerting: rebuffer_rate > SLO → investigate CDN PoP or origin health
+    Batch: daily QoE report → content team (which titles have worst experience?)
+
+Architecture actions driven by QoE:
+  High VST in region X → Pre-warm CDN cache for popular content in that region
+  High rebuffer on mobile → Lower starting bitrate in ABR profile for mobile
+  Playback failures on device Y → Check DRM compatibility; add fallback stream
+```
+
+---
+
+## Multi-CDN and Origin Protection
+
+### Multi-CDN Strategy
+
+| Strategy | How It Works | When to Use |
+|----------|-------------|-------------|
+| **Primary + failover** | One CDN default; switch on health-check failure | Cost-sensitive; acceptable failover time (30-60s) |
+| **Split by geography** | CDN-A for Americas, CDN-B for EMEA, CDN-C for APAC | Regional performance optimization |
+| **Load-balanced** | Traffic steering layer distributes requests by real-time performance | Premium delivery; minimize rebuffer globally |
+| **Content-type split** | CDN-A for video segments, CDN-B for images/thumbnails | Different cost profiles per content type |
+
+### Origin Protection
+
+```
+Problem: CDN cache miss → all requests hit origin → origin overwhelmed
+
+Origin shield pattern:
+  Client → Edge PoP (cache miss) → Origin Shield (regional cache)
+    → Only origin shield makes requests to true origin
+    → 90%+ of "misses" served by shield without hitting origin
+
+Collapse / coalesce:
+  100 concurrent requests for same segment → origin shield sends 1 request,
+  fans response to all 100 waiters
+
+Cache warming:
+  New content published → pre-warm top 10 CDN PoPs before release announcement
+  Prevents cold-cache stampede on launch
+```
+
+### CDN Cache Key and Invalidation
+
+| Concern | Implementation |
+|---------|---------------|
+| **Cache key structure** | `/{content_id}/{profile}/{segment_number}.ts` — no user-specific params |
+| **Vary headers** | None for video segments (same for all users); `Vary: Accept-Encoding` for manifests only |
+| **Invalidation** | Purge by content_id prefix on takedown; TTL-based expiry for manifests (5-30s); segments cached long-term (immutable after encoding) |
+| **DRM tokens** | NOT part of cache key — validated at edge, not cached per-user |
+| **Geo-restriction** | Edge checks viewer IP against geo-fence; same cached segment served or blocked |
+
+---
+
+## Content Security and DRM
+
+| Threat | Impact | Mitigation |
+|--------|--------|-----------|
+| **Stream ripping** | Content pirated and redistributed | DRM (Widevine/FairPlay/PlayReady); encrypted segments |
+| **Token sharing** | Unauthorized users access paid content | Short-lived signed URLs (5 min expiry); IP binding; concurrent stream limits |
+| **Screen recording** | Captured via OS-level recording | HDCP enforcement on supported devices; watermarking (forensic, invisible) |
+| **CDN credential theft** | Attacker requests segments directly with stolen CDN keys | Token-based CDN auth (signed URLs with expiry); rotate CDN keys regularly |
+| **Hotlinking** | Third-party sites embed player pointing to CDN URLs | Referer checks; signed URLs; domain allowlisting |
+
+### DRM License Flow
+
+```
+Client starts playback →
+  1. Fetch manifest (MPD/m3u8) from CDN
+  2. Detect DRM requirement from manifest
+  3. Request license from DRM license server (Widevine/FairPlay)
+     → Client sends: device cert, content_id, entitlement token
+     → Server checks: subscription active? geo-allowed? concurrent limit?
+     → Server returns: content decryption key (encrypted to device)
+  4. Client decrypts and plays segments locally
+  License duration: typically 24 hours (offline) or session-based (streaming)
+```
+
+---
+
+## Capacity and Cost Estimation — Streaming Platform
+
+### Storage Estimation
+
+```
+Content library: 50,000 titles
+  Average length: 90 minutes
+  Encoding profiles: 6 resolutions × 2 codecs (H.264 + H.265) = 12 renditions
+  Average rendition size: 4 GB (range: 500 MB for mobile to 15 GB for 4K)
+
+Total storage: 50,000 × 12 × 4 GB = 2.4 PB
+  + thumbnails, subtitles, metadata: +5% → ~2.5 PB
+  + 3x replication across regions: ~7.5 PB effective
+
+Monthly storage cost (S3): 2.5 PB × $0.023/GB = ~$57,500/month
+  With lifecycle (cold after 90 days for long-tail): ~$35,000/month
+```
+
+### Bandwidth and CDN Cost
+
+```
+Concurrent viewers: 10M peak
+Average bitrate: 5 Mbps
+Peak egress: 10M × 5 Mbps = 50 Tbps
+
+Monthly egress: assuming 4 hours/day × 30 days × 100M unique viewers
+  = 100M × 5 Mbps × 4h × 3600s × 30 = ~6.5 EB/month (exabytes)
+
+CDN cost at negotiated rate (~$0.01/GB):
+  6,500 PB × $0.01/GB × 1,000,000 GB/PB = $65M/month
+  (This is why Netflix builds its own CDN — Open Connect)
+```
+
+### Transcoding Cost
+
+```
+New uploads: 1,000 titles/month
+Transcoding: 12 renditions × 90 min × $0.015/min (AWS MediaConvert) = $16.20/title
+Monthly transcoding: 1,000 × $16.20 = $16,200/month
+  (Transcoding is a small fraction of total cost — CDN dominates)
+```
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| CDN cache strategy and invalidation | Ch 6: Caching Systems |
+| Storage lifecycle tiering | Ch 9: Storage Systems |
+| Multi-region deployment and failover | Ch 7: Load Balancing; Ch 4: Networking |
+| Cost optimization patterns | Ch A9: Cost Optimization |
+| Observability SLOs | F10: Observability & Operations |
+
 ---
 
 ## Final Recap

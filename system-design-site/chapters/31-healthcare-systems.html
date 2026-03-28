@@ -5619,6 +5619,81 @@ FHIR Migration Path:
 <li>Practice redrawing one of these systems for startup scale, then for enterprise or multi-region scale.</li>
 <li>Use the sub-subchapter sections as interview prompts: pick one system, frame the requirements, and sketch the trade-offs from memory.</li>
 </ul>
+<h2 id="privacy-threat-model">Healthcare Privacy Threat Model</h2>
+<p><em>Architectural reference, not legal advice. Regulations vary by jurisdiction.</em></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Vector</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Unauthorized PHI access</strong></td><td>Broad DB permissions</td><td>RBAC + RLS + ABAC for clinical context</td></tr>
+<tr><td><strong>PHI in logs</strong></td><td>Stack traces with patient data</td><td>Redaction middleware; allowlisted fields</td></tr>
+<tr><td><strong>Insider snooping</strong></td><td>Clinician accesses without treatment relationship</td><td>Break-glass audit; anomaly detection</td></tr>
+<tr><td><strong>Data exfiltration</strong></td><td>Bulk export of records</td><td>DLP rules; export approval + audit</td></tr>
+<tr><td><strong>Consent violation</strong></td><td>Processing without consent</td><td>Consent service enforces purpose-of-use</td></tr>
+<tr><td><strong>Cross-tenant leakage</strong></td><td>Wrong patient's data returned</td><td>org_id in every query; negative CI tests</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="audit-logging-healthcare">Audit Logging for Healthcare</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Event</th><th>Required Fields</th><th>Retention</th></tr></thead>
+<tbody>
+<tr><td>PHI access (read)</td><td>who, when, which patient, which data, from where</td><td>6 years</td></tr>
+<tr><td>PHI modification</td><td>who, when, before/after, reason</td><td>6 years</td></tr>
+<tr><td>Login/logout</td><td>who, success/failure, device, IP</td><td>6 years</td></tr>
+<tr><td>Permission changes</td><td>who granted/revoked what to whom</td><td>6 years</td></tr>
+<tr><td>Break-glass access</td><td>who, patient, justification</td><td>6 years + immediate alert</td></tr>
+</tbody>
+</table></div>
+<pre><code>Architecture: App → Kafka (audit_events) → Append-only DB (hash chain)
+  + Real-time alerting (break-glass, bulk access)
+  + Archive (6+ years, encrypted, immutable)</code></pre>
+<hr>
+<h2 id="consent-federation">Consent and Identity Federation</h2>
+<pre><code>Consent flow: Authenticate → Authorize (role) → Check consent (data + purpose + requestor)
+  → Pass: serve + log | Fail: deny + log | Emergency: break-glass + elevated alert</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Use Case</th><th>Standard</th></tr></thead>
+<tbody>
+<tr><td><strong>SAML 2.0</strong></td><td>Hospital SSO</td><td>Legacy, widespread</td></tr>
+<tr><td><strong>OAuth 2.0 + OIDC</strong></td><td>Patient apps, API access</td><td>Modern</td></tr>
+<tr><td><strong>SMART on FHIR</strong></td><td>Third-party EHR app access</td><td>HL7; OAuth-based; scoped</td></tr>
+<tr><td><strong>Cross-org trust</strong></td><td>Inter-hospital record sharing</td><td>TEFCA (US)</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="healthcare-reliability">Reliability and Data Minimization</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>System</th><th>Availability</th><th>RTO</th><th>RPO</th></tr></thead>
+<tbody>
+<tr><td>EHR (read)</td><td>99.99%</td><td>&lt; 5 min</td><td>0</td></tr>
+<tr><td>EHR (write)</td><td>99.95%</td><td>&lt; 15 min</td><td>&lt; 1 min</td></tr>
+<tr><td>Medication ordering</td><td>99.99%</td><td>&lt; 5 min</td><td>0</td></tr>
+<tr><td>Patient portal</td><td>99.9%</td><td>&lt; 1 hour</td><td>&lt; 5 min</td></tr>
+</tbody>
+</table></div>
+<h3 id="data-minimization">Data Minimization</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Principle</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Collect only what's needed</td><td>API scopes limit fields; no SELECT * for PHI</td></tr>
+<tr><td>Purpose limitation</td><td>Consent enforces treatment vs research vs billing</td></tr>
+<tr><td>De-identification for research</td><td>HIPAA Safe Harbor or Expert Determination</td></tr>
+<tr><td>Minimum necessary access</td><td>Clinicians see their patients only</td></tr>
+<tr><td>Encryption of PHI</td><td>AES-256; per-org KMS; field-level for sensitive</td></tr>
+</tbody>
+</table></div>
+<h3 id="healthcare-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Audit logging</td><td><a href="28-security-systems.html">Ch 28</a></td></tr>
+<tr><td>Access control (RBAC/ABAC)</td><td><a href="40-security-authentication.html">A8</a></td></tr>
+<tr><td>Regulatory requirements</td><td><a href="02-types-of-requirements.html">Ch 2</a></td></tr>
+<tr><td>Data residency</td><td><a href="09-storage-systems.html">Ch 9</a></td></tr>
+<tr><td>Zero trust</td><td><a href="28-security-systems.html">Ch 28</a></td></tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="navigation">Navigation</h2>
 <ul>
 <li>Previous: <a href="30-gaming-systems.html">Gaming Systems</a></li>

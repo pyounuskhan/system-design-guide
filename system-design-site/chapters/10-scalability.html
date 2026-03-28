@@ -1143,6 +1143,88 @@
 <li>Use elasticity to match cost to demand, but do not mistake automation for architectural correctness.</li>
 <li>Plan for partial failure while scaling, not only for happy-path growth.</li>
 </ul>
+<h2 id="scalability-toolbox">Scalability Toolbox</h2>
+<p>Every scalability problem maps to proven patterns. This table indexes them by bottleneck.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Bottleneck</th><th>Pattern</th><th>How It Helps</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Read-heavy DB</td><td>Caching (Redis)</td><td>Absorb repeated reads</td><td><a href="06-caching-systems.html">Ch 6</a></td></tr>
+<tr><td>Read-heavy DB</td><td>Read replicas</td><td>Offload reads to replicas</td><td><a href="05-databases-deep-dive.html">Ch 5</a></td></tr>
+<tr><td>Write-heavy DB</td><td>Sharding</td><td>Distribute writes by partition key</td><td>F7: Data Partitioning</td></tr>
+<tr><td>Write-heavy DB</td><td>Async writes (queue + worker)</td><td>Move writes off critical path</td><td><a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>Compute-heavy API</td><td>Horizontal scaling + LB</td><td>Add stateless instances</td><td><a href="07-load-balancing.html">Ch 7</a></td></tr>
+<tr><td>Compute-heavy API</td><td>CDN for cacheable responses</td><td>Offload edge-servable responses</td><td><a href="09-storage-systems.html">Ch 9</a></td></tr>
+<tr><td>Fan-out heavy</td><td>Event streaming (Kafka)</td><td>Decouple producer from consumers</td><td><a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>Latency-sensitive global</td><td>Multi-region deployment</td><td>Serve from nearest region</td><td><a href="04-networking-fundamentals.html">Ch 4</a>, <a href="07-load-balancing.html">Ch 7</a></td></tr>
+<tr><td>Storage growth</td><td>Lifecycle tiering</td><td>Move aging data to cheaper tiers</td><td><a href="09-storage-systems.html">Ch 9</a></td></tr>
+<tr><td>Cost scaling linearly</td><td>Caching + async + right-sizing</td><td>Sub-linear cost growth</td><td><a href="03-estimation-capacity-planning.html">Ch 3</a>, <a href="06-caching-systems.html">Ch 6</a></td></tr>
+</tbody>
+</table></div>
+<p><strong>Interview pattern:</strong> (1) Identify the bottleneck → (2) Pick the pattern → (3) Project the limit → (4) Reference the cost.</p>
+<hr>
+<h2 id="scaling-anti-patterns">Scaling Anti-Patterns</h2>
+<h3 id="hot-partitions">Hot Partitions</h3>
+<p>Traffic is unevenly distributed across partitions, overloading one while others sit idle.</p>
+<p><strong>Causes:</strong> Low-cardinality partition key, sequential keys, celebrity/viral content.</p>
+<p><strong>Fixes:</strong> High-cardinality keys, jitter suffix for hot keys, separate handling for known hot entities, per-partition monitoring.</p>
+<h3 id="thundering-herd">Thundering Herd</h3>
+<p>A single event (cache expiry, failover, restart) causes all clients to simultaneously request the same resource.</p>
+<p><strong>Fixes:</strong> Jittered TTLs, request coalescing, stale-while-revalidate (cache); slow-start weight (LB); connection pool limits (DB).</p>
+<h3 id="retry-storms">Retry Storms</h3>
+<p>A slow dependency gets worse as clients retry, adding 2-3x load in a positive feedback loop.</p>
+<p><strong>Fixes:</strong> Exponential backoff + jitter, retry budgets (10-20%), circuit breakers, deadline propagation.</p>
+<h3 id="premature-optimization">Premature Optimization</h3>
+<p>Adding sharding, microservices, or distributed caching before the system needs it. Complexity slows development without addressing the actual bottleneck.</p>
+<p><strong>Signals:</strong> DB at 5% utilization with 3 shards; service mesh for 3 services; team spends more time on infra than product.</p>
+<p><strong>Fix:</strong> Start simple. Measure. Scale the bottleneck. Repeat.</p>
+<hr>
+<h2 id="multi-tenant-scaling">Multi-Tenant Scaling</h2>
+<p>SaaS platforms must scale for diverse tenant workloads. One large tenant can degrade the experience for all others ("noisy neighbor").</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Challenge</th><th>What Happens</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Noisy neighbor</strong></td><td>One tenant's bulk import saturates shared DB</td><td>Per-tenant connection limits; rate limiting</td></tr>
+<tr><td><strong>Uneven growth</strong></td><td>5% of tenants generate 80% of traffic</td><td>Tier tenants; dedicated infra for largest</td></tr>
+<tr><td><strong>Data skew</strong></td><td>One tenant has 100M rows; most have 10K</td><td>Shard by tenant_id; monitor per-tenant volume</td></tr>
+<tr><td><strong>Isolation failures</strong></td><td>Slow query blocks other tenants</td><td>Query timeouts; separate replicas for large tenants</td></tr>
+<tr><td><strong>Cost attribution</strong></td><td>Can't determine which tenant drives cost</td><td>Tag by tenant; per-tenant metering</td></tr>
+</tbody>
+</table></div>
+<h3 id="tenant-tiers">Tenant Scaling Tiers</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Tier</th><th>Size</th><th>Infrastructure</th><th>Isolation</th></tr></thead>
+<tbody>
+<tr><td>Free / Small</td><td>&lt; 1K req/day</td><td>Shared everything</td><td>Application-level (tenant_id)</td></tr>
+<tr><td>Mid-tier</td><td>1K-100K req/day</td><td>Shared compute, dedicated DB schema</td><td>Schema-level / resource limits</td></tr>
+<tr><td>Enterprise</td><td>&gt; 100K req/day</td><td>Dedicated cluster + DB</td><td>Full infrastructure isolation</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="capacity-planning-loop">Saturation Monitoring and Capacity Planning Loops</h2>
+<p>Scaling is a continuous feedback loop connecting monitoring → forecasting → capacity → SLO validation → cost review.</p>
+<h3 id="saturation-signals">Saturation Signals by Layer</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Layer</th><th>Signal</th><th>Threshold</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>API / Compute</td><td>CPU utilization</td><td>&gt; 70% sustained</td><td>Scale out or up</td></tr>
+<tr><td>API / Compute</td><td>Request queue depth</td><td>&gt; 100 pending</td><td>Scale out; investigate slow endpoints</td></tr>
+<tr><td>Database</td><td>Connection pool utilization</td><td>&gt; 80%</td><td>Increase pool; add replicas; optimize queries</td></tr>
+<tr><td>Cache</td><td>Memory utilization</td><td>&gt; 85%</td><td>Scale cluster; evict low-value keys</td></tr>
+<tr><td>Queue</td><td>Consumer lag</td><td>Growing over time</td><td>Scale consumers; investigate slow processing</td></tr>
+<tr><td>Storage</td><td>Disk utilization</td><td>&gt; 80%</td><td>Lifecycle tiering; archive cold data</td></tr>
+</tbody>
+</table></div>
+<h3 id="scaling-slo-cost">Tying Scaling to SLOs and Cost</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>SLO Status</th><th>Capacity Action</th><th>Cost Implication</th></tr></thead>
+<tbody>
+<tr><td>Healthy, headroom &gt; 50%</td><td>Right-size: reduce overprovisioned resources</td><td>Save money</td></tr>
+<tr><td>Healthy, headroom 20-50%</td><td>Maintain current</td><td>Stable</td></tr>
+<tr><td>Healthy, headroom &lt; 20%</td><td>Proactive scale-up</td><td>Invest in reliability</td></tr>
+<tr><td>Degraded (burn rate &gt; 1x)</td><td>Immediate scale-up + investigation</td><td>Cost justified by SLO</td></tr>
+<tr><td>Breached (budget exhausted)</td><td>Emergency scaling + deploy freeze</td><td>Reliability &gt; cost</td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Calling a system scalable because only the web tier can scale while the real bottleneck cannot.</li>
@@ -1268,6 +1350,10 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#scalability-toolbox">Scalability Toolbox</a></li>
+<li><a href="#scaling-anti-patterns">Scaling Anti-Patterns</a></li>
+<li><a href="#multi-tenant-scaling">Multi-Tenant Scaling</a></li>
+<li><a href="#capacity-planning-loop">Saturation Monitoring &amp; Capacity Loops</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

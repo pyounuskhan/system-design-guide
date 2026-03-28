@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chapter 41 · Cost Optimization · System Design Mastery</title>
+  <title>Chapter A9 · Cost Optimization · System Design Mastery</title>
   <meta name="description" content="Cost optimization is not about making every system cheap. It is about making cost proportional to value and aligned with business requirements. A system that is too expensive for its traffic profile is poorly designed, but a system that is cheap because it fails reliability or latency goals is also poorly designed. The architect’s job is to find the right efficiency point.">
   <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/css/styles.css">
@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -984,13 +984,13 @@
         <span>/</span>
         <a href="../index.html#part-6">Advanced Architecture</a>
         <span>/</span>
-        <span>Chapter 41</span>
+        <span>Chapter A9</span>
       </div>
 
       <article class="chapter-article">
         <header class="chapter-hero part-6">
           <div class="chapter-hero-top">
-            <span class="chapter-kicker">Chapter 41 of 60</span>
+            <span class="chapter-kicker">Chapter A9 — Advanced Architecture</span>
             <span class="part-badge">Advanced Architecture</span>
           </div>
           <h1>Cost Optimization</h1>
@@ -1014,7 +1014,8 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 6 - Advanced Architecture<br>
-<strong>Position:</strong> Chapter 41 of 60
+<strong>Position:</strong> Chapter A9 (Advanced Architecture — Cost Optimization Primer)<br>
+<strong>Complements:</strong> F10 §3.2 (Capacity Planning &amp; Cost Modeling) and F12 §5 (Cost Awareness) cover cost estimation in depth.<br>
 <strong>Why this part exists:</strong> This section teaches the final layer of architect thinking: a system is not fully designed until it is economically sustainable under real load.<br>
 <strong>This chapter builds toward:</strong> cost-aware architecture, capacity discipline, unit economics, and trade-off evaluation under budget constraints</p>
 <h2 id="overview">Overview</h2>
@@ -1145,6 +1146,98 @@
 <li>Prefer elasticity where workloads are bursty and steady capacity where demand is predictable.</li>
 <li>Count engineering complexity and operational risk as part of total cost.</li>
 </ul>
+<h2 id="cost-worksheet">Cost Estimation Worksheet</h2>
+<p>Fill during design reviews. Categories: compute, storage, transfer, managed services.</p>
+<pre><code>Total monthly cost = Compute + Storage + Transfer + Managed + Observability
+Cost per request   = Total / monthly_requests
+Cost per user      = Total / MAU
+Cost per order     = Total / monthly_orders</code></pre>
+<p><strong>Quick reference prices (AWS us-east-1, approximate):</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>EC2 m6i.xlarge (4 vCPU, 16 GB)</td><td>~$140/mo on-demand, ~$85 reserved</td></tr>
+<tr><td>RDS r6g.xlarge (PostgreSQL)</td><td>~$350/mo</td></tr>
+<tr><td>ElastiCache r6g.large (Redis)</td><td>~$175/mo</td></tr>
+<tr><td>S3 Standard</td><td>$0.023/GB/mo</td></tr>
+<tr><td>S3 Glacier</td><td>$0.004/GB/mo</td></tr>
+<tr><td>CloudFront egress</td><td>$0.085/GB</td></tr>
+<tr><td>NAT Gateway</td><td>$0.045/GB processed</td></tr>
+<tr><td>Lambda</td><td>$0.20/M invocations + duration</td></tr>
+<tr><td>API Gateway</td><td>$3.50/M requests</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="cost-examples">Concrete Cost Modeling Examples</h2>
+<h3 id="cache-vs-db">Cache vs Database</h3>
+<pre><code>50K QPS reads, 90% cacheable
+Without cache: 3 RDS replicas = $2,100/mo → saturated → $3,500/mo
+With Redis (90% hit): 2 Redis nodes ($350) + 1 replica ($700) = $1,050/mo
+Savings: $2,450/mo (70%) + latency drops 10ms → 1ms</code></pre>
+<h3 id="multi-region-cost">Multi-Region Replication</h3>
+<pre><code>Single region: $7,500/mo
+Active-active (2 regions): $16,000/mo (2.1x)
+  Extra: 2x compute, 2x storage, $800 cross-region replication, 2x CDN
+Decision: justify only if latency SLO &lt; 100ms globally OR data residency required</code></pre>
+<h3 id="telemetry-cost">Telemetry Cost Budget</h3>
+<pre><code>Before optimization: ~$80K/mo (logs $30K, metrics $50K, traces $200)
+After: sample INFO logs 10%, drop unused metrics → ~$38K/mo (52% savings)</code></pre>
+<hr>
+<h2 id="cost-anti-patterns">Cost Anti-Patterns</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Anti-Pattern</th><th>What Goes Wrong</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><strong>Over-provisioning</strong></td><td>70% idle compute</td><td>Right-size via VPA; monthly utilization review</td></tr>
+<tr><td><strong>No storage lifecycle</strong></td><td>5 years of logs in S3 Standard</td><td>30d → IA, 90d → Glacier, 365d → Deep Archive</td></tr>
+<tr><td><strong>Chatty microservices</strong></td><td>4x compute + transfer per request</td><td>Collapse hops; batch; use async</td></tr>
+<tr><td><strong>Unused environments</strong></td><td>Dev/staging at prod size 24/7</td><td>Scheduled scaling; scale down after hours</td></tr>
+<tr><td><strong>No cost attribution</strong></td><td>"$200K/mo" but unknown who drives it</td><td>Tag by team + service; per-team dashboards</td></tr>
+<tr><td><strong>Ignoring egress</strong></td><td>40% CDN miss rate = origin serves most traffic</td><td>Tune cache keys, extend TTLs, stale-while-revalidate</td></tr>
+<tr><td><strong>No reserved instances</strong></td><td>All on-demand for steady workloads</td><td>1-year RI saves 30-40% for baseline capacity</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="finops">FinOps Practices</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Phase</th><th>What You Do</th><th>Outcome</th></tr></thead>
+<tbody>
+<tr><td><strong>Inform</strong></td><td>Tag, dashboard, attribute by team</td><td>"We know what we spend"</td></tr>
+<tr><td><strong>Optimize</strong></td><td>Right-size, lifecycle, cache, reserve</td><td>"We spend efficiently"</td></tr>
+<tr><td><strong>Operate</strong></td><td>Per-team budgets, cost in design reviews</td><td>"Cost is a design parameter"</td></tr>
+</tbody>
+</table></div>
+<h3 id="unit-economics-example">Unit Economics by Feature</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Feature</th><th>Monthly Cost</th><th>Usage</th><th>Cost/Unit</th></tr></thead>
+<tbody>
+<tr><td>Search API</td><td>$12,000</td><td>300M queries</td><td>$0.00004/query</td></tr>
+<tr><td>Image upload</td><td>$8,000</td><td>5M uploads</td><td>$0.0016/upload</td></tr>
+<tr><td>Notifications</td><td>$3,500</td><td>50M sent</td><td>$0.00007/notif</td></tr>
+<tr><td>Analytics pipeline</td><td>$15,000</td><td>2B events</td><td>$0.000008/event</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="cloud-guidance">Cloud Provider Guidance &amp; Sustainability</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Provider</th><th>Key Tools</th><th>Focus</th></tr></thead>
+<tbody>
+<tr><td>AWS</td><td>Cost Explorer, Trusted Advisor, Well-Architected</td><td>Right-sizing, RI, S3 lifecycle, NAT alternatives</td></tr>
+<tr><td>GCP</td><td>Active Assist, Committed Use, BigQuery slots</td><td>Per-second billing, preemptible VMs, sustained use</td></tr>
+<tr><td>Azure</td><td>Advisor, Cost Management, Reserved VMs</td><td>Hybrid benefit, spot VMs, storage tiers</td></tr>
+</tbody>
+</table></div>
+<p><strong>Sustainability:</strong> Cost optimization and carbon reduction often align — right-sizing reduces compute energy, tiering reduces active storage, caching reduces DB operations.</p>
+<h3 id="cost-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Estimation formulas</td><td><a href="03-estimation-capacity-planning.html">Ch 3: Estimation</a></td></tr>
+<tr><td>Storage lifecycle tiering</td><td><a href="09-storage-systems.html">Ch 9: Storage</a></td></tr>
+<tr><td>Cache hit rate optimization</td><td><a href="06-caching-systems.html">Ch 6: Caching</a></td></tr>
+<tr><td>Observability cost as budget</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+<tr><td>Multi-region cost multipliers</td><td><a href="04-networking-fundamentals.html">Ch 4</a>, <a href="07-load-balancing.html">Ch 7</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Trying to cut spend without first understanding where it comes from.</li>
@@ -1271,6 +1364,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#cost-worksheet">Cost Estimation Worksheet</a></li>
+<li><a href="#cost-examples">Concrete Cost Modeling Examples</a></li>
+<li><a href="#cost-anti-patterns">Cost Anti-Patterns</a></li>
+<li><a href="#finops">FinOps Practices</a></li>
+<li><a href="#cloud-guidance">Cloud Guidance &amp; Sustainability</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

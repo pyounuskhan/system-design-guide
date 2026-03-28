@@ -5145,6 +5145,284 @@ Cross-program considerations:
 <li>A hotel reports that a room you confirmed is actually unavailable due to channel manager sync delay. What is the recovery path?</li>
 </ol>
 <hr>
+<h2 id="reservation-saga">Reservation Saga — Failure and Compensation</h2>
+<h3 id="booking-saga-flow">Booking Saga Flow</h3>
+<pre><code>1. SEARCH → Price + availability snapshot (TTL: 15 min)
+2. HOLD → Temporary reservation (idempotency_key = session:booking_id)
+   → Inventory decremented with soft lock (expires in 15 min)
+3. PAYMENT → Authorize card (PSP idempotency key)
+   → If fails: release hold → notify user "payment declined"
+4. CONFIRM → Convert hold to confirmed booking
+   → Emit BookingConfirmed event → email, calendar, partner notification
+5. TICKET → Issue e-ticket / voucher (idempotent per booking_id)
+
+Compensation on failure at step N:
+  Step 3 fails → compensate step 2 (release hold)
+  Step 4 fails → compensate step 3 (void auth) + step 2 (release hold)
+  Step 5 fails → retry (ticketing is idempotent); don't compensate payment
+</code></pre>
+<h3 id="idempotency-keys-by-step">Idempotency Keys by Step</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Idempotency Key</th>
+<th>TTL</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hold</td>
+<td><code>hold:{session}:{flight_or_room}:{date}</code></td>
+<td>15 min</td>
+<td>Prevent double-hold</td>
+</tr>
+<tr>
+<td>Payment</td>
+<td><code>pay:{booking_id}</code></td>
+<td>24 hours</td>
+<td>Prevent double-charge</td>
+</tr>
+<tr>
+<td>Confirm</td>
+<td><code>confirm:{booking_id}</code></td>
+<td>24 hours</td>
+<td>Prevent duplicate booking record</td>
+</tr>
+<tr>
+<td>Ticket</td>
+<td><code>ticket:{booking_id}</code></td>
+<td>7 days</td>
+<td>Prevent duplicate e-ticket</td>
+</tr>
+<tr>
+<td>Cancel</td>
+<td><code>cancel:{booking_id}</code></td>
+<td>30 days</td>
+<td>Prevent double-refund</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="oversell-prevention">Oversell Prevention and Fairness</h2>
+<h3 id="inventory-contention-patterns">Inventory Contention Patterns</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>How</th>
+<th>Trade-off</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pessimistic lock</strong></td>
+<td><code>SELECT FOR UPDATE</code> on inventory row</td>
+<td>Blocks concurrent readers; safe but slow</td>
+<td>Low concurrency (boutique hotels)</td>
+</tr>
+<tr>
+<td><strong>Optimistic lock</strong></td>
+<td>Version check on update; retry on conflict</td>
+<td>No blocking; retry overhead under contention</td>
+<td>Medium concurrency (most bookings)</td>
+</tr>
+<tr>
+<td><strong>Reservation counter</strong></td>
+<td>Redis <code>DECR</code>; reject if &lt; 0</td>
+<td>Fastest; eventual consistency with DB</td>
+<td>High concurrency (flash sales, last-minute)</td>
+</tr>
+<tr>
+<td><strong>Queue serialization</strong></td>
+<td>Enqueue all booking requests; process serially per resource</td>
+<td>Perfect fairness; higher latency</td>
+<td>Extremely hot inventory (concert tickets)</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="fairness-during-high-demand">Fairness During High Demand</h3>
+<pre><code>Problem: 10,000 users try to book 50 seats in 1 second
+
+Without fairness: first TCP connections win (network advantage, not user fairness)
+
+With virtual queue:
+  1. User enters queue → receives queue position + estimated wait
+  2. Queue releases users in FIFO batches (50 at a time)
+  3. Released users have 5-minute hold window to complete payment
+  4. Expired holds release back to pool → next batch released
+
+  Result: fair ordering; no server overload; clear UX ("You are #347 in queue")
+</code></pre>
+<hr>
+<h2 id="load-shedding">Load Shedding for Search and Booking</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Priority</th>
+<th>Shed Policy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Active payment</strong></td>
+<td>P0 (never shed)</td>
+<td>Always process; dedicated thread pool</td>
+</tr>
+<tr>
+<td><strong>Booking confirmation</strong></td>
+<td>P0</td>
+<td>Always process</td>
+</tr>
+<tr>
+<td><strong>Reservation hold</strong></td>
+<td>P1</td>
+<td>Shed if system &gt; 90% capacity</td>
+</tr>
+<tr>
+<td><strong>Search results</strong></td>
+<td>P2</td>
+<td>Return cached results if fresh &lt; 5 min; shed complex filters</td>
+</tr>
+<tr>
+<td><strong>Price refresh</strong></td>
+<td>P2</td>
+<td>Serve cached price; re-validate at checkout</td>
+</tr>
+<tr>
+<td><strong>Recommendations</strong></td>
+<td>P3</td>
+<td>Hide panel entirely under load</td>
+</tr>
+<tr>
+<td><strong>Analytics tracking</strong></td>
+<td>P3</td>
+<td>Drop silently</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="booking-slos">Booking SLOs</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>SLO</th>
+<th>Alert</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Search latency (p99)</td>
+<td>&lt; 2 seconds</td>
+<td>&gt; 5 seconds</td>
+<td>Users abandon slow search</td>
+</tr>
+<tr>
+<td>Booking confirmation</td>
+<td>&lt; 10 seconds end-to-end</td>
+<td>&gt; 30 seconds</td>
+<td>User anxiety; double-click risk</td>
+</tr>
+<tr>
+<td>Hold success rate</td>
+<td>&gt; 95% of attempts</td>
+<td>&lt; 85%</td>
+<td>Inventory contention or system overload</td>
+</tr>
+<tr>
+<td>Payment success rate</td>
+<td>&gt; 99% first attempt</td>
+<td>&lt; 97%</td>
+<td>PSP health or card issues</td>
+</tr>
+<tr>
+<td>Oversell rate</td>
+<td>&lt; 0.01% of bookings</td>
+<td>Any oversell</td>
+<td>Trust destruction; compensation cost</td>
+</tr>
+<tr>
+<td>Cancellation processing</td>
+<td>&lt; 5 seconds</td>
+<td>&gt; 30 seconds</td>
+<td>Refund delays frustrate users</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="conflict-resolution-playbook">Conflict Resolution Playbook</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Conflict</th>
+<th>Detection</th>
+<th>Resolution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Double-booking</strong> (same room/seat sold twice)</td>
+<td>Unique constraint violation on (resource, date)</td>
+<td>Second booker gets apology + upgrade/alternative + compensation</td>
+</tr>
+<tr>
+<td><strong>Hold expired but user paid</strong></td>
+<td>Payment webhook arrives after hold TTL</td>
+<td>Re-check availability; if still open → confirm; if sold → refund + apologize</td>
+</tr>
+<tr>
+<td><strong>Price changed between search and payment</strong></td>
+<td>Price at checkout ≠ price at search</td>
+<td>Honor search price if within TTL; otherwise show updated price + re-confirm</td>
+</tr>
+<tr>
+<td><strong>Partner inventory mismatch</strong></td>
+<td>Channel manager reports different availability</td>
+<td>Reconciliation job every 5 min; if discrepancy → freeze inventory + alert ops</td>
+</tr>
+<tr>
+<td><strong>Concurrent cancellation and modification</strong></td>
+<td>Race between cancel and modify requests</td>
+<td>Use optimistic locking (version field); first writer wins; second gets conflict error</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="cross-references">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Chapter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Saga and distributed transactions</td>
+<td>Ch 13: Distributed Transactions</td>
+</tr>
+<tr>
+<td>Idempotency patterns</td>
+<td>Ch 8: Message Queues; Ch 19: Fintech</td>
+</tr>
+<tr>
+<td>Inventory concurrency (e-commerce)</td>
+<td>Ch 18: E-Commerce</td>
+</tr>
+<tr>
+<td>Load shedding and resilience</td>
+<td>Ch 12: Fault Tolerance</td>
+</tr>
+<tr>
+<td>Multi-region booking pitfalls</td>
+<td>Ch 7: Load Balancing; Ch 11: Consistency</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="navigation">Navigation</h2>
 <ul>
 <li>Previous: <a href="36-blockchain-distributed-systems.html">Blockchain &amp; Distributed Systems</a></li>

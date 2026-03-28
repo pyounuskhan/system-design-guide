@@ -122,6 +122,221 @@ A dashboard system is a strong CQRS case because the read side wants fast summar
 - Measure and communicate projection lag explicitly.
 - Treat projection rebuilds and data quality as production responsibilities, not edge cases.
 
+## Worked CQRS Example: E-Commerce Order Dashboard
+
+This example walks through a complete CQRS implementation for an order management system where the write model serves checkout correctness and the read model serves operational dashboards.
+
+### Write Side (Command Model)
+
+```sql
+-- Normalized write model: optimized for correctness and transactional integrity
+CREATE TABLE orders (
+    id UUID PRIMARY KEY,
+    customer_id UUID NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+    id UUID PRIMARY KEY,
+    order_id UUID REFERENCES orders(id),
+    product_id UUID NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL
+);
+
+CREATE TABLE payments (
+    id UUID PRIMARY KEY,
+    order_id UUID REFERENCES orders(id),
+    amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    provider_ref VARCHAR(100)
+);
+```
+
+**Write API:** `POST /orders` → validates inventory, creates order, publishes `OrderPlaced` event.
+
+### Event Publication (via Outbox)
+
+```sql
+-- In the same transaction as the order write
+INSERT INTO outbox (event_type, aggregate_id, payload, created_at) VALUES (
+    'order.placed',
+    'ord-98765',
+    '{"order_id":"ord-98765","customer_id":"cust-123","items":[...],"total":149.99}',
+    NOW()
+);
+```
+
+### Read Side (Query Model)
+
+```sql
+-- Denormalized read model: optimized for dashboard queries
+CREATE TABLE order_dashboard_view (
+    order_id UUID PRIMARY KEY,
+    customer_name VARCHAR(255),
+    customer_email VARCHAR(255),
+    item_count INT,
+    total_amount DECIMAL(10,2),
+    status VARCHAR(20),
+    payment_status VARCHAR(20),
+    created_at TIMESTAMP,
+    last_updated TIMESTAMP
+);
+
+-- Single-query dashboard read (no joins needed)
+SELECT * FROM order_dashboard_view
+WHERE status = 'pending'
+AND created_at > NOW() - INTERVAL '24 hours'
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+### Projection Worker
+
+```python
+# Consumes events and updates the read model
+def handle_order_placed(event):
+    customer = customer_service.get(event.payload["customer_id"])
+    db.execute("""
+        INSERT INTO order_dashboard_view
+        (order_id, customer_name, customer_email, item_count, total_amount,
+         status, payment_status, created_at, last_updated)
+        VALUES (%s, %s, %s, %s, %s, 'pending', 'awaiting', %s, NOW())
+        ON CONFLICT (order_id) DO NOTHING
+    """, (event.payload["order_id"], customer.name, customer.email,
+          len(event.payload["items"]), event.payload["total"],
+          event.payload["created_at"]))
+
+def handle_payment_completed(event):
+    db.execute("""
+        UPDATE order_dashboard_view
+        SET payment_status = 'completed', status = 'confirmed', last_updated = NOW()
+        WHERE order_id = %s
+    """, (event.payload["order_id"],))
+```
+
+### Read-Model Rebuild
+
+When the projection has a bug or the schema changes, the read model must be rebuilt from scratch:
+
+```
+1. Create new read model table (order_dashboard_view_v2)
+2. Deploy new projection worker consuming from topic offset "earliest"
+   → New consumer group: "order-dashboard-v2"
+3. Process all historical events into new table
+4. Compare v2 with v1 (sample 1000 orders, verify correctness)
+5. If correct: switch Query API to read from v2
+6. Decommission v1 table + old consumer group
+```
+
+**Rebuild time estimate:** 100M orders × 0.1ms/event = ~3 hours. Plan for this in operational runbooks.
+
+---
+
+## CQRS vs Event Sourcing — When You Need Which
+
+| Dimension | CQRS (without Event Sourcing) | CQRS + Event Sourcing |
+|-----------|------------------------------|----------------------|
+| **Write model** | Standard database (relational, document) | Append-only event log |
+| **Source of truth** | Current state in database | Complete event history |
+| **How read model is fed** | CDC, outbox, or direct projection from DB changes | Replay events from the log |
+| **Audit trail** | Must be added separately (audit log table) | Built-in (events ARE the audit trail) |
+| **State rebuild** | Not possible from events alone | Replay all events to reconstruct any point in time |
+| **Schema evolution** | Standard DB migrations | Must handle every historical event format |
+| **Complexity** | Moderate | High |
+| **Use when** | Read-write asymmetry; dashboard/feed optimization | Financial ledgers; compliance audit; undo/redo; full history required |
+
+**Decision rule:** Start with CQRS without event sourcing. Add event sourcing only if you genuinely need the full event history as your source of truth (audit-grade, regulatory, or undo/redo requirements).
+
+### Operational Complexity Warning
+
+CQRS adds real operational burden. Before adopting it, verify that the benefits outweigh these costs:
+
+| Cost | What It Means in Practice |
+|------|--------------------------|
+| **Two data stores to maintain** | Separate backups, monitoring, and capacity planning for write and read models |
+| **Projection code to own** | A new category of code that must be correct, idempotent, and observable |
+| **Lag to communicate** | Product/UX must design for "data may be N seconds stale" |
+| **Rebuild tooling** | You WILL need to rebuild read models; without tooling, it's a multi-day incident |
+| **Debugging complexity** | "Why does the dashboard show X when the order is Y?" requires tracing through projection logic |
+
+---
+
+## Read Freshness SLOs
+
+The delay between a write and its appearance in the read model is not a bug — it is a design parameter that must be measured and governed.
+
+### Freshness SLO by Consumer
+
+| Consumer | Acceptable Lag | Why | Measurement |
+|----------|---------------|-----|-------------|
+| Customer-facing order status page | < 5 seconds | Customer expects to see their order immediately after placing it | Event-to-projection latency metric |
+| Operations dashboard | < 30 seconds | Operators need near-real-time visibility | Projection lag metric (Kafka consumer lag) |
+| Finance reconciliation report | < 5 minutes | Batch-oriented; slight delay acceptable | Pipeline completion time |
+| Search index | < 60 seconds | New products should be searchable quickly | Index freshness metric |
+| Analytics / BI dashboard | < 15 minutes | Historical analysis; not real-time | Data pipeline lag |
+
+### Read-After-Write Consistency Workaround
+
+When a user writes data and immediately reads it back, the read model may not have caught up yet. Solutions:
+
+| Approach | How It Works | Trade-off |
+|----------|-------------|-----------|
+| **Read from write model** | For the writing user's session, route reads to the write DB for N seconds after their write | Increases write DB load; requires session awareness |
+| **Optimistic UI** | Client shows the write result locally before the server confirms the read model update | Client may show data that fails validation; needs error handling |
+| **Polling with version** | Client polls read model with a version token; read model returns data only when version >= expected | Adds polling latency; requires version tracking |
+| **Write returns read-model-friendly response** | The write API response includes enough data for the client to display immediately | Couples write response to read model shape |
+
+---
+
+## Projection Lag — Operational Playbook
+
+### Monitoring
+
+| Metric | What It Measures | Alert Threshold |
+|--------|-----------------|----------------|
+| Kafka consumer lag (offsets) | Events waiting to be processed by projection worker | Growing for > 5 minutes |
+| Event-to-projection latency | Time from event timestamp to read-model update timestamp | > SLO threshold (e.g., 30s for dashboard) |
+| Projection error rate | % of events that failed processing | > 1% |
+| Dead letter queue depth | Events that repeatedly failed | > 0 (any DLQ entry is investigatable) |
+
+### Incident Response for Projection Lag
+
+```
+Lag detected (consumer lag growing, freshness SLO breached)
+  │
+  ├─ Is the projection worker healthy?
+  │   → NO: Restart workers; check for OOM, crash loops, deployment issues
+  │   → YES: Continue
+  │
+  ├─ Is the projection worker processing slowly?
+  │   → YES: Check for slow DB writes, missing indexes, N+1 queries
+  │   → YES: Scale consumer fleet (add more instances)
+  │   → NO: Continue
+  │
+  ├─ Is the source topic receiving a burst?
+  │   → YES: Expected burst (launch, sale)? Wait for it to drain
+  │   → YES: Unexpected? Investigate upstream producer
+  │
+  ├─ Are events failing (going to DLQ)?
+  │   → YES: Inspect DLQ; fix consumer bug; replay failed events
+  │
+  └─ Is the read model corrupted?
+      → YES: Trigger full read-model rebuild (see rebuild procedure above)
+```
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Event-driven architecture and projections | Ch 16: Event-Driven Architecture |
+| Outbox pattern (dual-write avoidance) | Ch 5: Databases; Ch 8: Message Queues |
+| Schema evolution for events | Ch 8: Message Queues; Ch 16: EDA |
+| Staleness SLOs and replica lag | Ch 11: Consistency & CAP |
+| Observability for async pipelines | F10: Observability & Operations |
+
 ## Common Mistakes
 - Applying CQRS to small systems that do not need it.
 - Assuming event sourcing is mandatory for CQRS.

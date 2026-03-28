@@ -3547,6 +3547,114 @@ Scenario 4: CDN Complete Outage
 - Full SaaS stack (Contentful + Algolia + Auth0 + Vercel): fastest time to market but highest ongoing cost and vendor dependency.
 - Full self-hosted including CDN and email: maximum control but excessive operational burden for capabilities that are true commodities.
 
+## CRDT and Local-First Collaboration
+
+For real-time collaborative editing (Google Docs-style), CRDTs enable multiple users to edit simultaneously without a central lock.
+
+### CRDT Types for Content Systems
+
+| CRDT | Use Case | How It Works |
+|------|----------|-------------|
+| **RGA (Replicated Growable Array)** | Text editing (character-level) | Each character has a unique position ID; concurrent inserts merge deterministically |
+| **Yjs / Automerge** | Rich-text and structured document editing | CRDT libraries handling text, lists, maps, and nested structures |
+| **OR-Set** | Tag sets, collaborator lists | Add/remove with unique operation IDs; merge = union minus tombstones |
+| **LWW-Register** | Document title, metadata fields | Last-writer-wins by timestamp |
+| **LWW-Map** | Key-value settings, config | Per-key LWW; concurrent updates to different keys don't conflict |
+
+### Local-First Architecture
+
+```
+User A (offline) ──edits──→ Local CRDT state
+User B (online)  ──edits──→ Local CRDT state
+                                  │
+                    ┌─────────────▼──────────────┐
+                    │  Sync Server               │
+                    │  Merges CRDT states          │
+                    │  Broadcasts to connected     │
+                    │  Persists merged state       │
+                    └─────────────┬──────────────┘
+                                  │
+User A reconnects ──sync──→ Receives merged state (no conflicts)
+```
+
+**When to use local-first vs server-authoritative:**
+
+| Approach | Best For | Trade-off |
+|----------|---------|-----------|
+| **Server-authoritative** | Structured data (forms, records, financial) | Simpler; requires connectivity; strong consistency |
+| **CRDT / local-first** | Unstructured editing (docs, notes, whiteboards) | Works offline; eventual consistency; larger state overhead |
+| **OT (Operational Transform)** | Google Docs legacy; centralized editing | Requires central server; simpler than CRDTs for text |
+
+---
+
+## Permission Model Patterns
+
+### Access Control for Content Systems
+
+| Model | How Decisions Are Made | Best For |
+|-------|----------------------|----------|
+| **ACL (Access Control List)** | Per-document list of (principal, permission) pairs | File systems, simple sharing (Google Drive-style) |
+| **RBAC** | Role → permissions mapping; users assigned roles | Enterprise CMS (admin, editor, viewer) |
+| **ABAC** | Attributes of user + resource + context | Complex policies (department + sensitivity + time-based) |
+| **Hierarchical inheritance** | Permissions inherited from parent folder/space | Nested content structures (Confluence-style) |
+
+### Permission Evaluation Flow
+
+```
+User requests access to document →
+  1. Check document-level ACL (explicit grant/deny)
+  2. If no explicit rule → check parent folder permissions (inheritance)
+  3. If no inherited rule → check workspace/org default
+  4. Apply deny-overrides-allow (explicit deny always wins)
+  5. Log decision for audit trail
+```
+
+### Sharing Levels
+
+| Level | Who Can Access | Example |
+|-------|---------------|---------|
+| **Private** | Owner only | Draft document |
+| **Specific people** | Named users/groups | Shared with team@company.com |
+| **Anyone with link** | Anyone who has the URL (no auth required) | Public wiki page |
+| **Organization** | All authenticated members of the org | Internal knowledge base article |
+| **Public** | Anyone on the internet | Published blog post |
+
+### Permission Change Audit
+
+Every permission change must be logged:
+```json
+{
+  "event": "permission_changed",
+  "document_id": "doc-123",
+  "actor": "user-456",
+  "change": { "principal": "user-789", "from": "viewer", "to": "editor" },
+  "timestamp": "2026-03-15T14:32:01Z"
+}
+```
+
+---
+
+## Sync Freshness and Collaboration SLOs
+
+| Metric | SLO Target | Alert Threshold |
+|--------|-----------|----------------|
+| **Collaborative edit latency** | < 200ms (keystroke to other user's screen) | > 500ms |
+| **Offline sync time** | < 5 seconds after reconnect | > 30 seconds |
+| **Permission propagation** | < 5 seconds (revoke must be fast) | > 30 seconds (security risk) |
+| **Search index freshness** | < 60 seconds from publish/edit | > 5 minutes |
+| **Version history availability** | 100% for last 90 days | Any gap |
+| **Document save confirmation** | < 1 second | > 3 seconds |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| CRDTs in messaging | Ch 22: Communication Systems |
+| Consistency models | Ch 11: Consistency & CAP |
+| Search indexing pipeline | Ch 25: Search & Discovery |
+| Access control patterns | Ch A8: Security & Authentication |
+| Audit logging and compliance | Ch 28: Security Systems |
+
 ---
 
 ## Navigation

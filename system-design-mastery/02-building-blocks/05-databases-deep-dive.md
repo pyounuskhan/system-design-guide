@@ -123,6 +123,181 @@ A social media platform highlights why one database rarely solves every problem 
 - Expect polyglot persistence in mature systems, but introduce it only when the workload truly justifies it.
 - Model data evolution and migration cost as part of the architecture, not as future cleanup work.
 
+## Isolation Levels — A Practical Primer
+
+Transaction isolation determines what one transaction can see of another transaction's uncommitted or recently committed changes. Choosing the wrong isolation level causes bugs that are extremely hard to reproduce and diagnose.
+
+### The Four Standard Levels (weakest to strongest)
+
+| Level | What You Can See | Anomalies Allowed | Performance | Use When |
+|-------|-----------------|-------------------|-------------|----------|
+| **Read Uncommitted** | Other transactions' uncommitted writes | Dirty reads, non-repeatable reads, phantoms | Fastest | Almost never — acceptable only for approximate analytics |
+| **Read Committed** | Only committed data (re-read may change) | Non-repeatable reads, phantoms | Fast | Default for most OLTP (PostgreSQL default) |
+| **Repeatable Read** | Snapshot of data at transaction start (re-reads are stable) | Phantoms (new rows can appear) | Moderate | Financial reporting, inventory checks, anywhere re-read consistency matters |
+| **Serializable** | As if transactions ran one at a time | None | Slowest (more aborts/retries) | Money transfers, double-booking prevention, any case where correctness trumps throughput |
+
+### Anomaly Quick Reference
+
+| Anomaly | What Happens | Example | Prevented By |
+|---------|-------------|---------|-------------|
+| **Dirty read** | Read uncommitted data that may be rolled back | See a balance of $0 during a transfer that hasn't committed | Read Committed+ |
+| **Non-repeatable read** | Same query returns different values within one transaction | Check inventory → 10 items; check again → 8 items (someone bought 2) | Repeatable Read+ |
+| **Phantom** | New rows appear that match a previous query's WHERE clause | Count orders → 50; count again → 51 (new order inserted) | Serializable |
+| **Write skew** | Two transactions read the same data, make decisions, and both write — creating an invalid state | Two doctors both check "at least 1 doctor on call" → both go off call → zero doctors on call | Serializable (or application-level locking) |
+
+### Practical Guidance
+
+- **Default to Read Committed** for most application code — it prevents the worst anomalies while keeping throughput high.
+- **Use Repeatable Read** for workflows that read data, compute, then write based on that data (e.g., inventory reservation, balance calculations).
+- **Use Serializable** only for critical correctness paths (e.g., financial transfers, seat booking) and be prepared to handle serialization failures with retries.
+- **Never use Read Uncommitted** in production application code.
+
+### Database Default Isolation Levels
+
+| Database | Default Level | Notes |
+|----------|-------------|-------|
+| PostgreSQL | Read Committed | Supports Serializable via SSI (Serializable Snapshot Isolation) |
+| MySQL (InnoDB) | Repeatable Read | Uses MVCC; phantom protection via gap locking |
+| SQL Server | Read Committed | Supports snapshot isolation as an alternative |
+| Oracle | Read Committed | Uses MVCC; no true Serializable (uses snapshot) |
+| CockroachDB | Serializable | Distributed DB with Serializable by default |
+| Spanner | External consistency | Strongest guarantee — uses TrueTime |
+
+**Cross-reference:** For how isolation interacts with distributed systems, see **F2: CAP Theorem & Consistency** and **F4: Consensus & Coordination**.
+
+---
+
+## Change Data Capture (CDC) and the Outbox Pattern
+
+When a database write must trigger downstream actions (update a cache, publish an event, sync to a search index), the naive approach — write to DB then call an API — is fragile. If the API call fails after the DB write, the systems are inconsistent.
+
+### The Problem: Dual-Write Inconsistency
+
+```
+Service writes to database → success
+Service publishes event to Kafka → FAILS
+Result: database updated, but downstream systems never learn about the change
+```
+
+### Solution 1: Transactional Outbox Pattern
+
+Write the event to an "outbox" table inside the same database transaction as the business data. A separate process reads the outbox and publishes events.
+
+```
+┌─────────────────────────────────────────┐
+│  Single Database Transaction             │
+│                                          │
+│  1. INSERT INTO orders (...) VALUES (...)|
+│  2. INSERT INTO outbox (event_type,      │
+│     payload, created_at) VALUES (...)    │
+│                                          │
+│  COMMIT                                  │
+└─────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────┐
+│  Outbox Relay (Debezium / custom poller) │
+│  • Reads outbox table                    │
+│  • Publishes to Kafka                    │
+│  • Marks rows as published               │
+└─────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────┐
+│  Downstream Consumers                    │
+│  • Search index update                   │
+│  • Cache invalidation                    │
+│  • Notification trigger                  │
+│  • Analytics pipeline                    │
+└─────────────────────────────────────────┘
+```
+
+**Why it works:** Both the business write and the event are in the same transaction. Either both succeed or both roll back. The relay process handles delivery with at-least-once semantics.
+
+### Solution 2: Log-Based CDC (Debezium)
+
+Instead of writing to an outbox table, capture changes directly from the database's write-ahead log (WAL/binlog). This is non-invasive — no application code changes needed.
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Outbox table** | Simple, works with any DB, explicit event schema | Adds a table + polling/relay process |
+| **Log-based CDC (Debezium)** | No application changes, captures all changes including direct DB edits | Requires WAL access, tighter coupling to DB internals, event schema mirrors DB schema |
+
+### When to Use CDC/Outbox
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Keep search index in sync with primary DB | CDC (Debezium → Kafka → Elasticsearch) |
+| Publish domain events after writes | Outbox pattern (explicit event schema) |
+| Replicate data to analytics warehouse | CDC (Debezium → Kafka → data lake) |
+| Invalidate cache on DB change | CDC or outbox (trigger cache delete/update) |
+| Cross-service data sync in microservices | Outbox pattern (avoids distributed transactions) |
+
+---
+
+## Multi-Tenant Data Isolation and Data Residency
+
+SaaS systems serving multiple customers (tenants) must decide how to isolate tenant data. The choice affects security, compliance, performance, and operational complexity.
+
+### Tenant Isolation Models
+
+| Model | How It Works | Isolation Level | Cost | Best For |
+|-------|-------------|----------------|------|----------|
+| **Shared database, shared schema** | All tenants in same tables, distinguished by `tenant_id` column | Low (application-enforced) | Lowest | Early-stage SaaS, low compliance needs |
+| **Shared database, separate schemas** | Each tenant has own schema (tables) within same DB instance | Medium | Moderate | Mid-tier SaaS, moderate compliance |
+| **Separate databases** | Each tenant has own database instance | High | Highest | Enterprise SaaS, regulated industries (healthcare, finance) |
+| **Hybrid** | Most tenants share; high-value/regulated tenants get dedicated | Variable | Moderate-High | SaaS with mixed customer tiers |
+
+### Tenant Isolation Checklist
+
+- [ ] Every query includes `tenant_id` filter (shared schema) — enforce via ORM middleware, not developer discipline
+- [ ] Row-Level Security (RLS) enabled in PostgreSQL for defense-in-depth
+- [ ] Cross-tenant data access tested in CI (negative tests: ensure tenant A cannot see tenant B's data)
+- [ ] Tenant-specific encryption keys for sensitive data (per-tenant KMS key)
+- [ ] Backup and restore scoped to individual tenants (not full database restores)
+- [ ] Performance isolation: noisy-neighbor protection via resource limits or separate connection pools
+
+### Data Residency Requirements
+
+| Requirement | Implementation |
+|------------|---------------|
+| EU data stays in EU | Deploy EU tenant data in eu-west-1; routing layer directs EU tenants to EU database |
+| Tenant chooses region | Region field in tenant config; application routes reads/writes to tenant's chosen region |
+| No cross-border replication | Disable cross-region replicas for tenants with residency constraints |
+| Audit trail for data location | Log all data access with region tag; exportable for compliance audits |
+
+---
+
+## Further Reading and Cross-References
+
+### Cross-Links to Deep Chapters
+
+| Topic | Chapter | What You'll Learn |
+|-------|---------|-------------------|
+| CAP theorem and consistency models | F2: CAP Theorem & Consistency | How partition tolerance forces trade-offs between consistency and availability |
+| Consensus protocols (Raft, Paxos) | F4: Consensus & Coordination | How distributed databases achieve agreement across replicas |
+| Sharding strategies and hot partitions | F7: Data Partitioning | Hash vs range partitioning, rebalancing, partition-aware routing |
+| Caching in front of databases | Chapter 6: Caching Systems | Cache-aside, write-through, invalidation strategies |
+| Database observability | F10: Observability & Operations | Connection pool monitoring, query latency tracking, replication lag alerts |
+| Database migrations in deployment | F11: Deployment & DevOps | Expand-contract pattern for zero-downtime schema changes |
+
+### Cloud Database Guidance
+
+| Provider | Recommended Reading |
+|----------|-------------------|
+| AWS | Aurora best practices, DynamoDB design patterns, RDS performance insights documentation |
+| GCP | Cloud Spanner schema design, Cloud SQL for PostgreSQL, Firestore data modeling |
+| Azure | Cosmos DB consistency levels, Azure SQL elastic pools, Azure Database for PostgreSQL |
+
+### Key Concepts from "Designing Data-Intensive Applications" (DDIA)
+
+| DDIA Concept | Relevance | Chapter Connection |
+|-------------|-----------|-------------------|
+| Log-structured merge trees (LSM) vs B-trees | Explains why different databases optimize for reads vs writes | Storage engine internals |
+| Linearizability vs serializability | Two different consistency guarantees often confused | F2: CAP Theorem |
+| Stream processing and CDC | How databases feed real-time pipelines | CDC/Outbox section above |
+| Partitioning by hash vs range | Trade-offs in data distribution strategy | F7: Data Partitioning |
+
 ## Common Mistakes
 - Choosing SQL or NoSQL as an identity statement instead of a workload decision.
 - Over-indexing write-heavy tables and then wondering why throughput suffers.

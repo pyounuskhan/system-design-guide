@@ -1049,7 +1049,7 @@
 <hr>
 <h2 id="why-this-system-matters-in-real-systems">Why This System Matters in Real Systems</h2>
 <ul>
-<li><strong>Caching</strong> reduces database load by 90%+ and cuts p99 latency from 200ms to 2ms. Without it, most systems would collapse under read traffic.</li>
+<li><strong>Caching</strong> can, on hot read paths, dramatically reduce database load and cut tail latency by orders of magnitude <em>(actual improvement is workload-dependent)</em>. Without it, most systems would collapse under read traffic.</li>
 <li><strong>Message queues</strong> decouple services, absorb traffic spikes, and enable event-driven architectures. Kafka processes <strong>trillions of messages per day</strong> at LinkedIn.</li>
 <li><strong>Rate limiting</strong> prevents abuse, protects backend resources, and ensures fair usage. Stripe rate-limits API calls to prevent cascade failures.</li>
 <li><strong>Feature flags</strong> enable safe deployments. Netflix deploys hundreds of times per day using feature flags to control rollout.</li>
@@ -5657,6 +5657,148 @@ Steps:
 <tr>
 <td>USE</td>
 <td>Utilization, Saturation, Errors — monitoring method for resources</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="iac-cross-cutting">Infrastructure-as-Code as a Cross-Cutting System</h2>
+<p>IaC is a peer cross-cutting system alongside caching, queues, and observability. It determines whether infrastructure is reproducible, auditable, and safe to change.</p>
+<h3 id="iac-reference-implementation">IaC Reference Implementation</h3>
+<pre><code>REPOSITORY STRUCTURE:
+  infrastructure/
+  ├── modules/                    # Reusable Terraform modules
+  │   ├── vpc/                    # Network baseline
+  │   ├── rds/                    # Database module (PostgreSQL)
+  │   ├── redis/                  # Cache cluster
+  │   ├── kafka/                  # Event streaming
+  │   └── k8s-service/            # Standard service deployment
+  ├── environments/
+  │   ├── dev/                    # Dev variables + backend config
+  │   ├── staging/                # Staging
+  │   └── production/             # Production
+  ├── policies/                   # OPA/Sentinel policy checks
+  └── .github/workflows/
+      └── terraform.yml           # CI: plan on PR, apply on merge
+
+WORKFLOW:
+  Engineer creates PR → CI runs `terraform plan` + policy check
+  → Reviewer approves → Merge → CI runs `terraform apply`
+  → State stored in S3 + DynamoDB lock
+  → Drift detection: weekly plan-only run; alert if actual ≠ desired
+</code></pre>
+<h3 id="iac-maturity">IaC Maturity</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Level</th>
+<th>What You Have</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L0: Manual</td>
+<td>Console clicks; no record of changes</td>
+<td>Unreproducible; no audit trail</td>
+</tr>
+<tr>
+<td>L1: Scripts</td>
+<td>Bash/CLI scripts committed to Git</td>
+<td>Partially reproducible; fragile</td>
+</tr>
+<tr>
+<td>L2: Declarative IaC</td>
+<td>Terraform/Pulumi; PR-based changes; remote state</td>
+<td>Reproducible; auditable</td>
+</tr>
+<tr>
+<td>L3: Policy-enforced</td>
+<td>OPA/Sentinel validates every plan; no unapproved changes</td>
+<td>Guardrails prevent misconfigurations</td>
+</tr>
+<tr>
+<td>L4: Self-service</td>
+<td>Platform team provides modules; app teams self-serve</td>
+<td>Fast + safe; golden path for infra</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="incident-management-infrastructure">Incident Management as Cross-Cutting Infrastructure</h2>
+<p>Incident response is infrastructure, not ad-hoc heroism.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>What It Provides</th>
+<th>Tool</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Alert routing</strong></td>
+<td>Right person paged for right service</td>
+<td>PagerDuty / OpsGenie</td>
+</tr>
+<tr>
+<td><strong>War room</strong></td>
+<td>Coordinated response with IC, debuggers, communicators</td>
+<td>Slack incident channel (auto-created)</td>
+</tr>
+<tr>
+<td><strong>Runbooks</strong></td>
+<td>Step-by-step response per alert</td>
+<td>Linked from alert → Confluence/wiki</td>
+</tr>
+<tr>
+<td><strong>Status page</strong></td>
+<td>Customer-facing communication</td>
+<td>Statuspage.io / Instatus</td>
+</tr>
+<tr>
+<td><strong>Postmortem</strong></td>
+<td>Learning from every P0/P1 incident</td>
+<td>Template in F10 §2.3.6</td>
+</tr>
+<tr>
+<td><strong>Action item tracking</strong></td>
+<td>Prevent repeat incidents</td>
+<td>JIRA tickets with postmortem tag</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="cross-references-cc">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Chapter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IaC and GitOps deep dive</td>
+<td>F11: Deployment &amp; DevOps</td>
+</tr>
+<tr>
+<td>Policy-as-code (Kyverno, OPA)</td>
+<td>Ch A7: Kubernetes &amp; DevOps</td>
+</tr>
+<tr>
+<td>Observability pipeline</td>
+<td>F10: Observability &amp; Operations</td>
+</tr>
+<tr>
+<td>Incident lifecycle and postmortems</td>
+<td>F10 §2.3, §2.5</td>
+</tr>
+<tr>
+<td>Caching patterns (invalidation, stampede)</td>
+<td>Ch 6: Caching Systems</td>
+</tr>
+<tr>
+<td>Rate limiting algorithms</td>
+<td>Ch 15: API Gateway</td>
 </tr>
 </tbody>
 </table></div>

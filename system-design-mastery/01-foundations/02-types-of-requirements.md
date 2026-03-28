@@ -58,6 +58,91 @@ Architecture gets stronger when fuzzy goals are translated into targets. Instead
 ### Edge cases reveal missing requirements
 Some of the most important requirements appear only when you ask uncomfortable questions. Should messages be delivered while the user is offline? What happens when a payment provider times out? Can admins override user data? How long must audit logs be kept? What happens during a regional outage? These are not nice-to-have questions; they define the architecture.
 
+### SLOs and SLAs are requirements, not metrics
+Service Level Objectives (SLOs) and Service Level Agreements (SLAs) are often discussed in the observability chapter, but they belong here too — because they are *requirements* that constrain the design. An SLO is a measurable reliability target. An SLA is a contractual promise with financial consequences. Both must be defined during requirements gathering, not after the system is built.
+
+**SLO examples by system type:**
+
+| System | SLI (What You Measure) | SLO (Target) | Why It Shapes Architecture |
+|--------|----------------------|-------------|---------------------------|
+| E-commerce checkout | % of requests returning 2xx within 500ms | 99.95% availability | Requires multi-AZ deployment, circuit breakers on payment provider, async order confirmation |
+| Chat messaging | % of messages delivered within 2 seconds | 99.9% delivery within SLA | Requires persistent queues, retry logic, delivery acknowledgment protocol |
+| Search API | p99 latency of search queries | < 200ms at p99 | Requires in-memory index, CDN for static results, pre-computed ranking |
+| Batch data pipeline | % of jobs completing before deadline | 99.5% on-time completion | Requires capacity headroom, job-level monitoring, automatic retry |
+| File storage | Proportion of objects retrievable after write | 99.999999999% durability (11 nines) | Requires cross-region replication, erasure coding, checksum verification |
+
+**How to derive SLOs during requirements gathering:**
+
+1. Ask: "What happens if this feature is down for 5 minutes? 30 minutes? 4 hours?" — the answer reveals the acceptable downtime.
+2. Ask: "Which user action must never lose data?" — the answer reveals durability requirements.
+3. Ask: "What response time makes users abandon the workflow?" — the answer reveals latency SLOs.
+4. Convert answers to numbers: "99.9% availability = 43 minutes downtime per month."
+
+### Requirements often conflict — resolution patterns
+
+When requirements conflict (and they will), architects must identify which requirement yields and document why. Here are common conflicts with resolution patterns:
+
+| Conflict | Example | Resolution Pattern |
+|----------|---------|-------------------|
+| **Consistency vs. Latency** | Banking: account balance must be correct, but users expect instant transfers | Use strong consistency for balance reads; use async processing for transfer execution with optimistic UI ("transfer pending") |
+| **Cost vs. Availability** | Startup cannot afford multi-region deployment but needs high uptime | Single region with multi-AZ; accept regional outage risk; document as explicit trade-off for investors |
+| **Security vs. Usability** | Healthcare portal requires MFA but doctors need instant access during emergencies | Tiered auth: MFA for sensitive data, session-based for read-only views, break-glass override with audit logging |
+| **Freshness vs. Performance** | Dashboard needs real-time data but queries are slow on live tables | Pre-aggregate into materialized views with 1-minute refresh; label UI as "data as of 1 min ago" |
+| **Privacy vs. Analytics** | Marketing wants user behavior data but GDPR limits data collection | Anonymize/aggregate at collection time; separate PII store from analytics store; consent-gated collection |
+| **Simplicity vs. Scalability** | Team of 3 engineers cannot maintain a microservices architecture | Start as a modular monolith; extract services only when a specific module needs independent scaling |
+
+**Resolution principle:** When two requirements conflict, ask "which one has a higher cost of failure?" The requirement whose violation causes greater business damage (revenue loss, legal penalty, user churn) wins.
+
+### Regulatory, compliance, and privacy requirements
+
+In regulated industries (finance, healthcare, government, education), compliance requirements are not optional extras — they are hard constraints that override performance and convenience preferences. Treat them as first-class requirements.
+
+**Regulatory requirements template:**
+
+| Category | Questions to Ask | Example Requirements |
+|----------|-----------------|---------------------|
+| **Data Residency** | Where must data be stored? Can it cross borders? | "EU user data must remain in EU regions" (GDPR) |
+| **Data Retention** | How long must data be kept? When must it be deleted? | "Financial records retained 7 years" (SOX); "User data deleted within 30 days of account closure" (GDPR) |
+| **Audit Logging** | What actions must be logged? Who can access logs? | "All admin actions logged with immutable audit trail" (SOC 2) |
+| **Access Control** | Who can see what data? How is access authenticated? | "PHI accessible only to treating providers" (HIPAA); "Separation of duties for financial approvals" |
+| **Encryption** | Must data be encrypted at rest? In transit? With what standard? | "AES-256 at rest, TLS 1.3 in transit" (PCI-DSS for cardholder data) |
+| **Consent** | Is user consent required before data collection? Can users opt out? | "Explicit consent before tracking; honor Do Not Track" (CCPA/GDPR) |
+| **Breach Notification** | What happens if data is compromised? | "Notify affected users within 72 hours" (GDPR) |
+
+**Privacy-by-design checklist** — verify during requirements gathering:
+
+- [ ] PII fields identified in the data model (name, email, phone, IP, device ID)
+- [ ] Data minimization applied (collect only what is needed)
+- [ ] Retention policy defined for each data category
+- [ ] Deletion/anonymization mechanism specified for account closure
+- [ ] Consent flow designed for data collection
+- [ ] Cross-border data transfer reviewed (standard contractual clauses if needed)
+- [ ] Encryption requirements specified for PII at rest and in transit
+
+### Anti-requirements: what the system explicitly will NOT do
+
+Anti-requirements (explicit exclusions) are as important as requirements themselves. They prevent scope creep, set clear expectations, and save engineering effort. Every design should include a "Not in Scope" section.
+
+**Why anti-requirements matter:**
+
+| Without Anti-Requirements | With Anti-Requirements |
+|--------------------------|----------------------|
+| Stakeholders assume every feature is planned | Clear boundaries on what v1 delivers |
+| Engineers build for imagined future requirements | Engineers optimize for confirmed requirements |
+| Design reviews debate features that were never committed | Reviews focus on committed scope |
+| Cost and timeline estimates are unreliable | Estimates are scoped to actual deliverables |
+
+**How to write anti-requirements:**
+
+Use this format: "The system will **not** [capability] in this version because [reason]. This is planned for [never / v2 / if demand warrants]."
+
+**Examples:**
+
+- "The system will **not** support real-time collaborative editing in v1 because the user base is single-editor per document. Planned for v2 if usage patterns confirm demand."
+- "The system will **not** handle multi-currency transactions because the product launches in a single market. Will revisit for international expansion."
+- "The system will **not** provide sub-second search because the corpus is < 100K documents and a simple database query with index meets latency targets."
+- "The system will **not** guarantee exactly-once delivery because the messaging protocol supports at-least-once with idempotent consumers, which is sufficient."
+
 ## Diagram / Flow Representation
 ### Requirement Funnel
 ```mermaid
@@ -125,6 +210,66 @@ WhatsApp is a good requirement-analysis exercise because the visible feature set
 - Separate must-have requirements from preferences so the design space remains realistic.
 - Document assumptions explicitly because hidden assumptions become future incidents or interview weak points.
 - Use requirements to justify design choices, not to justify a preferred technology.
+
+## Requirements Worksheet — Reusable Template
+
+Use this worksheet at the start of every system design — whether in a design document, an architecture review, or an interview. It ensures no category of requirement is overlooked.
+
+```markdown
+# Requirements Worksheet: [System Name]
+
+## 1. Functional Requirements (What the system does)
+| # | Requirement | Priority | Notes |
+|---|------------|----------|-------|
+| FR-1 | | P0 / P1 / P2 | |
+| FR-2 | | P0 / P1 / P2 | |
+| FR-3 | | P0 / P1 / P2 | |
+
+## 2. Non-Functional Requirements (How well it does it)
+| Category | Target | Measurement |
+|----------|--------|-------------|
+| Availability | 99.X% | Uptime over 30-day rolling window |
+| Latency (read) | p99 < Xms | End-to-end API response time |
+| Latency (write) | p99 < Xms | Time to durable acknowledgment |
+| Throughput | X req/sec (peak) | Sustained peak QPS |
+| Durability | 99.X% | Probability of no data loss after write ack |
+| Consistency | Strong / Eventual | Per data entity — specify which needs what |
+| Freshness | Data visible within X seconds | Time from write to read visibility |
+
+## 3. Constraints
+| Type | Constraint | Impact on Design |
+|------|-----------|-----------------|
+| Budget | $X/month infrastructure | Limits vendor choices, multi-region scope |
+| Team | X engineers | Limits operational complexity |
+| Timeline | Launch by YYYY-MM-DD | Limits v1 scope |
+| Regulatory | GDPR / HIPAA / PCI / SOX | Mandates encryption, retention, audit |
+| Existing systems | Must integrate with [system] | Constrains protocol, data format choices |
+
+## 4. Risks and Assumptions
+| # | Assumption / Risk | What Happens If Wrong |
+|---|-------------------|----------------------|
+| A-1 | Traffic will not exceed Xk QPS in year 1 | Need to re-evaluate DB sharding earlier |
+| A-2 | Users are in a single geographic region | Multi-region adds latency + cost |
+| R-1 | Third-party API may have outages | Need circuit breaker + fallback |
+
+## 5. Anti-Requirements (Explicit Exclusions)
+| # | What the System Will NOT Do | Reason | Revisit When |
+|---|---------------------------|--------|-------------|
+| X-1 | | | Never / v2 / If demand |
+| X-2 | | | Never / v2 / If demand |
+
+## 6. SLO Definitions
+| SLI | SLO Target | Error Budget (30 days) | Alerting Threshold |
+|-----|-----------|----------------------|-------------------|
+| Availability | 99.X% | X minutes downtime | Burn rate > 6x |
+| Latency (p99) | < Xms | X% of requests over target | Burn rate > 3x |
+```
+
+**How to use this worksheet:**
+1. Fill sections 1-2 during the first 5-8 minutes of a design interview or the first meeting of a design review.
+2. Fill sections 3-4 to constrain the solution space before drawing any architecture.
+3. Fill section 5 to prevent scope creep and set clear expectations.
+4. Fill section 6 to make reliability a concrete, measurable goal.
 
 ## Common Mistakes
 - Treating all requirements as equally important instead of ranking them.

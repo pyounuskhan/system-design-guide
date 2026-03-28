@@ -1,9 +1,10 @@
-# 40. Security & Authentication
+# A8. Security & Authentication
 
 ## Part Context
-**Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 40 of 60
-**Why this part exists:** This section adds the production-grade concerns that separate a technically functioning system from a trustworthy one.  
+**Part:** Part 6 - Advanced Architecture
+**Position:** Chapter A8 (Advanced Architecture — Security & Authentication Primer)
+**Complements:** F9: Security Fundamentals (deep chapter) covers threat modeling, encryption, compliance, and audit in production depth. This chapter provides the conceptual primer for identity and access architecture.
+**Why this part exists:** This section adds the production-grade concerns that separate a technically functioning system from a trustworthy one.
 **This chapter builds toward:** identity flows, authorization design, token strategy, and secure-by-default architectural thinking
 
 ## Overview
@@ -132,6 +133,197 @@ Assume a product supports web, mobile, and partner APIs. Users log in through an
 - Keep authorization explicit, reviewable, and centrally understandable.
 - Prefer short-lived credentials and least privilege to reduce blast radius.
 - Treat service-to-service trust with the same seriousness as user login.
+
+## Canonical Identity Architecture
+
+This reference architecture shows how identity, authentication, and authorization flow through a production system with multiple client types and internal services.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  CLIENTS                                                 │
+│  [Web App]  [Mobile App]  [Partner API]  [Internal SPA]  │
+└──────────────────────┬──────────────────────────────────┘
+                       │ HTTPS + Authorization header
+┌──────────────────────▼──────────────────────────────────┐
+│  API GATEWAY / Edge                                      │
+│  • TLS termination                                       │
+│  • Rate limiting (per API key / per tenant)               │
+│  • JWT validation (signature + expiry + issuer)           │
+│  • Forward identity context to backends                   │
+└──────────────────────┬──────────────────────────────────┘
+                       │ Internal: identity context (user_id, tenant_id, scopes)
+┌──────────────────────▼──────────────────────────────────┐
+│  IDENTITY PROVIDER (IdP)                                 │
+│  • Login (password, SSO, social, MFA)                    │
+│  • Token issuance (access + refresh + ID tokens)         │
+│  • OAuth 2.1 / OIDC compliant                            │
+│  • Session management + revocation                        │
+│  Examples: Auth0, Okta, Keycloak, AWS Cognito             │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│  AUTHORIZATION LAYER                                     │
+│  • Policy engine: OPA / Cedar / Casbin / custom           │
+│  • Input: (principal, action, resource, context)          │
+│  • Rules: RBAC, ABAC, resource ownership, tenant scope    │
+│  • Output: allow / deny + reason                          │
+│  • Audit: every decision logged                           │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│  APPLICATION SERVICES                                    │
+│  • Enforce authZ decision (never re-implement locally)    │
+│  • Pass identity context via headers / gRPC metadata      │
+│  • Service-to-service auth: workload identity / mTLS      │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│  DATA LAYER                                              │
+│  • Row-level security (tenant isolation)                 │
+│  • Encryption at rest (KMS)                              │
+│  • Field-level encryption for PII                        │
+│  • Audit logging for sensitive data access                │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## OAuth 2.1 and OIDC — Modern Standards
+
+OAuth 2.1 consolidates best practices from OAuth 2.0 and its security extensions into a single specification. OIDC layers identity on top.
+
+### OAuth 2.1 Key Changes from 2.0
+
+| Change | What It Means | Why It Matters |
+|--------|-------------|----------------|
+| **PKCE required for all clients** | Proof Key for Code Exchange prevents authorization code interception | Mobile and SPA apps are no longer second-class |
+| **Implicit flow removed** | No more tokens in URL fragments | Eliminates a major token leakage vector |
+| **Resource owner password grant removed** | Apps must never handle user passwords | Forces proper delegated auth |
+| **Refresh token rotation required** | Every refresh produces a new refresh token; old one is invalidated | Limits damage from stolen refresh tokens |
+| **Exact redirect URI matching** | No wildcard or partial matching | Prevents open redirect attacks |
+
+### Token Strategy Quick Reference
+
+| Token | Lifetime | Where Stored | Revocation | Use Case |
+|-------|----------|-------------|-----------|----------|
+| **Access token (JWT)** | 5-15 minutes | Memory (SPA), secure storage (mobile) | Short-lived = self-revoking | API authorization |
+| **Refresh token** | Hours to days | Secure HTTP-only cookie or secure storage | Server-side revocation list | Obtain new access tokens |
+| **ID token (JWT)** | 5-15 minutes | Memory | N/A (used once for identity verification) | Prove user identity to client |
+| **Session cookie** | Hours | HTTP-only, Secure, SameSite cookie | Server-side session store (invalidate on logout) | Traditional web app auth |
+
+---
+
+## Service-to-Service Authentication Patterns
+
+Internal services must authenticate to each other. "The network is trusted" is not a security architecture.
+
+| Pattern | How It Works | Best For | Limitation |
+|---------|-------------|----------|-----------|
+| **mTLS (mutual TLS)** | Both sides present certificates; mesh automates rotation | Service mesh environments (Istio, Linkerd) | Requires cert infrastructure; no application-layer identity |
+| **Workload identity** | Cloud-native identity tied to compute (e.g., AWS IAM Role, GCP Service Account) | Cloud services calling cloud APIs | Vendor-specific; doesn't work across clouds |
+| **Service tokens (JWT)** | Service obtains short-lived JWT from IdP; passes to downstream | Cross-service calls needing application-level claims | Requires token management per service |
+| **API keys** | Static secret per service | Simple internal APIs | No rotation without downtime unless externalized |
+
+### Secret Rotation Architecture
+
+Static secrets are the #1 source of service-to-service credential compromise. Rotation must be automated.
+
+```
+Secret Lifecycle:
+  1. Secret created in Vault / AWS Secrets Manager
+  2. Application reads secret via sidecar or SDK (never from env var directly)
+  3. Rotation scheduled (e.g., every 30 days)
+  4. New secret generated → pushed to secret store
+  5. Application picks up new secret on next read (no restart needed)
+  6. Old secret remains valid for grace period (dual-secret window)
+  7. Old secret invalidated after grace period
+
+Tools: HashiCorp Vault, AWS Secrets Manager, External Secrets Operator (K8s)
+```
+
+---
+
+## Authorization Boundaries — Worked Examples
+
+Authorization is where most security designs become inconsistent. These examples show how to model boundaries for common scenarios.
+
+### Example 1: Multi-Tenant SaaS
+
+```
+Policy: Users can only access resources within their own tenant.
+
+Input:  (user: alice@acme.com, action: read, resource: /api/invoices/inv-123)
+Check:  invoice.tenant_id == user.tenant_id
+Result: ALLOW if tenant matches; DENY otherwise
+
+Enforcement:
+  • API Gateway: validate JWT, extract tenant_id from claims
+  • Application: add WHERE tenant_id = :user_tenant_id to every query
+  • Database: PostgreSQL Row-Level Security as defense-in-depth
+```
+
+### Example 2: Role-Based Access (RBAC)
+
+```
+Roles: admin, editor, viewer
+Resources: documents
+
+Policy:
+  admin  → create, read, update, delete
+  editor → create, read, update
+  viewer → read
+
+Input:  (user: bob, role: editor, action: delete, resource: doc-456)
+Result: DENY (editor cannot delete)
+```
+
+### Example 3: Attribute-Based Access (ABAC)
+
+```
+Policy: Users can approve expenses only if:
+  - They are a manager AND
+  - The expense is from their department AND
+  - The amount is ≤ their approval limit
+
+Input:  (user: carol, role: manager, dept: engineering, action: approve,
+         resource: expense-789 {dept: engineering, amount: $4,500})
+Check:  carol.role == manager
+        AND expense.dept == carol.dept
+        AND expense.amount <= carol.approval_limit ($5,000)
+Result: ALLOW
+```
+
+### Authorization Model Comparison
+
+| Model | How Decisions Are Made | Best For | Limitation |
+|-------|----------------------|----------|-----------|
+| **RBAC** | Role → permissions mapping | Simple apps, internal tools | Doesn't handle resource-level or contextual rules |
+| **ABAC** | Attributes of user + resource + context | Complex policies, regulatory compliance | Policy complexity can grow quickly |
+| **ReBAC** | Relationship between user and resource (ownership, group membership) | Social apps, document sharing, Google Zanzibar-style | Requires relationship graph infrastructure |
+
+---
+
+## Well-Architected Security References
+
+| Resource | What You'll Learn |
+|----------|------------------|
+| **OWASP Top 10** | Most critical web application security risks; update annually |
+| **OAuth 2.1 Specification** (datatracker.ietf.org) | Consolidated modern auth standard |
+| **NIST 800-63** (Digital Identity Guidelines) | Identity proofing, authentication assurance levels |
+| **AWS Well-Architected Security Pillar** | Cloud-specific security design principles |
+| **Google BeyondCorp** | Zero-trust architecture reference (no VPN, per-request auth) |
+| **F9: Security Fundamentals** (this site) | Deep chapter covering threat modeling, encryption, compliance |
+
+### Cross-Links
+
+| Topic | Chapter |
+|-------|---------|
+| API gateway auth and rate limiting | Ch 15: API Gateway Pattern |
+| Edge security (WAF, DDoS) | Ch 4: Networking Fundamentals |
+| Per-tenant data isolation | Ch 5: Databases Deep Dive |
+| Supply-chain security (image signing, SBOM) | F11: Deployment & DevOps §1.5 |
+| Service mesh mTLS | F11 §3.5 (Service Mesh) |
+| Regulatory/compliance requirements | Ch 2: Types of Requirements |
 
 ## Common Mistakes
 - Using JWTs everywhere without understanding revocation and claim staleness trade-offs.

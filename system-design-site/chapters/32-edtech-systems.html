@@ -5662,6 +5662,82 @@ Implementation:
 <li>Practice redrawing one of these systems for startup scale, then for enterprise or multi-region scale.</li>
 <li>Use the sub-subchapter sections as interview prompts: pick one system, frame the requirements, and sketch the trade-offs from memory.</li>
 </ul>
+<h2 id="peak-capacity">Peak-Capacity Scenario: Synchronized Exam Start</h2>
+<pre><code>Normal: 10K concurrent, 500 req/sec
+Exam start: 50K students in 30s = 1,667 req/sec (3.3x)
+  Each: auth + load exam + create attempt + start timer + WebSocket
+
+Strategy: Pre-scale 30 min before; CDN pre-warm exam assets 1h before
+Backpressure: Queue exam-starts in Kafka; process at 1K/sec DB write rate
+  Client shows "Preparing..." → all 50K started within 60s
+  WITHOUT backpressure: DB pool exhausted at T+5s → cascade failure</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Normal</th><th>Peak</th><th>Strategy</th></tr></thead>
+<tbody>
+<tr><td>API servers</td><td>4</td><td>12 (pre-scaled)</td><td>Scheduled HPA</td></tr>
+<tr><td>DB writes</td><td>50/sec</td><td>1,700/sec</td><td>Queue buffer; batch insert</td></tr>
+<tr><td>WebSocket</td><td>2</td><td>10 (pre-scaled)</td><td>Sticky connections</td></tr>
+<tr><td>Auth</td><td>Normal</td><td>3x</td><td>Cache session tokens</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="assessment-integrity">Assessment Integrity Model</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Detection</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Answer sharing</strong></td><td>IP proximity; answer similarity</td><td>Randomized order + question pools</td></tr>
+<tr><td><strong>Tab switching</strong></td><td>Visibility API monitoring</td><td>Log events; flag &gt; 3 switches</td></tr>
+<tr><td><strong>Impersonation</strong></td><td>Photo verification; periodic face checks</td><td>Identity verification; behavioral biometrics</td></tr>
+<tr><td><strong>Time manipulation</strong></td><td>Server-side authoritative timer</td><td>Client timer is display-only</td></tr>
+<tr><td><strong>Disconnect abuse</strong></td><td>Server tracks elapsed regardless</td><td>Reconnect resumes from server time</td></tr>
+</tbody>
+</table></div>
+<h3 id="data-integrity">Assessment Data Integrity</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Requirement</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Answer durability</td><td>Auto-save every 30s + on each change</td></tr>
+<tr><td>Submission atomicity</td><td>Single atomic write; partial preserved as draft</td></tr>
+<tr><td>Audit trail</td><td>Every change logged: student, question, old→new, timestamp</td></tr>
+<tr><td>Grading integrity</td><td>Locked after publish; changes need audit + approver</td></tr>
+<tr><td>Time fairness</td><td>Server-side timer; accommodations applied server-side</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="live-session-observability">Live Session Observability</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>SLO</th><th>Alert</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td>Live video latency</td><td>&lt; 3s glass-to-glass</td><td>&gt; 5s</td><td>Students can't follow</td></tr>
+<tr><td>Chat delivery</td><td>&lt; 2s</td><td>&gt; 5s</td><td>Q&amp;A feels broken</td></tr>
+<tr><td>Exam page load</td><td>&lt; 2s (p99)</td><td>&gt; 5s</td><td>Exam start fails</td></tr>
+<tr><td>Answer save</td><td>&lt; 1s</td><td>&gt; 3s</td><td>Student loses confidence</td></tr>
+<tr><td>WebSocket stability</td><td>&lt; 1% disconnect/session</td><td>&gt; 3%</td><td>Proctoring gaps</td></tr>
+<tr><td>Exam submission</td><td>99.99%</td><td>Any failure</td><td>Student loses exam</td></tr>
+</tbody>
+</table></div>
+<h3 id="proctoring-privacy">Proctoring Privacy</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Data minimization</td><td>Capture only during exam, not before/after</td></tr>
+<tr><td>Consent</td><td>Explicit before session; opt-out = in-person alternative</td></tr>
+<tr><td>Retention</td><td>Delete after grade finalization + appeal (90 days)</td></tr>
+<tr><td>AI bias</td><td>Audit flagging rates across demographics; human review</td></tr>
+<tr><td>Compliance</td><td>FERPA (US), GDPR (EU) for student data</td></tr>
+</tbody>
+</table></div>
+<h3 id="edtech-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Video streaming</td><td><a href="21-video-streaming-platforms.html">Ch 21</a></td></tr>
+<tr><td>WebSocket management</td><td><a href="04-networking-fundamentals.html">Ch 4</a>, <a href="22-communication-systems.html">Ch 22</a></td></tr>
+<tr><td>Backpressure / load shedding</td><td><a href="12-fault-tolerance-resilience.html">Ch 12</a></td></tr>
+<tr><td>Privacy and consent</td><td><a href="02-types-of-requirements.html">Ch 2</a>, <a href="28-security-systems.html">Ch 28</a></td></tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="navigation">Navigation</h2>
 <ul>
 <li>Previous: <a href="31-healthcare-systems.html">Healthcare Systems</a></li>

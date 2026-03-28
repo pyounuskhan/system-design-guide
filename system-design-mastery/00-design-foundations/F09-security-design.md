@@ -97,6 +97,8 @@ This section covers the six major authentication mechanisms used in modern distr
 
 ## 1.1 OAuth 2.0
 
+> **Version note (OAuth 2.1):** OAuth 2.1 (draft consolidation of OAuth 2.0 + best-practice RFCs) makes PKCE mandatory for all clients, removes the implicit grant entirely, removes the resource-owner password credentials grant, and requires refresh token rotation or sender-constraining. See Section 4.16 for a dedicated OAuth 2.1 / OIDC Modern Standards deep-dive.
+
 ### 1.1.1 What OAuth 2.0 Is (and Is Not)
 
 OAuth 2.0 is an **authorization delegation framework** — it allows a user to grant a third-party application limited access to their resources without sharing their credentials. Despite its name, OAuth 2.0 is widely used as the foundation for authentication when combined with OpenID Connect (OIDC).
@@ -176,6 +178,8 @@ sequenceDiagram
 6. An attacker who intercepts the authorization code cannot use it because they do not have the `code_verifier`.
 
 **PKCE is now recommended for ALL clients**, including confidential (server-side) clients, as per OAuth 2.1. It adds defense-in-depth even when a client secret is available.
+
+> **OAuth 2.1 update:** In OAuth 2.1, PKCE is **mandatory** for every authorization code grant — not just public clients. The implicit grant is removed entirely. See Section 4.16 for the full OAuth 2.1 changes.
 
 ### 1.1.4 Client Credentials Grant
 
@@ -4331,6 +4335,556 @@ token=dXNlcm5hbWU6cGFzc3dvcmQ&token_type_hint=refresh_token
 | **Performance** | Fast (cryptographic verification only) | Slower (network call per request) |
 | **Token size** | Larger (contains claims) | Small (random string) |
 | **Best for** | High-throughput microservices | Admin panels, sensitive operations |
+
+---
+
+## 4.14 Threat Model Template (STRIDE-Based)
+
+Threat modeling is the structured process of identifying what can go wrong, how likely it is, and what to do about it. The STRIDE framework provides a systematic approach that every team can apply.
+
+### Step 1: Identify Assets
+
+List everything worth protecting:
+
+| Asset Category | Examples |
+|---------------|----------|
+| **Data** | User PII, payment info, session tokens, API keys, business-critical records |
+| **Services** | Authentication service, payment gateway, order service, admin panel |
+| **Credentials** | Database passwords, TLS certificates, signing keys, OAuth client secrets |
+| **Infrastructure** | DNS records, load balancers, container registries, CI/CD pipelines |
+
+### Step 2: Draw Trust Boundaries
+
+Map your system into zones with different trust levels:
+
+```mermaid
+graph LR
+    subgraph External["External Zone (Untrusted)"]
+        Browser[Browser / Mobile App]
+        ThirdParty[Third-Party Webhooks]
+    end
+
+    subgraph DMZ["DMZ (Semi-Trusted)"]
+        CDN[CDN / WAF]
+        APIGateway[API Gateway]
+        LB[Load Balancer]
+    end
+
+    subgraph Internal["Internal Zone (Trusted)"]
+        AuthService[Auth Service]
+        OrderService[Order Service]
+        PaymentService[Payment Service]
+        DB[(Database)]
+        Cache[(Redis Cache)]
+    end
+
+    subgraph Restricted["Restricted Zone (Highly Trusted)"]
+        HSM[HSM / Key Vault]
+        AuditLog[(Audit Log Store)]
+        AdminPanel[Admin Panel]
+    end
+
+    Browser -->|HTTPS| CDN
+    ThirdParty -->|HTTPS + HMAC| APIGateway
+    CDN --> LB
+    LB --> APIGateway
+    APIGateway -->|mTLS| AuthService
+    APIGateway -->|mTLS| OrderService
+    OrderService -->|mTLS| PaymentService
+    OrderService --> DB
+    AuthService --> Cache
+    PaymentService -->|mTLS| HSM
+    AuthService --> AuditLog
+```
+
+Every arrow crossing a boundary is an attack surface that requires explicit security controls.
+
+### Step 3: Apply STRIDE per Component
+
+For each component at a trust boundary, evaluate all six threat categories:
+
+| Threat | Question | Example Attack | Typical Mitigation |
+|--------|----------|---------------|-------------------|
+| **S**poofing | Can an attacker impersonate a user or service? | Stolen JWT used to call Order Service | mTLS, short-lived tokens, token binding |
+| **T**ampering | Can data be modified in transit or at rest? | Man-in-the-middle modifies order total | TLS everywhere, signed payloads, checksums |
+| **R**epudiation | Can an actor deny performing an action? | Admin claims they never deleted records | Tamper-evident audit logs, signed log entries |
+| **I**nformation Disclosure | Can sensitive data leak? | Error messages expose stack traces or PII | PII redaction, structured error responses, encryption at rest |
+| **D**enial of Service | Can the service be made unavailable? | Unauthenticated endpoint flooded with requests | Rate limiting, WAF, auto-scaling, circuit breakers |
+| **E**levation of Privilege | Can an attacker gain higher permissions? | IDOR allows user to access another user's orders | RBAC enforcement, resource ownership checks, input validation |
+
+### Step 4: Rate Risk (Likelihood x Impact Matrix)
+
+| | **Impact: Low** | **Impact: Medium** | **Impact: High** | **Impact: Critical** |
+|---|---|---|---|---|
+| **Likelihood: Almost Certain** | Medium | High | Critical | Critical |
+| **Likelihood: Likely** | Low | Medium | High | Critical |
+| **Likelihood: Possible** | Low | Medium | High | High |
+| **Likelihood: Unlikely** | Low | Low | Medium | High |
+| **Likelihood: Rare** | Low | Low | Low | Medium |
+
+**Risk rating definitions:**
+- **Critical** — Must fix before launch; active exploit path exists.
+- **High** — Fix within current sprint; significant data or availability impact.
+- **Medium** — Schedule within the quarter; limited blast radius.
+- **Low** — Accept or address opportunistically.
+
+### Step 5: Define Mitigations
+
+For each identified threat, define a concrete mitigation with an owner and deadline.
+
+### Worked Example: E-Commerce Checkout Flow Threat Model
+
+| Component | Threat (STRIDE) | Attack Scenario | Risk | Mitigation |
+|-----------|-----------------|-----------------|------|------------|
+| Checkout API | **S** Spoofing | Attacker replays stolen session cookie | High | HttpOnly + SameSite=Strict cookies, short session TTL, bind session to device fingerprint |
+| Checkout API | **T** Tampering | Client modifies item prices in POST body | Critical | Server re-fetches prices from catalog DB; never trust client-supplied prices |
+| Payment Service | **I** Info Disclosure | Payment card numbers logged in application logs | Critical | PCI-DSS tokenization; PII redaction middleware; no raw card data outside payment processor |
+| Order DB | **T** Tampering | SQL injection modifies order records | High | Parameterized queries only; DB user has no DDL permissions |
+| Checkout API | **D** DoS | Bot submits thousands of checkout requests | High | Rate limit per user + per IP; CAPTCHA on checkout; queue-based order processing |
+| Order Confirmation | **R** Repudiation | Customer claims they never placed an order | Medium | Signed order receipt emailed; tamper-evident audit log of all order events |
+| Admin Endpoint | **E** Elevation | Regular user accesses /admin/orders endpoint | Critical | RBAC middleware on all admin routes; separate admin authentication flow with MFA |
+
+### Blank Threat Model Template
+
+Teams can copy this table for their own systems:
+
+| Component | Trust Boundary | Threat (S/T/R/I/D/E) | Attack Scenario | Likelihood | Impact | Risk Rating | Mitigation | Owner | Status |
+|-----------|---------------|----------------------|-----------------|------------|--------|-------------|------------|-------|--------|
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+| | | | | | | | | | |
+
+---
+
+## 4.15 AuthN/AuthZ in Microservices Blueprint
+
+In a microservices architecture, authentication and authorization are cross-cutting concerns that must be explicitly designed. The monolith's single session store is replaced by a distributed identity fabric.
+
+### 4.15.1 Authentication Patterns
+
+| Pattern | How It Works | Pros | Cons |
+|---------|-------------|------|------|
+| **API Gateway Auth (Centralized)** | Gateway validates tokens and passes verified identity (claims) downstream | Single enforcement point; services stay simple; easy to change auth provider | Gateway becomes bottleneck and SPOF; all traffic must traverse gateway |
+| **Per-Service Auth (Decentralized)** | Each service validates tokens independently using shared public keys (JWKS) | No single point of failure; services are self-contained | Duplicated validation logic; harder to enforce consistent policies; key distribution complexity |
+| **Hybrid (Recommended)** | Gateway performs initial token validation + rate limiting; services re-verify claims and enforce fine-grained authorization | Defense in depth; gateway handles coarse checks, services handle domain-specific checks | More complex to implement; requires shared understanding of token format |
+
+### 4.15.2 Token Propagation Patterns
+
+| Pattern | Mechanism | When to Use |
+|---------|-----------|-------------|
+| **JWT Forwarding** | Gateway forwards the original user JWT to downstream services | Simple; works when all services need the same user context; risk of token scope creep |
+| **Token Exchange (RFC 8693)** | Service A exchanges user token for a new token scoped to Service B's needs | Principle of least privilege; downstream service gets only the claims it needs; audit trail shows delegation chain |
+| **Phantom Tokens** | Gateway converts opaque tokens to JWTs for internal use; external clients never see JWTs | Best of both worlds — revocable opaque tokens externally, fast JWT validation internally |
+
+### 4.15.3 Authorization Patterns
+
+| Pattern | Description | Best For |
+|---------|-------------|----------|
+| **Centralized Policy Engine (OPA/Cedar)** | All services query a central policy engine for authorization decisions | Consistent policy enforcement; single audit point; policy-as-code |
+| **Embedded Policy** | Each service contains its own authorization logic | Simple services with straightforward rules; low-latency requirements |
+| **RBAC** | Permissions assigned to roles; users assigned to roles | Small number of well-defined roles; organizational hierarchies |
+| **ABAC** | Permissions based on attributes of user, resource, action, and environment | Complex conditional access; regulatory environments; time-based or location-based rules |
+| **ReBAC** | Permissions based on relationships between entities (graph-based) | Document sharing (Google Docs model); social features; hierarchical ownership |
+
+### 4.15.4 Service-to-Service Authentication
+
+| Method | How It Works | Strength |
+|--------|-------------|----------|
+| **mTLS** | Both client and server present TLS certificates; identity proven cryptographically | Strongest — identity is tied to infrastructure; no bearer tokens to steal |
+| **JWT Service Accounts** | Services authenticate with JWTs issued by a shared IdP (client credentials grant) | Familiar pattern; works across network boundaries; easy to scope |
+| **SPIFFE/SPIRE** | Services receive cryptographic identities (SVIDs) from a SPIRE server based on workload attestation | Zero-trust native; works across heterogeneous infrastructure; automatic rotation |
+
+### 4.15.5 Full Auth Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant SA as Service A (Orders)
+    participant SB as Service B (Payments)
+    participant OPA as Policy Engine (OPA)
+
+    User->>GW: 1. Request + Bearer Token
+    GW->>GW: 2. Validate JWT signature (JWKS cache)
+    GW->>GW: 3. Check token expiry, issuer, audience
+    GW->>OPA: 4. Coarse-grained authz check (endpoint-level)
+    OPA-->>GW: 5. Allow / Deny
+
+    GW->>SA: 6. Forward request + verified claims header
+    SA->>OPA: 7. Fine-grained authz (resource-level)
+    OPA-->>SA: 8. Allow / Deny
+
+    SA->>Auth: 9. Token exchange (RFC 8693) — request scoped token for Service B
+    Auth-->>SA: 10. New scoped JWT (audience=Service B)
+
+    SA->>SB: 11. Request + scoped JWT (over mTLS)
+    SB->>SB: 12. Validate JWT + verify mTLS identity
+    SB->>OPA: 13. Authz check for payment operation
+    OPA-->>SB: 14. Allow / Deny
+    SB-->>SA: 15. Payment result
+    SA-->>GW: 16. Order response
+    GW-->>User: 17. Response
+```
+
+### 4.15.6 Centralized vs Decentralized Auth — Trade-off Comparison
+
+| Dimension | Centralized (Gateway Auth) | Decentralized (Per-Service Auth) | Hybrid |
+|-----------|---------------------------|----------------------------------|--------|
+| **Complexity** | Low for services | Higher per service | Medium overall |
+| **Latency** | Single validation hop | Per-service validation (parallel with JWKS cache) | Gateway + service validation |
+| **Resilience** | Gateway is SPOF | No single point of failure | Gateway failure degrades but services can self-validate |
+| **Policy consistency** | Easy (one place) | Hard (each service must agree) | Good (shared policy engine) |
+| **Token revocation** | Gateway blocklist | Each service must check blocklist | Gateway blocklist + short token TTL |
+| **Audit** | Single audit point | Distributed audit logs | Gateway audit + service-level audit |
+| **Recommended for** | Small teams, few services | Large teams, high autonomy | Most production microservice architectures |
+
+---
+
+## 4.16 OAuth 2.1 / OIDC Modern Standards
+
+> This section consolidates the evolution from OAuth 2.0 to OAuth 2.1 and provides a reference for modern OIDC integration.
+
+### 4.16.1 OAuth 2.1 Key Changes
+
+OAuth 2.1 is a consolidation of OAuth 2.0 (RFC 6749) plus the security best practices that emerged from years of production deployment. It is not a breaking change but a strict subset.
+
+| Change | OAuth 2.0 | OAuth 2.1 | Rationale |
+|--------|-----------|-----------|-----------|
+| **PKCE** | Optional (recommended for public clients) | **Mandatory for all clients** | Prevents authorization code interception even for confidential clients |
+| **Implicit Grant** | Allowed (response_type=token) | **Removed** | Tokens in URL fragments are leaked via browser history, referrer headers, and logs |
+| **Resource Owner Password Credentials** | Allowed (grant_type=password) | **Removed** | Exposes user credentials to the client; incompatible with MFA |
+| **Refresh Token Rotation** | Optional | **Required or sender-constrained** | Detects token theft — if a stolen refresh token is used, rotation invalidates both old and new tokens |
+| **Exact redirect URI matching** | Recommended | **Required** | Prevents open redirect attacks via partial URI matching |
+| **Bearer tokens in query parameters** | Allowed | **Forbidden** | Query parameters are logged in server access logs and browser history |
+
+### 4.16.2 OIDC Essentials
+
+OpenID Connect (OIDC) adds an identity layer on top of OAuth 2.0:
+
+| OIDC Concept | Purpose |
+|-------------|---------|
+| **ID Token** | JWT containing user identity claims (sub, name, email); returned alongside the access token |
+| **UserInfo Endpoint** | REST endpoint returning user profile claims; called with the access token |
+| **Discovery Document** | `/.well-known/openid-configuration` — machine-readable metadata about the IdP's endpoints, supported scopes, signing algorithms |
+| **JWKS Endpoint** | `/.well-known/jwks.json` — public keys for validating token signatures |
+| **Standard Scopes** | `openid` (required), `profile`, `email`, `address`, `phone` |
+| **Nonce** | Random value bound to the ID token to prevent replay attacks |
+
+### 4.16.3 Token Best Practices
+
+| Token Type | Recommended TTL | Best Practices |
+|-----------|----------------|----------------|
+| **Access Token** | 5-15 minutes | Short-lived; never store in localStorage; use in Authorization header only |
+| **Refresh Token** | 1-24 hours (with rotation) | Rotate on every use; detect reuse (invalidate family); store in HttpOnly cookie or secure backend |
+| **ID Token** | Single-use at login | Validate immediately; do not use as an API credential; verify nonce, iss, aud, exp |
+
+**Token binding** (DPoP — Demonstration of Proof of Possession, RFC 9449): Binds access tokens to a client-generated key pair so that a stolen token cannot be used by a different client. This is the strongest defense against token theft in browser-based applications.
+
+### 4.16.4 OAuth 2.1 + PKCE Authorization Code Flow
+
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant App as Client Application
+    participant AS as Authorization Server
+    participant RS as Resource Server
+
+    Note over App: Generate code_verifier (43-128 random chars)
+    Note over App: code_challenge = BASE64URL(SHA256(code_verifier))
+
+    App->>AS: 1. GET /authorize
+    Note over App,AS: response_type=code<br/>client_id=app123<br/>redirect_uri=https://app.example.com/callback<br/>scope=openid profile email<br/>state=random_state<br/>nonce=random_nonce<br/>code_challenge=abc123<br/>code_challenge_method=S256
+
+    AS->>User: 2. Display login + consent
+    User->>AS: 3. Authenticate (password + MFA)
+    AS->>App: 4. Redirect with authorization code
+    Note over AS,App: ?code=auth_code_xyz&state=random_state
+
+    App->>AS: 5. POST /token (back-channel)
+    Note over App,AS: grant_type=authorization_code<br/>code=auth_code_xyz<br/>client_id=app123<br/>code_verifier=original_verifier<br/>redirect_uri=https://app.example.com/callback
+
+    AS->>AS: 6. Verify SHA256(code_verifier) == stored code_challenge
+    AS->>App: 7. { access_token, id_token, refresh_token }
+
+    Note over App: 8. Validate ID token (sig, iss, aud, exp, nonce)
+
+    App->>RS: 9. GET /api/resource + Authorization: Bearer access_token
+    RS->>RS: 10. Validate access_token (signature, exp, scope)
+    RS->>App: 11. Protected resource
+
+    Note over App: 12. When access_token expires:
+    App->>AS: 13. POST /token (grant_type=refresh_token)
+    Note over AS: 14. Rotate refresh token (old token invalidated)
+    AS->>App: 15. New { access_token, refresh_token }
+```
+
+---
+
+## 4.17 Secure Defaults Checklist
+
+Use these checklists during architecture reviews, PR reviews, and go-live readiness checks. Every item represents a default that should be on unless there is a documented exception.
+
+### Web API Defaults
+
+```
+[ ] HTTPS only — redirect HTTP to HTTPS; HSTS header with min 1 year max-age and includeSubDomains
+[ ] CORS — allowlist specific origins; never use Access-Control-Allow-Origin: *  in production
+[ ] Content-Security-Policy (CSP) — restrict script sources; no unsafe-inline / unsafe-eval
+[ ] X-Content-Type-Options: nosniff
+[ ] X-Frame-Options: DENY  (or use CSP frame-ancestors)
+[ ] Referrer-Policy: strict-origin-when-cross-origin
+[ ] Permissions-Policy — disable unused browser features (camera, microphone, geolocation)
+[ ] Secure cookies — HttpOnly, Secure, SameSite=Strict (or Lax for top-level navigation)
+[ ] Response body — never include stack traces, internal IPs, or database error messages
+[ ] API versioning — version in URL path or Accept header; reject unversioned requests
+```
+
+### Database Defaults
+
+```
+[ ] No public internet access — databases live in private subnets only
+[ ] Encryption at rest — enabled for all volumes (AES-256 or equivalent)
+[ ] TLS in transit — require TLS for all client connections; reject plaintext
+[ ] Least-privilege roles — application user has SELECT/INSERT/UPDATE/DELETE only; no DDL, no SUPERUSER
+[ ] Separate read/write users — read replicas use read-only credentials
+[ ] Connection limits — max connections per user/application; connection pooling (PgBouncer, ProxySQL)
+[ ] Audit logging — log all DDL operations, privilege changes, and failed login attempts
+[ ] Automated backups — point-in-time recovery enabled; backups encrypted; tested restore procedure
+```
+
+### Container Defaults
+
+```
+[ ] Non-root user — RUN adduser / USER directive in Dockerfile; never run as UID 0
+[ ] Read-only root filesystem — readOnlyRootFilesystem: true  in security context
+[ ] No privileged mode — privileged: false; no SYS_ADMIN or NET_ADMIN capabilities
+[ ] Drop all capabilities — securityContext.capabilities.drop: ["ALL"]; add back only what is needed
+[ ] Minimal base image — use distroless, Alpine, or scratch; no shell, no package manager
+[ ] Image scanning — Trivy/Grype/Snyk scan in CI; block deployment on critical/high CVEs
+[ ] Signed images — cosign or Notation; enforce signature verification in admission controllers
+[ ] No secrets in images — never COPY .env or embed credentials; use mounted secrets or env injection
+[ ] Resource limits — set CPU and memory limits to prevent noisy-neighbor and DoS
+```
+
+### Kubernetes Defaults
+
+```
+[ ] NetworkPolicy — default-deny ingress and egress; explicitly allow required traffic
+[ ] PodSecurityStandards — enforce "restricted" profile (no root, no host networking, no privileged)
+[ ] RBAC — no cluster-admin bindings for applications; namespace-scoped roles only
+[ ] No default service account — automountServiceAccountToken: false; create purpose-specific ServiceAccounts
+[ ] Resource quotas — per-namespace quotas for CPU, memory, and pod count
+[ ] Admission controllers — enforce policies (Kyverno/OPA Gatekeeper) for image sources, labels, security context
+[ ] Secrets encryption — encrypt etcd at rest (EncryptionConfiguration); prefer external secrets operators (ESO)
+[ ] Pod-to-pod mTLS — service mesh (Istio/Linkerd) or SPIFFE for workload identity
+[ ] Audit logging — enable Kubernetes audit policy; ship logs to SIEM
+```
+
+### Cloud Defaults (AWS / GCP / Azure)
+
+```
+[ ] No public S3/GCS/Blob storage — block public access at the account/org level; use presigned URLs for sharing
+[ ] VPC / private networking — all compute and data resources in private subnets; NAT gateway for outbound
+[ ] Security groups / firewall rules — default-deny; allow only required ports and sources
+[ ] CloudTrail / Cloud Audit Logs — enabled for all regions; ship to immutable log storage
+[ ] IAM — no long-lived access keys; use IAM roles, workload identity, or OIDC federation
+[ ] MFA on root / break-glass accounts — hardware key (YubiKey) for root; time-limited access for admin
+[ ] GuardDuty / Security Command Center — enabled for anomaly detection
+[ ] Config rules / Security Health Analytics — continuous compliance checks for drift detection
+[ ] Tagging policy — enforce cost-center, environment, and owner tags for auditability
+```
+
+---
+
+## 4.18 Secure Logging, Redaction, and Audit Trails
+
+Logging is a security control, not just an operational convenience. Done right, it provides detection, forensics, and compliance evidence. Done wrong, it becomes a data breach vector.
+
+### 4.18.1 What to Log
+
+| Event Category | Examples | Why |
+|---------------|----------|-----|
+| **Authentication events** | Login success/failure, MFA challenges, password resets, token issuance | Detect credential stuffing, brute force, account takeover |
+| **Authorization failures** | 403 responses, RBAC denials, policy engine rejections | Detect privilege escalation attempts, IDOR |
+| **Data access** | Read/write to sensitive tables, file downloads, API calls returning PII | Compliance (HIPAA, SOX); insider threat detection |
+| **Admin actions** | Config changes, user provisioning, role assignments, deployment triggers | Separation of duties audit; change management |
+| **Security events** | WAF blocks, rate limit triggers, certificate errors, failed mTLS handshakes | Detect active attacks; tune security controls |
+
+### 4.18.2 What NOT to Log
+
+| Data Type | Risk if Logged | Alternative |
+|-----------|---------------|-------------|
+| **Passwords** (plaintext or hashed) | Credential theft from log storage | Log only "authentication attempt for user_id=X" |
+| **Access / refresh tokens** | Token theft enables impersonation | Log token fingerprint (SHA-256 of first 8 chars) |
+| **Credit card numbers** | PCI-DSS violation; financial fraud | Log last 4 digits only (e.g., ****1234) |
+| **SSN / national ID** | Identity theft | Log only "SSN verified for user_id=X" |
+| **PHI (health data)** | HIPAA violation | Log access event without the data itself |
+| **Full request/response bodies** | May contain any of the above | Log sanitized summaries; use structured logging |
+
+### 4.18.3 PII Redaction Patterns
+
+| Pattern | How It Works | Use Case |
+|---------|-------------|----------|
+| **Field Masking** | Replace characters: `john@example.com` becomes `j***@e***.com` | Display in logs and support UIs |
+| **Tokenization** | Replace PII with a random token; store mapping in a secure vault | Payment processing; cross-system references without exposing PII |
+| **Hashing (one-way)** | SHA-256 of the value; allows correlation without reversibility | Log correlation ("same user across events") without storing PII |
+| **Encryption (reversible)** | Encrypt PII with a key stored in KMS; decrypt only with audit trail | Regulatory hold / legal discovery; need to recover original value |
+
+**Log redaction middleware example (Python):**
+
+```python
+import re
+import json
+import hashlib
+from functools import wraps
+
+# Patterns for common PII
+PII_PATTERNS = {
+    'email': (r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', lambda m: m.group()[0] + '***@***'),
+    'ssn': (r'\b\d{3}-\d{2}-\d{4}\b', lambda m: '***-**-' + m.group()[-4:]),
+    'credit_card': (r'\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b', lambda m: '****-****-****-' + m.group()[-4:]),
+    'bearer_token': (r'Bearer\s+[A-Za-z0-9\-._~+/]+=*', lambda m: 'Bearer [REDACTED]'),
+    'password_field': (r'"password"\s*:\s*"[^"]*"', lambda m: '"password": "[REDACTED]"'),
+}
+
+def redact_pii(log_message: str) -> str:
+    """Redact PII from log messages using pattern matching."""
+    redacted = log_message
+    for field_name, (pattern, replacer) in PII_PATTERNS.items():
+        redacted = re.sub(pattern, replacer, redacted)
+    return redacted
+
+def secure_log_context(user_id: str, action: str, resource: str, **extra) -> dict:
+    """Create a structured, PII-safe log entry."""
+    return {
+        'timestamp': '...',  # Use ISO 8601
+        'user_id_hash': hashlib.sha256(user_id.encode()).hexdigest()[:16],
+        'action': action,
+        'resource': resource,
+        'ip_hash': extra.get('ip_hash', ''),
+        'result': extra.get('result', 'success'),
+        'metadata': {k: redact_pii(str(v)) for k, v in extra.items() if k not in ('ip_hash', 'result')},
+    }
+```
+
+### 4.18.4 Audit Trail Requirements
+
+| Requirement | Implementation | Why |
+|------------|----------------|-----|
+| **Tamper-evident** | Hash chain — each log entry includes a hash of the previous entry | Detects log deletion or modification |
+| **Immutable storage** | Write-once storage (S3 Object Lock, WORM, append-only Kafka topic) | Prevents attackers from covering tracks |
+| **Retention policy** | Defined per regulation (see table below); automated lifecycle | Legal compliance; storage cost management |
+| **Access control** | Separate from application logs; read access requires justification | Prevents insiders from reading or modifying audit logs |
+| **Timestamping** | NTP-synchronized clocks; UTC timestamps; include timezone offset | Forensic correlation across services |
+
+### 4.18.5 Compliance Audit Requirements Comparison
+
+| Requirement | GDPR | SOX | HIPAA | PCI-DSS |
+|------------|------|-----|-------|---------|
+| **What to log** | Processing activities, consent, data access, data subject requests | Financial transaction changes, access to financial data, system changes | All access to PHI, authentication events, security incidents | All access to cardholder data, authentication, admin actions |
+| **Retention period** | As long as necessary for processing purpose; delete when no longer needed | 7 years minimum | 6 years minimum | 1 year minimum; 3 months immediately accessible |
+| **Access control** | Data Protection Officer oversight; privacy-by-design | SOX auditor access; segregation of duties evidence | Minimum necessary access; break-glass audit | Need-to-know basis; quarterly access reviews |
+| **Tamper protection** | Required (Article 32 — integrity of processing) | Required (Section 302/404 — internal controls) | Required (164.312(c)(1) — integrity controls) | Required (Requirement 10.5 — secure audit trails) |
+| **Breach notification** | 72 hours to supervisory authority | Immediate to audit committee | 60 days to HHS and affected individuals | Varies by card brand; typically within 24-72 hours |
+| **Right to deletion** | Yes (Right to Erasure, Article 17) | No (retention is mandatory) | No (retention is mandatory) | No (retention is mandatory) |
+
+---
+
+## 4.19 Attack Surface Reduction for Microservices
+
+The attack surface is the sum of all points where an attacker can attempt to enter or extract data from a system. The goal is to minimize this surface area to the smallest possible set.
+
+### 4.19.1 Core Principle
+
+> **Minimize what is exposed; maximize what is monitored.** Every port, endpoint, dependency, and configuration option is a potential attack vector. Remove everything that is not strictly necessary.
+
+### 4.19.2 Network-Level Attack Surface Reduction
+
+| Pattern | Before | After |
+|---------|--------|-------|
+| **API Gateway as single entry point** | Each microservice has a public IP and exposed port | Only the API Gateway is internet-facing; internal services are in private subnets |
+| **Internal services not internet-routable** | Services communicate over public internet | Services use private DNS and VPC-internal addresses; no public IPs |
+| **Network segmentation** | Flat network — any service can talk to any other service | NetworkPolicies / security groups enforce least-privilege service-to-service communication |
+| **Service mesh** | Direct HTTP between services | mTLS via sidecar proxy (Istio/Linkerd); traffic is encrypted and authenticated automatically |
+
+### 4.19.3 Container Hardening
+
+| Technique | What It Does | Tools |
+|-----------|-------------|-------|
+| **Minimal base images** | Distroless or scratch images remove shells, package managers, and unnecessary binaries | Google Distroless, Chainguard Images |
+| **No shell access** | Without `/bin/sh`, an attacker who gains code execution cannot run arbitrary commands | Distroless images have no shell by default |
+| **Read-only root filesystem** | Prevents an attacker from writing malicious files to the container filesystem | `readOnlyRootFilesystem: true` in Kubernetes security context |
+| **Drop all capabilities** | Removes Linux capabilities (NET_RAW, SYS_PTRACE, etc.) that enable privilege escalation | `capabilities: { drop: ["ALL"] }` |
+| **Seccomp profiles** | Restrict which system calls the container can make; blocks exploit primitives | Kubernetes RuntimeDefault profile; custom profiles for hardened workloads |
+
+### 4.19.4 Dependency Management
+
+| Practice | Purpose | Tools |
+|----------|---------|-------|
+| **Software Bill of Materials (SBOM)** | Machine-readable inventory of all dependencies; enables rapid response to CVEs | Syft, Trivy, CycloneDX |
+| **Vulnerability scanning** | Detect known CVEs in dependencies and base images | Trivy, Grype, Snyk, GitHub Dependabot alerts |
+| **Automated updates** | Keep dependencies current; patch vulnerabilities within SLA | Dependabot, Renovate Bot, Mend |
+| **Dependency pinning** | Pin exact versions (lock files); prevent supply chain attacks via version injection | package-lock.json, go.sum, poetry.lock |
+| **Private registry** | Proxy and cache dependencies; control which packages are allowed | Artifactory, Nexus, GitHub Packages |
+
+### 4.19.5 Runtime Protection
+
+| Tool | What It Does | Detection Examples |
+|------|-------------|-------------------|
+| **Falco** | Runtime anomaly detection using kernel-level system call monitoring | Unexpected shell execution in container, read of /etc/shadow, outbound connection to suspicious IP |
+| **Seccomp profiles** | Whitelist of allowed system calls; blocks everything else | Blocks `ptrace` (used for process injection), `mount` (container escape), `keyctl` (credential theft) |
+| **AppArmor / SELinux** | Mandatory access control at the OS level | Restrict file access, network access, and capability usage per container |
+| **eBPF-based observability** | Kernel-level monitoring without performance overhead | Cilium Tetragon for network policy enforcement and process monitoring |
+
+### 4.19.6 Attack Surface Before vs After Hardening
+
+```mermaid
+graph TB
+    subgraph Before["BEFORE: Large Attack Surface"]
+        Internet1[Internet] --> S1[Service A :8080<br/>Public IP]
+        Internet1 --> S2[Service B :8080<br/>Public IP]
+        Internet1 --> S3[Service C :8080<br/>Public IP]
+        Internet1 --> DB1[(Database :5432<br/>Public IP)]
+        S1 --> S2
+        S1 --> S3
+        S2 --> S3
+        S2 --> DB1
+        S3 --> DB1
+        S1 --> DB1
+
+        style S1 fill:#ff6b6b,color:#000
+        style S2 fill:#ff6b6b,color:#000
+        style S3 fill:#ff6b6b,color:#000
+        style DB1 fill:#ff6b6b,color:#000
+    end
+
+    subgraph After["AFTER: Reduced Attack Surface"]
+        Internet2[Internet] --> WAF[WAF / CDN]
+        WAF --> GW[API Gateway<br/>Only public endpoint]
+        GW -->|mTLS| S4[Service A<br/>Private subnet<br/>Distroless, non-root]
+        GW -->|mTLS| S5[Service B<br/>Private subnet<br/>Distroless, non-root]
+        S4 -->|mTLS| S6[Service C<br/>Private subnet<br/>Distroless, non-root]
+        S5 -->|NetworkPolicy| DB2[(Database<br/>Private subnet<br/>Encrypted, no public IP)]
+        S6 -->|NetworkPolicy| DB2
+
+        style GW fill:#51cf66,color:#000
+        style S4 fill:#51cf66,color:#000
+        style S5 fill:#51cf66,color:#000
+        style S6 fill:#51cf66,color:#000
+        style DB2 fill:#51cf66,color:#000
+    end
+```
+
+**Key reductions achieved:**
+- **Network exposure:** 4 public endpoints reduced to 1 (API Gateway behind WAF).
+- **Service communication:** Unencrypted flat network replaced with mTLS + NetworkPolicies.
+- **Database access:** Public IP removed; access restricted to specific services via NetworkPolicy.
+- **Container attack surface:** Full OS images replaced with distroless; non-root; read-only filesystem; capabilities dropped.
+- **Dependency risk:** SBOM generated; vulnerabilities scanned in CI; automated updates via Renovate.
+- **Runtime detection:** Falco monitors for anomalous system calls; seccomp profiles block exploit primitives.
 
 ---
 

@@ -122,6 +122,165 @@ Comparing banking and social media is useful because both use replication, but t
 - Keep the source of truth clear when multiple replicas and caches exist.
 - Think in workflow-level guarantees, not one label for the whole product.
 
+## The Consistency Menu
+
+Consistency is not binary (strong vs eventual). There is a spectrum of models, each with distinct guarantees, costs, and appropriate use cases. Think of it as a menu — choose the right model per workflow.
+
+| Model | Guarantee | Latency Cost | Example System | Use When |
+|-------|----------|-------------|----------------|----------|
+| **Linearizability** | Reads always see the most recent write; operations appear to execute atomically in real time | Highest (cross-node coordination on every operation) | Spanner, CockroachDB, ZooKeeper | Distributed locks, leader election, financial ledgers |
+| **Sequential consistency** | Operations appear in the same order to all observers, but not necessarily in real time | High | Distributed consensus logs | Multi-step workflows requiring total ordering |
+| **Causal consistency** | Operations that are causally related are seen in order; concurrent operations may appear in any order | Moderate | MongoDB (causal sessions), COPS | Social feeds (reply always appears after the post it replies to) |
+| **Session consistency** | Within one session, reads-your-writes + monotonic reads are guaranteed | Low-Moderate | DynamoDB (consistent reads), PostgreSQL session | User sees their own writes immediately; other users may lag |
+| **Eventual consistency** | Replicas converge eventually; no bound on staleness duration | Lowest | S3, DNS, Cassandra (ONE/ONE), DynamoDB (default) | Counters, likes, analytics, CDN content |
+
+### Session Guarantees — Practical Subset
+
+Most applications need stronger than "pure eventual" but weaker than linearizable. These session guarantees provide a practical middle ground:
+
+| Guarantee | What It Means | Example |
+|-----------|-------------|---------|
+| **Read-your-writes** | After writing, the same client always sees its own write | User updates profile → immediately sees updated profile (even if other users see stale) |
+| **Monotonic reads** | A client never sees data go backward in time | User sees 10 comments → refresh → never sees 8 comments |
+| **Monotonic writes** | A client's writes are applied in the order they were issued | User changes email to A, then to B → final state is always B, never A |
+| **Writes-follow-reads** | If a client reads value X, then writes, the write is ordered after X | Reply to a post is always ordered after the post itself |
+
+**Implementation:** Route the session to the same replica (sticky reads), or include a logical timestamp/version in the session context and reject reads from replicas behind that version.
+
+---
+
+## CAP Theorem — Formal Definitions and Canonical Sources
+
+### Formal Definitions
+
+The CAP theorem, proven by Gilbert and Lynch (2002), uses specific formal definitions that differ from casual usage:
+
+| Term | Formal CAP Definition | Common Misunderstanding |
+|------|----------------------|------------------------|
+| **Consistency (C)** | Linearizability — every read returns the most recent write or an error | "Data is correct" (too vague) |
+| **Availability (A)** | Every request to a non-failing node receives a response (no timeout, no error) | "The system is up" (too loose) |
+| **Partition tolerance (P)** | The system continues to operate despite arbitrary message loss between nodes | "Network is unreliable" (correct but incomplete) |
+
+**The theorem states:** In the presence of a network partition, a distributed system must choose between consistency (C) and availability (A). It cannot guarantee both simultaneously.
+
+**What CAP does NOT say:**
+- It does NOT say you must always choose two of three — you only choose during a partition
+- It does NOT say eventual consistency is "AP" — eventual consistency is a spectrum
+- It does NOT say CP systems are always unavailable — they are unavailable only during partitions
+- It does NOT apply to single-node systems — CAP is about distributed data
+
+### PACELC: Extending CAP
+
+Daniel Abadi's PACELC extension (2012) adds: even when there is no partition, there is a trade-off between latency and consistency.
+
+```
+If Partition → choose A or C  (CAP)
+Else (normal operation) → choose L (latency) or C (consistency)  (PACELC)
+```
+
+| System | During Partition (PAC) | Normal Operation (ELC) | Classification |
+|--------|----------------------|----------------------|----------------|
+| Spanner | PC (reject during partition) | EC (consistent, higher latency via TrueTime) | PC/EC |
+| DynamoDB | PA (available, eventual) | EL (low latency, eventual by default) | PA/EL |
+| Cassandra (QUORUM) | PC (requires quorum) | EC (quorum adds latency) | PC/EC |
+| MongoDB | PA (reads from secondaries) | EL (low latency from nearest replica) | PA/EL |
+
+### Canonical References
+
+| Source | Citation | Key Contribution |
+|--------|----------|-----------------|
+| Brewer's conjecture (2000) | Eric Brewer, PODC keynote | Original CAP conjecture |
+| Gilbert & Lynch (2002) | "Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services" | Formal proof |
+| Brewer's clarification (2012) | "CAP Twelve Years Later: How the Rules Have Changed" | Corrects common misunderstandings; introduces nuance |
+| Abadi's PACELC (2012) | "Consistency Tradeoffs in Modern Distributed Database System Design" | Extends CAP with latency trade-off during normal operation |
+| Kleppmann (2017) | "Designing Data-Intensive Applications" Chapter 9 | Best practical treatment of consistency models |
+
+---
+
+## Causal Consistency and CRDTs
+
+### Causal Consistency
+
+Causal consistency is a sweet spot between strong and eventual: it preserves the order of causally related operations while allowing concurrent operations to be seen in any order.
+
+**Why it matters:** Many real-world workflows are causal — a reply depends on the post, a cancellation depends on the order. Pure eventual consistency can violate these dependencies (user sees a reply before the post). Linearizability is too expensive for global systems. Causal consistency gives "good enough" ordering at much lower cost.
+
+**How it works:** Each operation carries a logical timestamp or vector clock. Replicas deliver operations only after their causal dependencies have been delivered.
+
+| Aspect | Eventual Consistency | Causal Consistency | Linearizability |
+|--------|---------------------|-------------------|-----------------|
+| Ordering | None guaranteed | Causally related ops ordered | Total order (real-time) |
+| Latency | Lowest | Low-Moderate | Highest |
+| Availability during partitions | Full | Full (within causal constraints) | Reduced (must contact leader) |
+| Implementation | Simple replication | Vector clocks / causal timestamps | Consensus protocol (Raft/Paxos) |
+| Example | DNS propagation | MongoDB causal sessions, social feeds | Spanner, ZooKeeper |
+
+### CRDTs (Conflict-free Replicated Data Types)
+
+CRDTs are data structures that can be updated independently on different replicas and always merge deterministically — no conflict resolution logic needed.
+
+| CRDT Type | What It Does | Example Use |
+|-----------|-------------|-------------|
+| **G-Counter** | Grow-only counter (each replica increments independently, merge = sum) | Like counts, view counts |
+| **PN-Counter** | Counter supporting increment and decrement | Inventory count (approximate) |
+| **G-Set** | Grow-only set (add only, merge = union) | Tags, labels, "seen" message IDs |
+| **OR-Set** | Observed-remove set (add and remove) | Shopping cart, user preferences |
+| **LWW-Register** | Last-writer-wins register (timestamp tiebreaker) | User profile fields, settings |
+
+**When to use CRDTs:** Multi-region writes where coordination latency is unacceptable, offline-capable apps (mobile, collaborative editors), and counters/sets that can tolerate bounded divergence.
+
+**Limitation:** CRDTs solve merge conflicts but cannot enforce business rules that require coordination (e.g., "balance must not go negative" requires a consistency check, not a CRDT).
+
+---
+
+## Measuring Staleness — Replica Lag as an SLO
+
+Staleness should be measured, not assumed. Track replica lag as an operational metric and set staleness SLOs per workflow.
+
+### Replica Lag Metrics
+
+| Metric | What It Measures | How to Collect |
+|--------|-----------------|---------------|
+| **Replication lag (seconds)** | Time between write on primary and visibility on replica | `pg_stat_replication` (PostgreSQL), `Seconds_Behind_Master` (MySQL), Kafka consumer lag |
+| **Replication lag (bytes/offsets)** | Volume of undelivered data to replica | WAL position difference, Kafka offset difference |
+| **Stale-read rate** | Percentage of reads served from replicas with lag > threshold | Application-level instrumentation (compare read version to known write version) |
+| **Consistency violation rate** | Reads that returned data older than the staleness SLO | Audit log comparison (expected vs observed state) |
+
+### Staleness SLOs by Workflow
+
+| Workflow | Acceptable Staleness | Measurement | Action If Exceeded |
+|----------|---------------------|-------------|-------------------|
+| Account balance | 0 (linearizable) | Read from primary only | N/A (always consistent) |
+| Order status | < 5 seconds | Replication lag metric | Route reads to primary if lag > 5s |
+| Social feed | < 30 seconds | Replication lag metric | Acceptable; no action needed |
+| Search index | < 60 seconds | Index freshness metric | Increase indexer throughput |
+| Analytics dashboard | < 5 minutes | Data pipeline lag | Acceptable for batch analytics |
+
+### Read Routing Strategy Based on Staleness
+
+```
+Read request arrives →
+  Is this a consistency-critical workflow? (balance, order confirmation)
+    → YES: Route to PRIMARY (always fresh, higher latency)
+    → NO: Check replica lag
+      → Lag < staleness SLO? → Route to REPLICA (fast, acceptable staleness)
+      → Lag > staleness SLO? → Route to PRIMARY (fallback for freshness)
+```
+
+---
+
+## Cross-References
+
+| Topic | Chapter | Connection |
+|-------|---------|------------|
+| Transaction isolation levels | Ch 5: Databases Deep Dive | How isolation interacts with consistency within a single DB |
+| Distributed transactions (2PC, Saga) | Ch 12: Fault Tolerance & Resilience | Coordination across services with consistency guarantees |
+| Consensus protocols (Raft, Paxos) | F4: Consensus & Coordination | How leader election and agreement enforce consistency |
+| CDC and outbox pattern | Ch 5: Databases, Ch 8: Message Queues | Publishing consistent events from DB changes |
+| SLO-based monitoring of lag | F10: Observability & Operations | Tracking replication lag as an SLO signal |
+| Banking system design | Domain chapters | Strong consistency for financial workflows |
+| Social media system design | Domain chapters | Eventual consistency for engagement features |
+
 ## Common Mistakes
 - Calling an entire product CP or AP without discussing the actual workflow and failure mode.
 - Assuming eventual consistency is automatically better for scale without considering product confusion or recovery complexity.

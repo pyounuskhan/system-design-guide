@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>65 min read</small>
+                      <small>76 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>46 min read</small>
+                      <small>61 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>62 min read</small>
+                      <small>68 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>58 min read</small>
+                      <small>70 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>91 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>66 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>73 min read</small>
+                      <small>86 min read</small>
                     </span>
                   </a>
                 </li>
@@ -998,7 +998,7 @@
           <div class="chapter-meta-strip">
             <div class="summary-pill">
               <span class="summary-label">Reading time</span>
-              <strong>66 min read</strong>
+              <strong>79 min read</strong>
             </div>
             <div class="summary-pill">
               <span class="summary-label">Focus</span>
@@ -1288,6 +1288,137 @@ Server responds:  /index.html
 </tr>
 </tbody>
 </table></div>
+<h3 id="115a-modern-protocol-updates-2026-ready">1.1.5a Modern Protocol Updates (2026-Ready)</h3>
+<p>This section consolidates the latest protocol developments that affect real-world system design decisions as of 2026.</p>
+<h4 id="tls-13-behavioral-changes-production-impact">TLS 1.3 Behavioral Changes (Production Impact)</h4>
+<p>TLS 1.3 is no longer optional — it is the baseline for secure communication.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>TLS 1.3 Change</th>
+<th>Why It Matters for System Design</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1-RTT handshake</strong></td>
+<td>Reduces connection latency by 33-50% compared to TLS 1.2 (2-RTT). Critical for mobile and high-latency links.</td>
+</tr>
+<tr>
+<td><strong>0-RTT resumption</strong></td>
+<td>Returning clients send encrypted data in the first packet. Use only for idempotent requests (GET) due to replay risk.</td>
+</tr>
+<tr>
+<td><strong>Removed RSA key exchange</strong></td>
+<td>Only ephemeral Diffie-Hellman (ECDHE) is supported. Eliminates passive decryption if private key is compromised.</td>
+</tr>
+<tr>
+<td><strong>Mandatory forward secrecy</strong></td>
+<td>Every session uses unique keys. Compromise of long-term keys does not decrypt past sessions.</td>
+</tr>
+<tr>
+<td><strong>Removed ChangeCipherSpec</strong></td>
+<td>Simpler state machine, fewer implementation bugs.</td>
+</tr>
+<tr>
+<td><strong>Encrypted handshake</strong></td>
+<td>Server certificate is encrypted, preventing passive fingerprinting of server identity.</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>Compliance note:</strong> TLS 1.2 is deprecated for PCI DSS 4.0 (effective March 2025). All payment-handling systems must use TLS 1.3. Many organizations are adopting TLS 1.3-only policies for all internal and external traffic.</p>
+</blockquote>
+<p><strong>Version annotation for existing protocol sections:</strong>
+- HTTP/1.1 (Section 1.1.2): Still uses TLS 1.2 in many legacy deployments. Upgrade path: enable TLS 1.3 at the load balancer/reverse proxy.
+- HTTP/2 (Section 1.1.3): Requires ALPN (Application-Layer Protocol Negotiation) in TLS. TLS 1.3 with HTTP/2 is the recommended baseline for 2026.
+- HTTP/3 (Section 1.1.4): Mandates TLS 1.3 — there is no HTTP/3 without TLS 1.3 since it is built into QUIC.</p>
+<h4 id="quichttp3-production-readiness-2026-status">QUIC/HTTP/3 Production Readiness (2026 Status)</h4>
+<p>QUIC is no longer experimental. Major platforms have adopted it in production:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Transport</strong></td>
+<td>UDP-based with built-in TLS 1.3 — no separate TLS handshake layer</td>
+</tr>
+<tr>
+<td><strong>0-RTT connection</strong></td>
+<td>Resumed connections send data immediately; new connections complete in 1-RTT</td>
+</tr>
+<tr>
+<td><strong>Connection migration</strong></td>
+<td>Connections survive IP changes (Wi-Fi to cellular) via connection IDs instead of IP/port tuples</td>
+</tr>
+<tr>
+<td><strong>HOL blocking elimination</strong></td>
+<td>Packet loss in one stream does not block other streams (unlike TCP where all streams stall)</td>
+</tr>
+<tr>
+<td><strong>Congestion control</strong></td>
+<td>Pluggable — supports BBR, Cubic, and custom algorithms per connection</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Real-world adoption and performance:</strong>
+- Google reports ~30% latency reduction for YouTube video start times with QUIC/HTTP/3
+- Cloudflare sees 12-15% improvement in TTFB for HTTP/3 vs HTTP/2
+- Meta uses QUIC for mobile app traffic, reducing connection failures by 20% on lossy networks
+- As of 2026, ~30% of global web traffic uses HTTP/3</p>
+<p><strong>When NOT to use HTTP/3:</strong>
+- Corporate networks with strict firewall rules blocking UDP/443
+- Low-loss, low-latency data center east-west traffic (TCP overhead is negligible)
+- Systems requiring deep packet inspection (QUIC encrypts more of the header)</p>
+<h4 id="grpc-over-http2-vs-http3">gRPC over HTTP/2 vs HTTP/3</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>gRPC over HTTP/2</th>
+<th>gRPC over HTTP/3 (experimental)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transport</td>
+<td>TCP with optional TLS</td>
+<td>QUIC (UDP) with mandatory TLS 1.3</td>
+</tr>
+<tr>
+<td>Multiplexing</td>
+<td>HTTP/2 streams (TCP HOL blocking)</td>
+<td>QUIC streams (no HOL blocking)</td>
+</tr>
+<tr>
+<td>Connection setup</td>
+<td>2-3 RTT (TCP + TLS)</td>
+<td>1 RTT (new), 0 RTT (resumed)</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Bidirectional streaming, all 4 modes</td>
+<td>Same 4 modes, better loss resilience</td>
+</tr>
+<tr>
+<td>Connection migration</td>
+<td>Not supported</td>
+<td>Supported (mobile-friendly)</td>
+</tr>
+<tr>
+<td>Maturity</td>
+<td>Production-ready everywhere</td>
+<td>Early adoption (2025-2026), supported in envoy and grpc-go</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Recommendation:</strong> Use gRPC over HTTP/2 for data center service-to-service communication. Evaluate gRPC over HTTP/3 for mobile clients and cross-region calls where latency and connection stability matter.</p>
+<h4 id="handshake-comparison-tls-12-vs-tls-13-vs-quic">Handshake Comparison: TLS 1.2 vs TLS 1.3 vs QUIC</h4>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-04.svg" alt="Diagram 4 for Networking Fundamentals" loading="lazy"></figure>
 <h3 id="116-http-methods-status-codes-and-headers-system-design-essentials">1.1.6 HTTP Methods, Status Codes, and Headers (System Design Essentials)</h3>
 <p><strong>Methods and Idempotency</strong></p>
 <div class="table-wrap"><table>
@@ -1477,7 +1608,7 @@ X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
 <h3 id="121-tcp-transmission-control-protocol">1.2.1 TCP (Transmission Control Protocol)</h3>
 <p>TCP provides <strong>reliable, ordered, error-checked</strong> delivery of a stream of bytes. It is the transport protocol for HTTP/1.1, HTTP/2, database connections, email, file transfer, and most inter-service communication.</p>
 <p><strong>The 3-Way Handshake</strong></p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-04.svg" alt="Diagram 4 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-05.svg" alt="Diagram 5 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Packet-Level Breakdown</strong></p>
 <p>A TCP segment contains:</p>
 <pre><code> 0                   1                   2                   3
@@ -1512,7 +1643,7 @@ X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
 - Measures the maximum bandwidth and minimum RTT of the path.
 - Targets sending at the bandwidth-delay product (BDP), neither over-filling buffers nor underutilizing the link.
 - Better performance in lossy networks (does not interpret loss as congestion signal).</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-05.svg" alt="Diagram 5 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-06.svg" alt="Diagram 6 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Flow Control</strong></p>
 <p>TCP uses a sliding window protocol. The receiver advertises its available buffer space in the Window field. The sender cannot send more data than the receiver's window allows.</p>
 <p><strong>Zero Window</strong>: If the receiver's buffer is full, it advertises window=0. The sender pauses and periodically sends probe packets (window probes) to check if space has freed up.</p>
@@ -1682,7 +1813,7 @@ Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
 Sec-WebSocket-Protocol: chat
 </code></pre>
 <p>After the 101 response, the TCP connection is repurposed for WebSocket frames. No more HTTP overhead.</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-06.svg" alt="Diagram 6 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-07.svg" alt="Diagram 7 for Networking Fundamentals" loading="lazy"></figure>
 <h3 id="133-websocket-frame-structure">1.3.3 WebSocket Frame Structure</h3>
 <pre><code> 0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -1733,7 +1864,7 @@ Max delay: 30s
 <p><strong>Challenge 2: Broadcasting to all connections on a server</strong></p>
 <p>If user A on Server 1 sends a message to user B on Server 2, Server 1 must route the message to Server 2.</p>
 <p><strong>Solution: Pub/Sub backbone</strong></p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-07.svg" alt="Diagram 7 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-08.svg" alt="Diagram 8 for Networking Fundamentals" loading="lazy"></figure>
 <p>Each WebSocket server subscribes to relevant channels in Redis Pub/Sub (or Kafka). When a message arrives, it is published to the channel. All subscribed servers receive it and forward it to their local connections.</p>
 <p><strong>Challenge 3: Load balancer stickiness</strong></p>
 <p>WebSocket connections must remain on the same server for their lifetime. The load balancer must support:
@@ -1915,7 +2046,7 @@ enum OrderStatus {
 </tbody>
 </table></div>
 <h3 id="143-four-streaming-modes">1.4.3 Four Streaming Modes</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-08.svg" alt="Diagram 8 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-09.svg" alt="Diagram 9 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>1. Unary RPC</strong> — Standard request-response. Client sends one message, server returns one message. Equivalent to a REST API call but with protobuf serialization.</p>
 <p><strong>2. Server Streaming</strong> — Client sends one request, server returns a stream of responses. Use cases: paginated data, real-time feeds, large result sets.</p>
 <p><strong>3. Client Streaming</strong> — Client sends a stream of requests, server returns one response after processing all. Use cases: file upload, telemetry ingestion, batch processing.</p>
@@ -2103,7 +2234,7 @@ Order.user = (order, args, context) =&gt; context.userLoader.load(order.userId);
 }
 </code></pre>
 <p>Implementation typically uses WebSocket (graphql-ws protocol) with a pub/sub backend:</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-09.svg" alt="Diagram 9 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-10.svg" alt="Diagram 10 for Networking Fundamentals" loading="lazy"></figure>
 <h3 id="156-persisted-queries">1.5.6 Persisted Queries</h3>
 <p>In production, sending full query strings with every request is wasteful and risky (injection, query complexity attacks). Persisted queries solve this:</p>
 <p><strong>Automatic Persisted Queries (APQ):</strong>
@@ -2160,7 +2291,7 @@ Order.user = (order, args, context) =&gt; context.userLoader.load(order.userId);
 <p>DNS translates human-readable domain names (www.example.com) to IP addresses (93.184.216.34). It is one of the oldest and most critical pieces of internet infrastructure — if DNS fails, nothing works.</p>
 <p>DNS is a <strong>hierarchical, distributed</strong> database. No single server knows all mappings. Resolution involves querying multiple servers in a delegation chain.</p>
 <h3 id="212-dns-resolution-process">2.1.2 DNS Resolution Process</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-10.svg" alt="Diagram 10 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-11.svg" alt="Diagram 11 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Step-by-step:</strong>
 1. <strong>Browser cache</strong>: Check if the domain was recently resolved.
 2. <strong>OS cache</strong>: Check the operating system's DNS cache (<code>/etc/hosts</code>, systemd-resolved).
@@ -2275,7 +2406,7 @@ After migration:        Verify traffic, raise TTL back to 3600
 <p>Lowering TTL before a migration ensures that when you change the IP, all caches expire quickly and clients resolve the new address within 60 seconds.</p>
 <h3 id="215-dns-failover">2.1.5 DNS Failover</h3>
 <p>DNS failover uses health checks to remove unhealthy servers from DNS responses:</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-11.svg" alt="Diagram 11 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-12.svg" alt="Diagram 12 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Limitations of DNS failover:</strong>
 - TTL caching means clients may still use the unhealthy IP for up to TTL seconds.
 - No connection-level awareness (DNS does not know if the TCP connection failed).
@@ -2347,7 +2478,7 @@ example.com A 10.0.3.1 (weight: 10)
 4. <strong>Perform health checks</strong>: Automatically detect and remove unhealthy backends.
 5. <strong>Terminate SSL</strong>: Offload TLS processing from application servers.</p>
 <h3 id="222-l4-vs-l7-load-balancing">2.2.2 L4 vs L7 Load Balancing</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-12.svg" alt="Diagram 12 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-13.svg" alt="Diagram 13 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>L4 (Transport Layer) Load Balancer</strong></p>
 <p>Operates at the TCP/UDP level. Routes based on IP address and port number. Does not inspect the payload.</p>
 <div class="table-wrap"><table>
@@ -2581,7 +2712,7 @@ Monitor real traffic responses. If a backend returns too many 5xx errors or time
 <p>Sticky sessions create an anti-pattern: uneven load distribution. If one backend accumulates many sticky sessions, it becomes a hotspot. Prefer <strong>externalized session state</strong> (Redis, database) over sticky sessions whenever possible.</p>
 <h3 id="226-ssltls-termination">2.2.6 SSL/TLS Termination</h3>
 <p>SSL termination at the load balancer offloads cryptographic processing from application servers:</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-13.svg" alt="Diagram 13 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-14.svg" alt="Diagram 14 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Benefits:</strong>
 - Application servers do not need TLS certificates or cryptographic processing.
 - Centralized certificate management (one place to update certificates).
@@ -2594,7 +2725,7 @@ For compliance requirements (e.g., PCI-DSS), the load balancer re-encrypts traff
 <p>This adds latency but ensures data is encrypted in transit even within the data center.</p>
 <h3 id="227-global-server-load-balancing-gslb">2.2.7 Global Server Load Balancing (GSLB)</h3>
 <p>GSLB distributes traffic across multiple data centers globally, combining DNS-based routing with health monitoring:</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-14.svg" alt="Diagram 14 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-15.svg" alt="Diagram 15 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>GSLB Decision Factors:</strong>
 1. <strong>Geographic proximity</strong>: Route to the nearest data center (lowest latency).
 2. <strong>Health status</strong>: Skip unhealthy data centers.
@@ -2613,7 +2744,7 @@ For compliance requirements (e.g., PCI-DSS), the load balancer re-encrypts traff
 <p><strong>Without CDN:</strong> Client in Tokyo requests an image from a server in Virginia. Round-trip time: ~200ms.
 <strong>With CDN:</strong> Client in Tokyo requests the same image from a CDN edge in Tokyo. Round-trip time: ~10ms.</p>
 <h3 id="232-cdn-architecture">2.3.2 CDN Architecture</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-15.svg" alt="Diagram 15 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-16.svg" alt="Diagram 16 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Tier 1 — Edge PoPs (Points of Presence):</strong> Closest to users. 100-300+ locations globally. Cache the most popular content.</p>
 <p><strong>Tier 2 — Origin Shield (Mid-Tier Cache):</strong> A single regional cache between edges and the origin. Collapses duplicate requests from multiple edges into a single origin request.</p>
 <p><strong>Tier 3 — Origin Server:</strong> The source of truth. Only receives requests that miss all cache tiers.</p>
@@ -2966,7 +3097,7 @@ Web App    → Web BFF Proxy    → Aggregates calls to microservices
 - <strong>Operational burden</strong> for updating cross-cutting policies.</p>
 <p>A service mesh moves these concerns into the infrastructure layer, implemented as sidecar proxies deployed alongside each service.</p>
 <h3 id="312-service-mesh-architecture">3.1.2 Service Mesh Architecture</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-16.svg" alt="Diagram 16 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-17.svg" alt="Diagram 17 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Control Plane:</strong> Manages the mesh configuration. Distributes routing rules, security policies, and service discovery information to all sidecar proxies. Examples: Istio (istiod), Linkerd (linkerd-destination, linkerd-identity).</p>
 <p><strong>Data Plane:</strong> The sidecar proxies (typically Envoy) that intercept all inbound and outbound traffic from each service. They enforce policies without application code changes.</p>
 <h3 id="313-istio">3.1.3 Istio</h3>
@@ -3206,7 +3337,7 @@ Web App    → Web BFF Proxy    → Aggregates calls to microservices
 - Persistent connections are acceptable</p>
 <h3 id="323-hybrid-approaches">3.2.3 Hybrid Approaches</h3>
 <p>Most production systems use multiple protocols:</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-17.svg" alt="Diagram 17 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-18.svg" alt="Diagram 18 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Common hybrid pattern:</strong>
 - REST or GraphQL for client-facing APIs (browser compatibility)
 - gRPC for internal service-to-service communication (performance)
@@ -3263,7 +3394,7 @@ Web App    → Web BFF Proxy    → Aggregates calls to microservices
 </table></div>
 <h3 id="332-mtls-mutual-tls">3.3.2 mTLS (Mutual TLS)</h3>
 <p>In standard TLS, only the server presents a certificate. In mTLS, <strong>both</strong> client and server present certificates and verify each other's identity.</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-18.svg" alt="Diagram 18 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-19.svg" alt="Diagram 19 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>mTLS use cases:</strong>
 - Service-to-service authentication in microservices (service mesh)
 - API authentication for B2B integrations
@@ -3422,7 +3553,7 @@ Server response:
 </tbody>
 </table></div>
 <p><strong>Defense-in-depth architecture:</strong></p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-19.svg" alt="Diagram 19 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-20.svg" alt="Diagram 20 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Rate limiting strategies:</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -4140,7 +4271,7 @@ sysctl -w net.ipv4.tcp_keepalive_probes=6
 </code></pre>
 <h3 id="354-network-latency-breakdown-at-scale">3.5.4 Network Latency Breakdown at Scale</h3>
 <p>Understanding where latency comes from at each layer helps engineers target optimizations:</p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-20.svg" alt="Diagram 20 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-21.svg" alt="Diagram 21 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Latency budget example for a 200ms target:</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -4287,9 +4418,9 @@ A service making 30,000+ outgoing connections (e.g., to a database or downstream
 <h2 id="36-network-topology-patterns-in-system-design">3.6 Network Topology Patterns in System Design</h2>
 <h3 id="361-common-network-topologies-for-distributed-systems">3.6.1 Common Network Topologies for Distributed Systems</h3>
 <p><strong>Single-Region, Multi-AZ</strong></p>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-21.svg" alt="Diagram 21 for Networking Fundamentals" loading="lazy"></figure>
-<p><strong>Multi-Region, Active-Active</strong></p>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-22.svg" alt="Diagram 22 for Networking Fundamentals" loading="lazy"></figure>
+<p><strong>Multi-Region, Active-Active</strong></p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-23.svg" alt="Diagram 23 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Network latency between regions (approximate):</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -4327,7 +4458,7 @@ A service making 30,000+ outgoing connections (e.g., to a database or downstream
 </table></div>
 <p>These numbers are critical for designing replication strategies, timeout values, and consistency models.</p>
 <h3 id="362-network-segmentation-and-security-zones">3.6.2 Network Segmentation and Security Zones</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-23.svg" alt="Diagram 23 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-24.svg" alt="Diagram 24 for Networking Fundamentals" loading="lazy"></figure>
 <p><strong>Network security zones:</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -4530,7 +4661,7 @@ The client queries a service registry to get a list of healthy instances and per
 </tbody>
 </table></div>
 <h3 id="372-cloud-load-balancer-selection-guide">3.7.2 Cloud Load Balancer Selection Guide</h3>
-<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-24.svg" alt="Diagram 24 for Networking Fundamentals" loading="lazy"></figure>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-25.svg" alt="Diagram 25 for Networking Fundamentals" loading="lazy"></figure>
 <h3 id="373-privatelink-and-vpc-endpoints">3.7.3 PrivateLink and VPC Endpoints</h3>
 <p>PrivateLink (AWS) / Private Service Connect (GCP) enables private connectivity to services without traversing the public internet:</p>
 <p><strong>Benefits:</strong>
@@ -4712,6 +4843,744 @@ The client queries a service registry to get a list of healthy instances and per
 - <code>http.request_content_length</code>: Request body size
 - <code>http.response_content_length</code>: Response body size</p>
 <hr>
+<h2 id="39-multi-region-latency-budgeting">3.9 Multi-Region Latency Budgeting</h2>
+<p>In multi-region architectures, the network is the dominant source of latency. The speed of light imposes hard physical limits that no amount of optimization can overcome. Engineers must budget latency explicitly.</p>
+<h3 id="391-speed-of-light-limits">3.9.1 Speed of Light Limits</h3>
+<p>Light in fiber travels at roughly 2/3 the speed of light in vacuum (~200,000 km/s). This sets the theoretical minimum RTT between regions. Real-world RTTs are 1.5-2x the theoretical minimum due to routing, switching, and protocol overhead.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Distance (km)</th>
+<th>Theoretical Min RTT</th>
+<th>Typical RTT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>US East (Virginia) ↔ US West (Oregon)</td>
+<td>3,700</td>
+<td>~37ms</td>
+<td>60-70ms</td>
+</tr>
+<tr>
+<td>US East (Virginia) ↔ EU West (Ireland)</td>
+<td>5,500</td>
+<td>~55ms</td>
+<td>75-85ms</td>
+</tr>
+<tr>
+<td>US East (Virginia) ↔ AP Southeast (Singapore)</td>
+<td>15,300</td>
+<td>~153ms</td>
+<td>200-230ms</td>
+</tr>
+<tr>
+<td>US West (Oregon) ↔ AP Northeast (Tokyo)</td>
+<td>7,700</td>
+<td>~77ms</td>
+<td>100-120ms</td>
+</tr>
+<tr>
+<td>EU West (Ireland) ↔ AP Southeast (Singapore)</td>
+<td>10,800</td>
+<td>~108ms</td>
+<td>160-180ms</td>
+</tr>
+<tr>
+<td>US East (Virginia) ↔ SA East (Sao Paulo)</td>
+<td>7,600</td>
+<td>~76ms</td>
+<td>120-140ms</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="392-inter-region-cloud-latency-reference-major-providers">3.9.2 Inter-Region Cloud Latency Reference (Major Providers)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Region Pair</th>
+<th>AWS (typical)</th>
+<th>GCP (typical)</th>
+<th>Azure (typical)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>us-east-1 ↔ eu-west-1</td>
+<td>75-85ms</td>
+<td>80-90ms</td>
+<td>75-85ms</td>
+</tr>
+<tr>
+<td>us-east-1 ↔ ap-southeast-1</td>
+<td>200-230ms</td>
+<td>190-220ms</td>
+<td>200-230ms</td>
+</tr>
+<tr>
+<td>us-east-1 ↔ us-west-2</td>
+<td>60-70ms</td>
+<td>55-65ms</td>
+<td>60-70ms</td>
+</tr>
+<tr>
+<td>eu-west-1 ↔ ap-northeast-1</td>
+<td>220-250ms</td>
+<td>210-240ms</td>
+<td>220-250ms</td>
+</tr>
+<tr>
+<td>Same AZ</td>
+<td>&lt; 0.5ms</td>
+<td>&lt; 0.5ms</td>
+<td>&lt; 0.5ms</td>
+</tr>
+<tr>
+<td>Cross-AZ (same region)</td>
+<td>1-2ms</td>
+<td>1-2ms</td>
+<td>1-2ms</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="393-latency-budget-worksheet-network-focused">3.9.3 Latency Budget Worksheet (Network-Focused)</h3>
+<p>For a user request that spans multiple regions, every network hop must be accounted for:</p>
+<pre><code>Example: User in Tokyo reads data that requires cross-region coordination
+
+Step                                  | Budget    | Cumulative
+--------------------------------------|-----------|----------
+Client → CDN Edge (Tokyo)             |    5ms    |     5ms
+CDN Miss → Origin (us-east-1)         |  110ms    |   115ms
+Origin → Database (same region)       |    2ms    |   117ms
+Database cross-region read (eu-west)  |   80ms    |   197ms
+Response: Origin → CDN Edge           |  110ms    |   307ms
+CDN Edge → Client                     |    5ms    |   312ms
+--------------------------------------|-----------|----------
+Total network budget                  |  312ms    |
+Application processing budget         |   38ms    |
+--------------------------------------|-----------|----------
+Target P99 latency                    |  350ms    |
+</code></pre>
+<p><strong>Rule of thumb:</strong> If your latency budget exceeds 300ms for any user-facing request, you need regional data locality or async patterns.</p>
+<h3 id="394-strategies-for-multi-region-latency-reduction">3.9.4 Strategies for Multi-Region Latency Reduction</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Latency Reduction</th>
+<th>Complexity</th>
+<th>Use When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Regional routing (GeoDNS/Anycast)</strong></td>
+<td>Route users to nearest region</td>
+<td>Low</td>
+<td>Read-heavy workloads with regional data copies</td>
+</tr>
+<tr>
+<td><strong>CDN edge caching</strong></td>
+<td>Eliminate origin round-trip for cacheable content</td>
+<td>Low</td>
+<td>Static assets, API responses with TTL</td>
+</tr>
+<tr>
+<td><strong>Connection pooling</strong></td>
+<td>Eliminate repeated handshake overhead</td>
+<td>Medium</td>
+<td>High-throughput service-to-service calls</td>
+</tr>
+<tr>
+<td><strong>Async replication</strong></td>
+<td>Avoid synchronous cross-region writes</td>
+<td>Medium</td>
+<td>Eventual consistency is acceptable</td>
+</tr>
+<tr>
+<td><strong>Read replicas per region</strong></td>
+<td>Local reads, cross-region writes only</td>
+<td>Medium</td>
+<td>Read-heavy with infrequent writes</td>
+</tr>
+<tr>
+<td><strong>CRDT / conflict-free writes</strong></td>
+<td>Local writes with automatic merge</td>
+<td>High</td>
+<td>Multi-region active-active writes (see F07)</td>
+</tr>
+<tr>
+<td><strong>Edge compute (Cloudflare Workers, Lambda@Edge)</strong></td>
+<td>Execute logic at the edge</td>
+<td>Medium</td>
+<td>Personalization, A/B testing, auth validation</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="395-multi-region-request-path-with-latency-annotations">3.9.5 Multi-Region Request Path with Latency Annotations</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-26.svg" alt="Diagram 26 for Networking Fundamentals" loading="lazy"></figure>
+<blockquote>
+<p><strong>Cross-reference:</strong> See F05 Scalability for tail latency budgeting and retry budget accounting. See F07 Distributed Systems for CRDT-based multi-region write strategies.</p>
+</blockquote>
+<hr>
+<h2 id="310-service-to-service-identity-and-mtls-at-scale">3.10 Service-to-Service Identity and mTLS at Scale</h2>
+<h3 id="3101-why-service-to-service-auth-matters-zero-trust">3.10.1 Why Service-to-Service Auth Matters (Zero Trust)</h3>
+<p>In a zero-trust network model, no service trusts any other service based on network location alone. Every service-to-service call must be authenticated and authorized. This is a fundamental shift from perimeter-based security where "inside the VPC" was considered safe.</p>
+<p><strong>Threats that mTLS addresses:</strong>
+- Compromised container making lateral calls to other services
+- Network-level man-in-the-middle attacks within the data center
+- Unauthorized services impersonating legitimate ones
+- Data exfiltration through unauthorized service communication</p>
+<h3 id="3102-how-mtls-works">3.10.2 How mTLS Works</h3>
+<p>In standard TLS, only the server presents a certificate. In mutual TLS (mTLS), both client and server present certificates and verify each other's identity.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-27.svg" alt="Diagram 27 for Networking Fundamentals" loading="lazy"></figure>
+<h3 id="3103-certificate-management-challenges-at-scale">3.10.3 Certificate Management Challenges at Scale</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Challenge</th>
+<th>Impact</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Certificate provisioning for 1000+ services</td>
+<td>Manual cert management is impossible</td>
+<td>Automated PKI (Vault PKI, AWS Private CA, SPIFFE)</td>
+</tr>
+<tr>
+<td>Certificate rotation without downtime</td>
+<td>Expired certs cause outages</td>
+<td>Short-lived certs (24h) with automatic rotation</td>
+</tr>
+<tr>
+<td>Cross-cluster identity</td>
+<td>Services in different clusters need mutual trust</td>
+<td>Federated trust roots (SPIFFE federation)</td>
+</tr>
+<tr>
+<td>Certificate revocation at scale</td>
+<td>CRL/OCSP adds latency to every request</td>
+<td>Short-lived certificates (no need to revoke)</td>
+</tr>
+<tr>
+<td>Private key security</td>
+<td>Compromised key breaks all trust</td>
+<td>In-memory keys, hardware-backed storage, no key export</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Hard to debug cert-related failures</td>
+<td>Cert expiry monitoring, handshake failure metrics</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="3104-spiffespire-for-workload-identity">3.10.4 SPIFFE/SPIRE for Workload Identity</h3>
+<p>SPIFFE (Secure Production Identity Framework For Everyone) provides a standard for service identity:</p>
+<ul>
+<li><strong>SPIFFE ID</strong>: A URI that uniquely identifies a workload: <code>spiffe://trust-domain/path</code> (e.g., <code>spiffe://prod.example.com/payments/api</code>)</li>
+<li><strong>SVID (SPIFFE Verifiable Identity Document)</strong>: An X.509 certificate or JWT that encodes the SPIFFE ID</li>
+<li><strong>SPIRE</strong>: The reference implementation that automates SVID issuance and rotation</li>
+</ul>
+<p><strong>How SPIRE works:</strong>
+1. SPIRE Agent runs on each node, attests workload identity using kernel-level information (PID, cgroups, Kubernetes pod identity)
+2. SPIRE Server issues short-lived SVIDs (certificates valid for 1-24 hours)
+3. Workloads use SVIDs for mTLS — no application code changes needed if using a sidecar/mesh
+4. Automatic rotation before expiry — zero downtime</p>
+<h3 id="3105-service-mesh-mtls-vs-application-level-mtls">3.10.5 Service Mesh mTLS vs Application-Level mTLS</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Service Mesh mTLS (Istio/Linkerd)</th>
+<th>Application-Level mTLS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Implementation</strong></td>
+<td>Sidecar proxy handles all TLS</td>
+<td>Application code manages TLS connections</td>
+</tr>
+<tr>
+<td><strong>Code changes</strong></td>
+<td>None — transparent to application</td>
+<td>Significant — cert loading, TLS config, rotation logic</td>
+</tr>
+<tr>
+<td><strong>Certificate management</strong></td>
+<td>Mesh control plane automates issuance/rotation</td>
+<td>Application must integrate with CA or Vault</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td>Extra hop through sidecar (~0.5-1ms)</td>
+<td>Direct connection, lower latency</td>
+</tr>
+<tr>
+<td><strong>Observability</strong></td>
+<td>Built-in metrics (handshake failures, cert expiry)</td>
+<td>Must instrument manually</td>
+</tr>
+<tr>
+<td><strong>Policy enforcement</strong></td>
+<td>Declarative (YAML) — AuthorizationPolicy in Istio</td>
+<td>Code-level — harder to audit and enforce</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Microservices at scale (50+ services)</td>
+<td>Small deployments, non-mesh environments, performance-critical paths</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="3106-certificate-rotation-without-downtime">3.10.6 Certificate Rotation Without Downtime</h3>
+<p>The key to zero-downtime certificate rotation is dual-cert support:</p>
+<ol>
+<li><strong>Before rotation</strong>: Service holds Certificate A (current)</li>
+<li><strong>Rotation starts</strong>: Service loads Certificate B (new) alongside Certificate A</li>
+<li><strong>Overlap period</strong>: Service presents Certificate B to new connections, accepts both A and B from clients</li>
+<li><strong>Rotation complete</strong>: Certificate A expires or is removed; only Certificate B remains</li>
+<li><strong>Monitoring</strong>: Alert if any service still presents the old certificate after the overlap window</li>
+</ol>
+<p><strong>Service mesh automation:</strong> Istio and Linkerd handle this automatically. Citadel (Istio) or Identity (Linkerd) rotates certificates before expiry with configurable overlap periods. Default in Istio: certificates are valid for 24 hours, rotated at 50% lifetime (every 12 hours).</p>
+<hr>
+<h2 id="311-timeouts-and-retries-as-network-policy">3.11 Timeouts and Retries as Network Policy</h2>
+<p>Timeouts are not optional configuration — they are network policy decisions that determine how your system behaves under degradation. Every network call without an explicit timeout is a potential resource leak and cascading failure vector.</p>
+<h3 id="3111-timeout-taxonomy">3.11.1 Timeout Taxonomy</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Timeout Type</th>
+<th>What It Controls</th>
+<th>Typical Value</th>
+<th>If Too Short</th>
+<th>If Too Long</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Connection timeout</strong></td>
+<td>Time to establish TCP/TLS connection</td>
+<td>1-5s</td>
+<td>Reject during DNS/network blips</td>
+<td>Threads blocked on unreachable hosts</td>
+</tr>
+<tr>
+<td><strong>Read timeout</strong></td>
+<td>Time waiting for first byte of response</td>
+<td>5-30s</td>
+<td>Fail on slow but valid queries</td>
+<td>Threads blocked on hung servers</td>
+</tr>
+<tr>
+<td><strong>Write timeout</strong></td>
+<td>Time to send the request body</td>
+<td>5-15s</td>
+<td>Fail on large uploads over slow links</td>
+<td>Stalled connections consume resources</td>
+</tr>
+<tr>
+<td><strong>Idle timeout</strong></td>
+<td>Time a connection sits unused before closure</td>
+<td>30-120s</td>
+<td>Excessive connection churn (re-establish overhead)</td>
+<td>Wasted resources on stale connections</td>
+</tr>
+<tr>
+<td><strong>Request timeout</strong></td>
+<td>End-to-end time for complete request lifecycle</td>
+<td>10-60s</td>
+<td>Fail valid complex operations</td>
+<td>Users wait too long, resources consumed</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="3112-timeout-propagation-and-deadline-budgets">3.11.2 Timeout Propagation and Deadline Budgets</h3>
+<p>In a service chain, timeouts must propagate to prevent upstream services from waiting longer than the original caller's deadline.</p>
+<p><strong>The deadline budget pattern:</strong></p>
+<pre><code>Client sets deadline: 500ms
+
+Gateway receives request
+  Remaining budget: 500ms - 5ms (network) = 495ms
+  Gateway processing: 10ms
+  Remaining: 485ms
+
+Service A receives request
+  Remaining budget: 485ms - 3ms (network) = 482ms
+  Service A processing: 20ms
+  Remaining: 462ms
+
+Service B receives request
+  Remaining budget: 462ms - 3ms (network) = 459ms
+  Service B must complete within: 459ms
+  If Service B needs to call Service C, it passes: 459ms - processing_time
+</code></pre>
+<p><strong>Critical rule:</strong> Every downstream call should set its timeout to min(own_timeout, remaining_deadline_budget). If the remaining budget is less than the minimum useful timeout, fail fast without making the call.</p>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-28.svg" alt="Diagram 28 for Networking Fundamentals" loading="lazy"></figure>
+<h3 id="3113-retry-classification">3.11.3 Retry Classification</h3>
+<p>Not all errors are retryable. Retrying non-retryable errors wastes resources and can cause duplicate side effects.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Retryable?</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>503 Service Unavailable</strong></td>
+<td>Yes</td>
+<td>Server is temporarily overloaded</td>
+</tr>
+<tr>
+<td><strong>429 Too Many Requests</strong></td>
+<td>Yes (with backoff)</td>
+<td>Rate limited — respect Retry-After header</td>
+</tr>
+<tr>
+<td><strong>Connection timeout</strong></td>
+<td>Yes</td>
+<td>Network or server unreachable temporarily</td>
+</tr>
+<tr>
+<td><strong>Connection refused</strong></td>
+<td>Yes (limited)</td>
+<td>Server process not running — may recover after restart</td>
+</tr>
+<tr>
+<td><strong>Connection reset</strong></td>
+<td>Yes</td>
+<td>Server dropped connection — may be transient</td>
+</tr>
+<tr>
+<td><strong>500 Internal Server Error</strong></td>
+<td>Maybe</td>
+<td>Could be transient; limit retries to 1-2</td>
+</tr>
+<tr>
+<td><strong>400 Bad Request</strong></td>
+<td>No</td>
+<td>Client error — retrying sends the same bad request</td>
+</tr>
+<tr>
+<td><strong>401 Unauthorized</strong></td>
+<td>No</td>
+<td>Invalid credentials — retry will not fix auth</td>
+</tr>
+<tr>
+<td><strong>403 Forbidden</strong></td>
+<td>No</td>
+<td>Permission denied — retry will not grant access</td>
+</tr>
+<tr>
+<td><strong>404 Not Found</strong></td>
+<td>No</td>
+<td>Resource does not exist</td>
+</tr>
+<tr>
+<td><strong>409 Conflict</strong></td>
+<td>No (usually)</td>
+<td>State conflict — retry may worsen the situation</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="3114-exponential-backoff-with-jitter">3.11.4 Exponential Backoff with Jitter</h3>
+<p>Exponential backoff prevents retry storms. Jitter prevents thundering herd when many clients retry simultaneously.</p>
+<p><strong>Formula:</strong></p>
+<pre><code>wait_time = min(base_delay * 2^attempt + random(0, jitter_range), max_delay)
+
+Example with base_delay=100ms, jitter_range=100ms, max_delay=30s:
+  Attempt 1: 100ms * 2^1 + random(0,100) = 200-300ms
+  Attempt 2: 100ms * 2^2 + random(0,100) = 400-500ms
+  Attempt 3: 100ms * 2^3 + random(0,100) = 800-900ms
+  Attempt 4: 100ms * 2^4 + random(0,100) = 1600-1700ms
+  ...capped at 30s
+</code></pre>
+<p><strong>Full jitter (recommended by AWS):</strong></p>
+<pre><code>wait_time = random(0, min(base_delay * 2^attempt, max_delay))
+</code></pre>
+<p>Full jitter provides the broadest spread of retry times, minimizing correlated retries across clients.</p>
+<h3 id="3115-circuit-breaker-integration">3.11.5 Circuit Breaker Integration</h3>
+<p>Retries and circuit breakers work together. The circuit breaker prevents retries when a downstream service is known to be failing:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Circuit State</th>
+<th>Retry Behavior</th>
+<th>Timeout Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Closed</strong> (healthy)</td>
+<td>Normal retries with backoff</td>
+<td>Normal timeouts</td>
+</tr>
+<tr>
+<td><strong>Open</strong> (failing)</td>
+<td>No retries — fail immediately</td>
+<td>No connection attempt — return cached/fallback</td>
+</tr>
+<tr>
+<td><strong>Half-Open</strong> (testing)</td>
+<td>Single probe request</td>
+<td>Shorter timeout to detect recovery quickly</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Transition thresholds (example):</strong>
+- Closed → Open: 5 failures in 30 seconds
+- Open → Half-Open: After 30-second cooldown
+- Half-Open → Closed: 3 consecutive successes
+- Half-Open → Open: 1 failure</p>
+<h3 id="3116-timeout-cascade-through-a-service-chain">3.11.6 Timeout Cascade Through a Service Chain</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-29.svg" alt="Diagram 29 for Networking Fundamentals" loading="lazy"></figure>
+<blockquote>
+<p><strong>Cross-reference:</strong> See F05 Scalability for retry budget accounting — total retry traffic should be capped at 10-20% of normal traffic to prevent retry storms from amplifying failures.</p>
+</blockquote>
+<hr>
+<h2 id="312-modern-edge-stack">3.12 Modern Edge Stack</h2>
+<p>Every user request traverses multiple layers of infrastructure before reaching application code. Understanding the full edge stack — each layer's role, latency contribution, and failure mode — is essential for system design.</p>
+<h3 id="3121-full-request-path-client-to-origin">3.12.1 Full Request Path: Client to Origin</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-30.svg" alt="Diagram 30 for Networking Fundamentals" loading="lazy"></figure>
+<h3 id="3122-edge-layer-responsibilities">3.12.2 Edge Layer Responsibilities</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Role</th>
+<th>Latency Added</th>
+<th>Failure Mode</th>
+<th>Recovery</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DNS</strong></td>
+<td>Name resolution, geographic routing</td>
+<td>2-50ms (cached: 0ms)</td>
+<td>NXDOMAIN, timeout, poisoning</td>
+<td>Multiple providers, low TTL during changes</td>
+</tr>
+<tr>
+<td><strong>Anycast CDN</strong></td>
+<td>Cache static/dynamic content at the edge</td>
+<td>1-5ms (cache hit: serves directly)</td>
+<td>Edge POP failure</td>
+<td>Automatic failover to next-nearest POP</td>
+</tr>
+<tr>
+<td><strong>WAF</strong></td>
+<td>Block SQL injection, XSS, malicious payloads</td>
+<td>1-3ms</td>
+<td>False positive blocks legitimate traffic</td>
+<td>Tunable rules, audit mode before enforcement</td>
+</tr>
+<tr>
+<td><strong>DDoS Mitigation</strong></td>
+<td>Absorb volumetric and protocol attacks</td>
+<td>0-2ms (inline)</td>
+<td>Attack exceeds capacity</td>
+<td>Scrubbing centers, upstream blackholing</td>
+</tr>
+<tr>
+<td><strong>API Gateway</strong></td>
+<td>Authentication, rate limiting, request routing</td>
+<td>2-10ms</td>
+<td>Auth service down, rate limiter misconfigured</td>
+<td>Circuit breaker on auth, cached tokens</td>
+</tr>
+<tr>
+<td><strong>Load Balancer</strong></td>
+<td>Distribute traffic, health checks, SSL termination</td>
+<td>1-3ms</td>
+<td>Health check flapping, algorithm imbalance</td>
+<td>Slow-start, dampened health checks</td>
+</tr>
+<tr>
+<td><strong>Service Mesh</strong></td>
+<td>mTLS, observability, traffic management</td>
+<td>0.5-1ms</td>
+<td>Sidecar crash, control plane down</td>
+<td>Data plane continues with last-known config</td>
+</tr>
+<tr>
+<td><strong>Application</strong></td>
+<td>Business logic</td>
+<td>Variable</td>
+<td>Application error, OOM, deadlock</td>
+<td>Autoscaling, health checks, graceful degradation</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Total edge overhead (typical):</strong> 8-75ms added before application code runs. Optimize by collapsing layers (e.g., CDN with built-in WAF and DDoS) and using keep-alive connections between layers.</p>
+<h3 id="3123-cdn-provider-architecture-comparison">3.12.3 CDN Provider Architecture Comparison</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Cloudflare</th>
+<th>Fastly</th>
+<th>AWS CloudFront</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Network</strong></td>
+<td>Anycast, 300+ cities</td>
+<td>Anycast, 90+ POPs</td>
+<td>400+ edge locations, 13 regional caches</td>
+</tr>
+<tr>
+<td><strong>Edge compute</strong></td>
+<td>Workers (V8 isolates, 0ms cold start)</td>
+<td>Compute@Edge (Wasm)</td>
+<td>Lambda@Edge (Node/Python, cold start ~100ms)</td>
+</tr>
+<tr>
+<td><strong>WAF</strong></td>
+<td>Integrated (managed + custom rules)</td>
+<td>Signal Sciences (acquired)</td>
+<td>AWS WAF (separate service)</td>
+</tr>
+<tr>
+<td><strong>DDoS</strong></td>
+<td>Always-on, unlimited (included)</td>
+<td>Always-on (included)</td>
+<td>Shield Standard (free) / Advanced ($3k/mo)</td>
+</tr>
+<tr>
+<td><strong>TLS termination</strong></td>
+<td>Edge (automatic certs)</td>
+<td>Edge (automatic certs)</td>
+<td>Edge (ACM integration)</td>
+</tr>
+<tr>
+<td><strong>Cache invalidation</strong></td>
+<td>Instant (~150ms global)</td>
+<td>Instant (~150ms global)</td>
+<td>1-10 minutes (batch invalidation)</td>
+</tr>
+<tr>
+<td><strong>Origin protocol</strong></td>
+<td>HTTP/1.1, HTTP/2, gRPC</td>
+<td>HTTP/1.1, HTTP/2</td>
+<td>HTTP/1.1, HTTP/2</td>
+</tr>
+<tr>
+<td><strong>Pricing model</strong></td>
+<td>Flat (unlimited bandwidth)</td>
+<td>Usage-based (requests + bandwidth)</td>
+<td>Usage-based (requests + bandwidth per region)</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Full-stack security + performance</td>
+<td>Low-latency API caching, Wasm compute</td>
+<td>AWS-native workloads, tight IAM integration</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="313-network-debugging-toolkit">3.13 Network Debugging Toolkit</h2>
+<p>While Section 3.4 covers network debugging tools in depth, this section provides a structured troubleshooting methodology — a decision-tree approach to diagnosing the most common production network issues.</p>
+<h3 id="3131-essential-tool-quick-reference">3.13.1 Essential Tool Quick Reference</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+<th>Key Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>traceroute / mtr</strong></td>
+<td>Path analysis, hop-by-hop latency</td>
+<td><code>mtr --report example.com</code></td>
+</tr>
+<tr>
+<td><strong>dig</strong></td>
+<td>DNS resolution debugging</td>
+<td><code>dig +trace example.com</code></td>
+</tr>
+<tr>
+<td><strong>curl timing</strong></td>
+<td>HTTP request latency breakdown</td>
+<td><code>curl -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total}\n' -o /dev/null -s https://example.com</code></td>
+</tr>
+<tr>
+<td><strong>tcpdump</strong></td>
+<td>Packet-level capture</td>
+<td><code>tcpdump -i any host 10.0.1.5 -nn -c 100</code></td>
+</tr>
+<tr>
+<td><strong>Wireshark</strong></td>
+<td>Deep packet inspection (GUI)</td>
+<td>Open pcap from tcpdump, filter: <code>tcp.analysis.retransmission</code></td>
+</tr>
+<tr>
+<td><strong>ss / netstat</strong></td>
+<td>Socket state and connection info</td>
+<td><code>ss -tnp state time-wait \| wc -l</code></td>
+</tr>
+<tr>
+<td><strong>openssl s_client</strong></td>
+<td>TLS handshake debugging</td>
+<td><code>openssl s_client -connect example.com:443 -servername example.com</code></td>
+</tr>
+<tr>
+<td><strong>nmap</strong></td>
+<td>Port scanning, service detection</td>
+<td><code>nmap -sT -p 443,8080 10.0.1.5</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="3132-common-network-issues-and-diagnosis-steps">3.13.2 Common Network Issues and Diagnosis Steps</h3>
+<p><strong>DNS Resolution Failure</strong></p>
+<p>Symptoms: <code>could not resolve host</code>, NXDOMAIN errors, intermittent name resolution failures.</p>
+<p>Diagnosis:
+1. <code>dig example.com @8.8.8.8</code> — Test with public DNS to isolate if issue is local resolver
+2. <code>dig +trace example.com</code> — Walk the full resolution chain to find where it breaks
+3. <code>dig example.com @$(cat /etc/resolv.conf | grep nameserver | head -1 | awk '{print $2}')</code> — Test with configured resolver
+4. Check: Is the DNS record TTL expired? Is the authoritative nameserver responding?</p>
+<p><strong>TLS Handshake Timeout</strong></p>
+<p>Symptoms: Connection hangs after TCP established, <code>SSL handshake timeout</code>, slow first requests.</p>
+<p>Diagnosis:
+1. <code>openssl s_client -connect example.com:443 -servername example.com</code> — Test TLS handshake directly
+2. <code>curl -v --tlsv1.3 https://example.com</code> — Check if specific TLS version works
+3. <code>tcpdump -i any port 443 -nn</code> — Look for incomplete handshake (ClientHello sent but no ServerHello)
+4. Check: Is the server overwhelmed? Is a firewall blocking TLS but allowing TCP? OCSP stapling timeout?</p>
+<p><strong>Connection Reset (RST)</strong></p>
+<p>Symptoms: <code>connection reset by peer</code>, intermittent failures, works on retry.</p>
+<p>Diagnosis:
+1. <code>tcpdump 'tcp[tcpflags] &amp; (tcp-rst) != 0'</code> — Capture RST packets to identify source
+2. Check load balancer idle timeout vs application keep-alive timeout (mismatch is the #1 cause)
+3. Check: Is a WAF/firewall terminating connections? Is the server hitting max connection limits?</p>
+<p><strong>High Latency</strong></p>
+<p>Symptoms: Slow responses, high P99 latency, intermittent slowness.</p>
+<p>Diagnosis:
+1. <code>curl -w 'dns:%{time_namelookup} tcp:%{time_connect} tls:%{time_appconnect} ttfb:%{time_starttransfer} total:%{time_total}\n' -o /dev/null -s https://example.com</code> — Identify which phase is slow
+2. <code>mtr --report --report-cycles 50 example.com</code> — Check for lossy hops
+3. <code>ss -tnp | grep ESTABLISHED | wc -l</code> — Check connection count (exhaustion?)
+4. Check: DNS slow? TLS handshake slow? Server processing slow? Response transfer slow?</p>
+<p><strong>Packet Loss</strong></p>
+<p>Symptoms: Retransmissions, intermittent timeouts, degraded throughput.</p>
+<p>Diagnosis:
+1. <code>mtr --report --report-cycles 200 example.com</code> — Identify lossy hop (look for Loss% &gt; 0)
+2. <code>tcpdump -i any -nn</code> then Wireshark filter: <code>tcp.analysis.retransmission</code> — Count retransmissions
+3. <code>ethtool -S eth0 | grep -i error</code> — Check NIC-level errors
+4. Check: Is the lossy hop in your network or upstream? Is it congestion-related (time-of-day pattern)?</p>
+<h3 id="3133-troubleshooting-decision-tree">3.13.3 Troubleshooting Decision Tree</h3>
+<figure class="mermaid-static-diagram"><img src="../assets/diagrams/F08-networking-fundamentals-diagram-31.svg" alt="Diagram 31 for Networking Fundamentals" loading="lazy"></figure>
+<blockquote>
+<p><strong>Cross-reference:</strong> See F10 Observability for distributed tracing integration — network-level debugging should be correlated with application-level traces using span annotations (<code>net.peer.ip</code>, <code>dns.resolution_time</code>, <code>tls.handshake_time</code>).</p>
+</blockquote>
+<hr>
 <h2 id="summary">Summary</h2>
 <p>Networking fundamentals span three critical domains for system designers:</p>
 <p><strong>Protocols</strong> determine how systems communicate. HTTP/2 and HTTP/3 have largely solved the performance limitations of HTTP/1.1 through multiplexing, header compression, and QUIC-based transport. TCP remains the workhorse for reliable communication, while UDP powers latency-sensitive applications and modern transports like QUIC. WebSocket enables real-time bidirectional communication. gRPC provides high-performance RPC with strong typing and streaming. GraphQL offers flexible data fetching for complex client needs.</p>
@@ -4829,6 +5698,7 @@ The client queries a service registry to get a list of healthy instances and per
 <li><a href="#113-http2-deep-dive">1.1.3 HTTP/2 Deep Dive</a></li>
 <li><a href="#114-http3-and-quic">1.1.4 HTTP/3 and QUIC</a></li>
 <li><a href="#115-tls-handshake-and-certificate-management">1.1.5 TLS Handshake and Certificate Management</a></li>
+<li><a href="#115a-modern-protocol-updates-2026-ready">1.1.5a Modern Protocol Updates (2026-Ready)</a></li>
 <li><a href="#116-http-methods-status-codes-and-headers-system-design-essentials">1.1.6 HTTP Methods, Status Codes, and Headers (System Design Essentials)</a></li>
 </ul>
 </li>
@@ -4983,6 +5853,44 @@ The client queries a service registry to get a list of healthy instances and per
 <li><a href="#381-golden-signals-for-network-health">3.8.1 Golden Signals for Network Health</a></li>
 <li><a href="#382-network-specific-metrics">3.8.2 Network-Specific Metrics</a></li>
 <li><a href="#383-distributed-tracing-for-network-issues">3.8.3 Distributed Tracing for Network Issues</a></li>
+</ul>
+</li>
+<li><a href="#39-multi-region-latency-budgeting">3.9 Multi-Region Latency Budgeting</a><ul>
+<li><a href="#391-speed-of-light-limits">3.9.1 Speed of Light Limits</a></li>
+<li><a href="#392-inter-region-cloud-latency-reference-major-providers">3.9.2 Inter-Region Cloud Latency Reference (Major Providers)</a></li>
+<li><a href="#393-latency-budget-worksheet-network-focused">3.9.3 Latency Budget Worksheet (Network-Focused)</a></li>
+<li><a href="#394-strategies-for-multi-region-latency-reduction">3.9.4 Strategies for Multi-Region Latency Reduction</a></li>
+<li><a href="#395-multi-region-request-path-with-latency-annotations">3.9.5 Multi-Region Request Path with Latency Annotations</a></li>
+</ul>
+</li>
+<li><a href="#310-service-to-service-identity-and-mtls-at-scale">3.10 Service-to-Service Identity and mTLS at Scale</a><ul>
+<li><a href="#3101-why-service-to-service-auth-matters-zero-trust">3.10.1 Why Service-to-Service Auth Matters (Zero Trust)</a></li>
+<li><a href="#3102-how-mtls-works">3.10.2 How mTLS Works</a></li>
+<li><a href="#3103-certificate-management-challenges-at-scale">3.10.3 Certificate Management Challenges at Scale</a></li>
+<li><a href="#3104-spiffespire-for-workload-identity">3.10.4 SPIFFE/SPIRE for Workload Identity</a></li>
+<li><a href="#3105-service-mesh-mtls-vs-application-level-mtls">3.10.5 Service Mesh mTLS vs Application-Level mTLS</a></li>
+<li><a href="#3106-certificate-rotation-without-downtime">3.10.6 Certificate Rotation Without Downtime</a></li>
+</ul>
+</li>
+<li><a href="#311-timeouts-and-retries-as-network-policy">3.11 Timeouts and Retries as Network Policy</a><ul>
+<li><a href="#3111-timeout-taxonomy">3.11.1 Timeout Taxonomy</a></li>
+<li><a href="#3112-timeout-propagation-and-deadline-budgets">3.11.2 Timeout Propagation and Deadline Budgets</a></li>
+<li><a href="#3113-retry-classification">3.11.3 Retry Classification</a></li>
+<li><a href="#3114-exponential-backoff-with-jitter">3.11.4 Exponential Backoff with Jitter</a></li>
+<li><a href="#3115-circuit-breaker-integration">3.11.5 Circuit Breaker Integration</a></li>
+<li><a href="#3116-timeout-cascade-through-a-service-chain">3.11.6 Timeout Cascade Through a Service Chain</a></li>
+</ul>
+</li>
+<li><a href="#312-modern-edge-stack">3.12 Modern Edge Stack</a><ul>
+<li><a href="#3121-full-request-path-client-to-origin">3.12.1 Full Request Path: Client to Origin</a></li>
+<li><a href="#3122-edge-layer-responsibilities">3.12.2 Edge Layer Responsibilities</a></li>
+<li><a href="#3123-cdn-provider-architecture-comparison">3.12.3 CDN Provider Architecture Comparison</a></li>
+</ul>
+</li>
+<li><a href="#313-network-debugging-toolkit">3.13 Network Debugging Toolkit</a><ul>
+<li><a href="#3131-essential-tool-quick-reference">3.13.1 Essential Tool Quick Reference</a></li>
+<li><a href="#3132-common-network-issues-and-diagnosis-steps">3.13.2 Common Network Issues and Diagnosis Steps</a></li>
+<li><a href="#3133-troubleshooting-decision-tree">3.13.3 Troubleshooting Decision Tree</a></li>
 </ul>
 </li>
 <li><a href="#summary">Summary</a></li>

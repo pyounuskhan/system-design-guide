@@ -1013,8 +1013,10 @@
 
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
-<p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 43 of 47</p>
+<p><strong>Part:</strong> Part 5 — Real-World System Design Examples<br>
+<strong>Position:</strong> Chapter 43 of 60<br>
+<strong>Last reviewed:</strong> March 2026. Healthcare regulations and interoperability standards evolve.</p>
+<p><strong>⚠️ Disclaimer:</strong> <em>Architectural reference only.</em> Healthcare data systems involve patient safety, privacy regulations, and liability. Production implementations require qualified legal, compliance, and clinical informatics review.</p>
 <hr>
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
@@ -6470,6 +6472,90 @@ Post-Market Surveillance (Real-world evidence)
 </li>
 </ol>
 <p>The platform architecture described in this chapter provides a comprehensive blueprint for building a national-scale healthcare data sharing system. The key challenge lies not just in the technology, but in the governance, organizational change management, and patient engagement required to make it successful.</p>
+<hr>
+<h2 id="phi-threat-model">PHI Data Sharing Threat Model</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Vector</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Unauthorized access</strong></td><td>Overly broad API scopes</td><td>Purpose-of-use enforcement; consent gateway</td></tr>
+<tr><td><strong>Transit leakage</strong></td><td>Unencrypted inter-org calls</td><td>Mutual TLS; certificate pinning</td></tr>
+<tr><td><strong>Insider abuse</strong></td><td>Access without treatment relationship</td><td>Break-glass audit; anomaly detection</td></tr>
+<tr><td><strong>Consent bypass</strong></td><td>Data processed without consent</td><td>Consent service enforces every release</td></tr>
+<tr><td><strong>Re-identification</strong></td><td>De-ID data + external sources</td><td>Expert determination; k-anonymity</td></tr>
+<tr><td><strong>Partner breach</strong></td><td>Receiving org has weak security</td><td>BAA; minimum standards; audit rights</td></tr>
+<tr><td><strong>Stale consent</strong></td><td>Revoked but still shared</td><td>Real-time consent check; event-driven revocation</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="consent-model">Consent Model Architecture</h2>
+<pre><code>Grant consent → store: patient, data_category, purpose, granted_to, valid dates
+Request arrives → authenticate org (mTLS+OAuth) → authorize role → check consent
+  → Pass: release minimized data + log | Fail: deny + log | Emergency: break-glass + alert</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Granularity</th><th>What Patient Controls</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Blanket</td><td>All data, all providers</td><td>"Share everything with my care team"</td></tr>
+<tr><td>Category-level</td><td>Specific data types per org</td><td>"Labs to Dr. Smith only"</td></tr>
+<tr><td>Record-level</td><td>Individual documents</td><td>"My Jan 2026 MRI to specialist"</td></tr>
+<tr><td>Purpose-based</td><td>Treatment vs research</td><td>"Treatment only, not research"</td></tr>
+<tr><td>Time-limited</td><td>Expires after date</td><td>"6 months for this episode"</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="sharing-audit-log">Audit Logging for Health Data Sharing</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Event</th><th>Fields</th><th>Alert</th></tr></thead>
+<tbody>
+<tr><td>Data shared</td><td>Sending/receiving org, patient, scope, consent_ref</td><td>Normal</td></tr>
+<tr><td>Access denied</td><td>Requestor, patient, reason</td><td>Repeated from same org → investigate</td></tr>
+<tr><td>Break-glass</td><td>Accessor, patient, justification</td><td><strong>Immediate P1</strong> to privacy officer</td></tr>
+<tr><td>Bulk export</td><td>Requestor, scope, record count</td><td>&gt; 100 records → approval + alert</td></tr>
+<tr><td>Consent change</td><td>Patient, scope, action</td><td>Revocation → immediate propagation</td></tr>
+</tbody>
+</table></div>
+<pre><code>Architecture: Events → Kafka → Append-only DB (hash chain) + Real-time alerts
+  + Patient portal ("Who accessed my data") + Regulatory export</code></pre>
+<hr>
+<h2 id="interop-patterns">Secure Interoperability Patterns</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>How</th><th>Use Case</th></tr></thead>
+<tbody>
+<tr><td><strong>FHIR REST</strong></td><td>Standard RESTful patient/observation/medication</td><td>Point-to-point org queries</td></tr>
+<tr><td><strong>SMART on FHIR</strong></td><td>OAuth app launch for EHR access</td><td>Patient apps; clinical decision support</td></tr>
+<tr><td><strong>FHIR Bulk Data</strong></td><td>Async ndjson export</td><td>Population health; research</td></tr>
+<tr><td><strong>TEFCA (US)</strong></td><td>Trusted Exchange Framework via QHINs</td><td>National-scale interoperability</td></tr>
+</tbody>
+</table></div>
+<h3 id="privacy-observability">Observability with Privacy</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>OK to Monitor</th><th>DO NOT Monitor</th></tr></thead>
+<tbody>
+<tr><td>API latency per org (no PHI)</td><td>Patient IDs in dashboards</td></tr>
+<tr><td>Records shared per day (aggregate)</td><td>Diagnoses in metrics</td></tr>
+<tr><td>Consent check latency</td><td>Provider names in alerts</td></tr>
+<tr><td>Error rates by type</td><td>Any PHI outside audit log</td></tr>
+</tbody>
+</table></div>
+<h3 id="health-sharing-refs">References &amp; Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Scope</th></tr></thead>
+<tbody>
+<tr><td>HIPAA Privacy/Security Rules</td><td>PHI use, disclosure, safeguards</td></tr>
+<tr><td>ONC TEFCA</td><td>US health data exchange framework</td></tr>
+<tr><td>HL7 FHIR R4</td><td>Interoperability standard</td></tr>
+<tr><td>SMART on FHIR</td><td>App launch framework</td></tr>
+<tr><td>NIST SP 800-66</td><td>HIPAA implementation guide</td></tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Healthcare privacy</td><td><a href="31-healthcare-systems.html">Ch 31</a></td></tr>
+<tr><td>Audit logging</td><td><a href="28-security-systems.html">Ch 28</a></td></tr>
+<tr><td>Identity federation</td><td><a href="40-security-authentication.html">A8</a></td></tr>
+<tr><td>Data residency</td><td><a href="09-storage-systems.html">Ch 9</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <p><em>This chapter is part of the System Design Mastery series. It covers healthcare data sharing as a representative example of designing systems at the intersection of technology, privacy, regulation, and human welfare.</em></p>
         </div>

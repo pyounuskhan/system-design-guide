@@ -1143,6 +1143,127 @@
 <li>Keep the source of truth clear when multiple replicas and caches exist.</li>
 <li>Think in workflow-level guarantees, not one label for the whole product.</li>
 </ul>
+<h2 id="consistency-menu">The Consistency Menu</h2>
+<p>Consistency is a spectrum. Choose the right model per workflow.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th>Guarantee</th><th>Latency Cost</th><th>Example System</th><th>Use When</th></tr></thead>
+<tbody>
+<tr><td><strong>Linearizability</strong></td><td>Reads always see most recent write; real-time order</td><td>Highest</td><td>Spanner, CockroachDB, ZooKeeper</td><td>Distributed locks, financial ledgers</td></tr>
+<tr><td><strong>Sequential</strong></td><td>All observers see same order (not real-time)</td><td>High</td><td>Consensus logs</td><td>Workflows requiring total ordering</td></tr>
+<tr><td><strong>Causal</strong></td><td>Causally related ops ordered; concurrent ops may vary</td><td>Moderate</td><td>MongoDB (causal sessions)</td><td>Social feeds (reply after post)</td></tr>
+<tr><td><strong>Session</strong></td><td>Read-your-writes + monotonic reads within session</td><td>Low-Moderate</td><td>DynamoDB (consistent reads)</td><td>User sees own writes immediately</td></tr>
+<tr><td><strong>Eventual</strong></td><td>Replicas converge; no bound on staleness</td><td>Lowest</td><td>S3, DNS, Cassandra (ONE/ONE)</td><td>Counters, likes, analytics</td></tr>
+</tbody>
+</table></div>
+<h3 id="session-guarantees">Session Guarantees</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Guarantee</th><th>Meaning</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Read-your-writes</strong></td><td>Client always sees its own writes</td><td>Update profile → see updated profile</td></tr>
+<tr><td><strong>Monotonic reads</strong></td><td>Never see data go backward</td><td>10 comments → refresh → never see 8</td></tr>
+<tr><td><strong>Monotonic writes</strong></td><td>Writes applied in issue order</td><td>Email: A then B → final state is B</td></tr>
+<tr><td><strong>Writes-follow-reads</strong></td><td>Write ordered after the read it depends on</td><td>Reply ordered after the post</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="cap-formal">CAP Theorem — Formal Definitions and Canonical Sources</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Term</th><th>Formal CAP Definition</th><th>Common Misunderstanding</th></tr></thead>
+<tbody>
+<tr><td><strong>C (Consistency)</strong></td><td>Linearizability — every read returns the most recent write or an error</td><td>"Data is correct" (too vague)</td></tr>
+<tr><td><strong>A (Availability)</strong></td><td>Every request to a non-failing node receives a response</td><td>"The system is up" (too loose)</td></tr>
+<tr><td><strong>P (Partition tolerance)</strong></td><td>System continues despite arbitrary message loss between nodes</td><td>"Network is unreliable" (incomplete)</td></tr>
+</tbody>
+</table></div>
+<p><strong>What CAP does NOT say:</strong> You don't always choose — only during a partition. Eventual consistency isn't simply "AP." CP systems are unavailable only during partitions. CAP doesn't apply to single-node systems.</p>
+<h3 id="pacelc">PACELC: Extending CAP</h3>
+<p>Even without partitions, there's a latency vs consistency trade-off:</p>
+<pre><code>If Partition → choose A or C (CAP)
+Else → choose L (latency) or C (consistency) (PACELC)</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>System</th><th>During Partition</th><th>Normal Operation</th><th>Class</th></tr></thead>
+<tbody>
+<tr><td>Spanner</td><td>PC (reject)</td><td>EC (consistent, higher latency)</td><td>PC/EC</td></tr>
+<tr><td>DynamoDB</td><td>PA (available)</td><td>EL (low latency, eventual)</td><td>PA/EL</td></tr>
+<tr><td>Cassandra (QUORUM)</td><td>PC</td><td>EC</td><td>PC/EC</td></tr>
+<tr><td>MongoDB</td><td>PA (from secondaries)</td><td>EL (nearest replica)</td><td>PA/EL</td></tr>
+</tbody>
+</table></div>
+<h3 id="canonical-refs">Canonical References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Source</th><th>Key Contribution</th></tr></thead>
+<tbody>
+<tr><td>Brewer (2000) PODC keynote</td><td>Original CAP conjecture</td></tr>
+<tr><td>Gilbert &amp; Lynch (2002)</td><td>Formal proof</td></tr>
+<tr><td>Brewer (2012) clarification</td><td>Corrects common misunderstandings</td></tr>
+<tr><td>Abadi (2012) PACELC</td><td>Extends with latency trade-off</td></tr>
+<tr><td>Kleppmann (2017) DDIA Ch 9</td><td>Best practical treatment</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="causal-crdts">Causal Consistency and CRDTs</h2>
+<h3 id="causal-consistency">Causal Consistency</h3>
+<p>Preserves order of causally related operations while allowing concurrent ops to be seen in any order — a sweet spot between strong and eventual.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Aspect</th><th>Eventual</th><th>Causal</th><th>Linearizable</th></tr></thead>
+<tbody>
+<tr><td>Ordering</td><td>None</td><td>Causally related ops ordered</td><td>Total real-time order</td></tr>
+<tr><td>Latency</td><td>Lowest</td><td>Low-Moderate</td><td>Highest</td></tr>
+<tr><td>Availability during partition</td><td>Full</td><td>Full (within causal constraints)</td><td>Reduced</td></tr>
+<tr><td>Implementation</td><td>Simple replication</td><td>Vector clocks / causal timestamps</td><td>Consensus (Raft/Paxos)</td></tr>
+</tbody>
+</table></div>
+<h3 id="crdts">CRDTs (Conflict-free Replicated Data Types)</h3>
+<p>Data structures updated independently on different replicas that always merge deterministically.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>CRDT</th><th>What It Does</th><th>Use Case</th></tr></thead>
+<tbody>
+<tr><td><strong>G-Counter</strong></td><td>Grow-only counter (merge = sum)</td><td>Like counts, view counts</td></tr>
+<tr><td><strong>PN-Counter</strong></td><td>Inc + dec counter</td><td>Inventory (approximate)</td></tr>
+<tr><td><strong>G-Set</strong></td><td>Add-only set (merge = union)</td><td>Tags, "seen" message IDs</td></tr>
+<tr><td><strong>OR-Set</strong></td><td>Add + remove set</td><td>Shopping cart, preferences</td></tr>
+<tr><td><strong>LWW-Register</strong></td><td>Last-writer-wins (timestamp)</td><td>Profile fields, settings</td></tr>
+</tbody>
+</table></div>
+<p><strong>Limitation:</strong> CRDTs solve merge conflicts but cannot enforce business rules requiring coordination (e.g., "balance ≥ 0").</p>
+<hr>
+<h2 id="measuring-staleness">Measuring Staleness — Replica Lag as an SLO</h2>
+<h3 id="lag-metrics">Replica Lag Metrics</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>What It Measures</th><th>How to Collect</th></tr></thead>
+<tbody>
+<tr><td>Replication lag (seconds)</td><td>Time from primary write to replica visibility</td><td><code>pg_stat_replication</code>, <code>Seconds_Behind_Master</code>, Kafka consumer lag</td></tr>
+<tr><td>Stale-read rate</td><td>% of reads from replicas with lag &gt; threshold</td><td>Compare read version to known write version</td></tr>
+<tr><td>Consistency violation rate</td><td>Reads older than staleness SLO</td><td>Audit log comparison</td></tr>
+</tbody>
+</table></div>
+<h3 id="staleness-slos">Staleness SLOs by Workflow</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Workflow</th><th>Acceptable Staleness</th><th>Action If Exceeded</th></tr></thead>
+<tbody>
+<tr><td>Account balance</td><td>0 (linearizable)</td><td>Always read from primary</td></tr>
+<tr><td>Order status</td><td>&lt; 5 seconds</td><td>Route to primary if lag &gt; 5s</td></tr>
+<tr><td>Social feed</td><td>&lt; 30 seconds</td><td>Acceptable; no action</td></tr>
+<tr><td>Search index</td><td>&lt; 60 seconds</td><td>Increase indexer throughput</td></tr>
+<tr><td>Analytics dashboard</td><td>&lt; 5 minutes</td><td>Acceptable for batch</td></tr>
+</tbody>
+</table></div>
+<h3 id="read-routing">Read Routing by Staleness</h3>
+<pre><code>Consistency-critical workflow? → Route to PRIMARY
+Otherwise: Replica lag &lt; SLO? → Route to REPLICA (fast)
+           Replica lag &gt; SLO? → Fallback to PRIMARY</code></pre>
+<hr>
+<h2 id="consistency-cross-refs">Cross-References</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Transaction isolation levels</td><td><a href="05-databases-deep-dive.html">Ch 5: Databases</a></td></tr>
+<tr><td>Distributed transactions (2PC, Saga)</td><td>Ch 12: Fault Tolerance</td></tr>
+<tr><td>Consensus protocols (Raft, Paxos)</td><td>F4: Consensus &amp; Coordination</td></tr>
+<tr><td>CDC and outbox pattern</td><td><a href="05-databases-deep-dive.html">Ch 5</a>, <a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>SLO-based lag monitoring</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Calling an entire product CP or AP without discussing the actual workflow and failure mode.</li>
@@ -1268,6 +1389,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#consistency-menu">The Consistency Menu</a></li>
+<li><a href="#cap-formal">CAP Formal Definitions &amp; PACELC</a></li>
+<li><a href="#causal-crdts">Causal Consistency &amp; CRDTs</a></li>
+<li><a href="#measuring-staleness">Measuring Staleness — Lag SLOs</a></li>
+<li><a href="#consistency-cross-refs">Cross-References</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

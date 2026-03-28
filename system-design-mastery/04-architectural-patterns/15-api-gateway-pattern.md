@@ -122,6 +122,182 @@ Mobile clients are a strong gateway case because network quality varies, round t
 - Prefer BFFs when client experiences differ meaningfully.
 - Treat the gateway as critical infrastructure with strong observability and reliability expectations.
 
+## Gateway vs Ingress vs Service Mesh
+
+These three components all handle traffic, but at different layers and for different purposes. Confusing them leads to duplicated functionality or gaps.
+
+| Dimension | Ingress Controller | API Gateway | Service Mesh |
+|-----------|-------------------|-------------|-------------|
+| **Scope** | External traffic into the cluster | External traffic into the application | Service-to-service traffic within the cluster |
+| **Layer** | L7 (HTTP routing at cluster edge) | L7 (application-level policies) | L7 (sidecar proxies per service) |
+| **Primary job** | Route by host/path to the right Kubernetes Service | Auth, rate limiting, request transformation, aggregation | mTLS, retries, circuit breakers, observability between services |
+| **Who configures** | Platform / infra team | API team / product team | Platform team |
+| **Examples** | Nginx Ingress, Traefik, AWS ALB Ingress | Kong, AWS API Gateway, Apigee, Envoy (as gateway) | Istio, Linkerd, Consul Connect |
+| **Overlap** | Some ingress controllers add gateway features (rate limiting, auth) | Some gateways can replace ingress | Mesh sidecars handle retries/circuit breakers that gateways might also do |
+
+### When You Need Each
+
+```
+External users → INGRESS CONTROLLER (TLS termination, host/path routing)
+  → API GATEWAY (auth, rate limiting, request shaping, versioning)
+    → SERVICE MESH (mTLS between services, retries, circuit breakers)
+      → BACKEND SERVICES
+```
+
+| Question | If Yes | If No |
+|----------|--------|-------|
+| Do external clients need auth, rate limits, or request transformation? | API Gateway | Ingress may suffice |
+| Do services need mutual auth, retries, and observability between each other? | Service Mesh | Application-level resilience patterns |
+| Are you on Kubernetes and need HTTP routing to services? | Ingress Controller | Cloud LB or direct routing |
+
+**Common mistake:** Implementing rate limiting in both the gateway AND the mesh, causing double-counting. Choose one enforcement point per policy.
+
+---
+
+## Gateway Failure Modes and High Availability
+
+The gateway is a critical choke point — if it fails, everything behind it is unreachable. Design for this explicitly.
+
+### Failure Modes
+
+| Failure Mode | Impact | Mitigation |
+|-------------|--------|-----------|
+| **Gateway process crash** | All traffic blocked until restart | Multiple replicas behind load balancer; health checks with fast failover |
+| **Gateway overload (CPU/memory)** | Latency spike → cascading timeouts upstream | Horizontal autoscaling; load shedding; request queue limits |
+| **Backend fan-out timeout** | Aggregation endpoint hangs waiting for slowest backend | Per-backend timeout; partial response with degraded data; circuit breaker per dependency |
+| **Configuration error (bad route)** | Traffic misrouted or 404 | Canary config deployments; config validation in CI; instant rollback |
+| **TLS certificate expiry** | All HTTPS connections fail | Automated cert renewal (cert-manager); expiry monitoring + alerting (< 14 days) |
+| **Single gateway, single region** | Regional outage = total outage | Multi-region gateway deployment; DNS-based failover |
+
+### Gateway HA Reference Architecture
+
+```
+┌──────────────────────────────────────────────┐
+│  DNS (latency-based or failover routing)      │
+└──────────────┬──────────────┬────────────────┘
+               │              │
+    ┌──────────▼──────┐  ┌───▼──────────────┐
+    │  Region A       │  │  Region B         │
+    │  ┌────────────┐ │  │  ┌────────────┐  │
+    │  │ LB (ALB)   │ │  │  │ LB (ALB)   │  │
+    │  └──────┬─────┘ │  │  └──────┬─────┘  │
+    │  ┌──────▼─────┐ │  │  ┌──────▼─────┐  │
+    │  │ Gateway    │ │  │  │ Gateway    │  │
+    │  │ Replicas   │ │  │  │ Replicas   │  │
+    │  │ (3+ pods)  │ │  │  │ (3+ pods)  │  │
+    │  └──────┬─────┘ │  │  └──────┬─────┘  │
+    │  ┌──────▼─────┐ │  │  ┌──────▼─────┐  │
+    │  │ Backend    │ │  │  │ Backend    │  │
+    │  │ Services   │ │  │  │ Services   │  │
+    │  └────────────┘ │  │  └────────────┘  │
+    └─────────────────┘  └──────────────────┘
+
+HA Requirements:
+  • 3+ gateway replicas per region (PodDisruptionBudget: minAvailable=2)
+  • Health checks: /healthz every 10s, 3 failures → remove from LB
+  • Autoscaling: HPA on CPU (target 60%) and request rate
+  • Circuit breaker per backend dependency
+  • Rate limiting state shared via Redis (not in-memory per pod)
+```
+
+---
+
+## API Contract and Versioning
+
+API versioning is a business-continuity concern, not a cosmetic choice. Broken contracts break clients, erode trust, and force emergency patches.
+
+### Versioning Strategies
+
+| Strategy | How It Works | Pros | Cons |
+|----------|-------------|------|------|
+| **URL path versioning** (`/v1/users`) | Version embedded in URL | Simple, explicit, easy to route | URL pollution; hard to sunset |
+| **Header versioning** (`Accept: application/vnd.api.v2+json`) | Version in request header | Clean URLs; supports content negotiation | Less visible; harder for developers to discover |
+| **Query parameter** (`/users?version=2`) | Version as query param | Simple to add | Mixes versioning with query logic |
+| **No versioning (evolve in place)** | Only backward-compatible changes | Simplest; one version to maintain | Requires strict discipline; breaking changes impossible |
+
+### Recommended Approach
+
+Use **URL path versioning** for public APIs (explicit, debuggable, cacheable). Use **evolve-in-place** for internal service-to-service APIs (with contract testing).
+
+### Backward Compatibility Rules
+
+| Rule | What It Means | Example |
+|------|-------------|---------|
+| **Add, don't remove** | New fields are added; old fields remain | Add `email_verified` field; keep `email` |
+| **New fields are optional** | Existing clients that don't send new fields still work | `preferred_name` defaults to `null` |
+| **Don't change field types** | A field that was `string` must stay `string` | If you need `int`, add a new field |
+| **Don't change semantics** | A field that meant "UTC timestamp" must always mean that | Don't silently switch to local timezone |
+| **Deprecate, then remove** | Announce deprecation with timeline; remove after clients migrate | `X-Deprecated: true` header for 6 months, then remove |
+
+### API Lifecycle Management
+
+```
+v1 (current) → v2 (new, coexists with v1)
+  → v1 deprecated (announce sunset date, 6-12 months)
+    → v1 removed (after migration deadline)
+
+At any time, at most 2 versions are active.
+Each version has its own documentation, tests, and monitoring.
+```
+
+---
+
+## Per-Tenant Rate Limiting and Quota Management
+
+Multi-tenant APIs must prevent one client from consuming disproportionate resources. Rate limiting and quota management protect both the platform and other tenants.
+
+### Rate Limiting vs Quotas
+
+| Concept | What It Controls | Time Window | Example |
+|---------|-----------------|-------------|---------|
+| **Rate limiting** | Requests per second/minute | Short (seconds to minutes) | 100 requests/minute per API key |
+| **Quota** | Total requests or resources per billing period | Long (daily, monthly) | 10,000 requests/day on free plan; 1M/day on enterprise |
+| **Burst allowance** | Short-term spike above rate limit | Seconds | Allow 200 req/sec burst for 5 seconds, then enforce 100 req/sec |
+
+### Per-Tenant Rate Limiting Architecture
+
+```
+Request arrives with API key or tenant ID
+  → Gateway looks up tenant plan (cached in Redis)
+  → Check rate limit:
+    Redis: INCR tenant:{id}:minute:{current_minute}
+    If count > limit → HTTP 429 Too Many Requests
+    Response headers:
+      X-RateLimit-Limit: 100
+      X-RateLimit-Remaining: 23
+      X-RateLimit-Reset: 1679616000
+      Retry-After: 37
+```
+
+### Rate Limiting Algorithms
+
+| Algorithm | How It Works | Best For |
+|-----------|-------------|----------|
+| **Fixed window** | Count requests in fixed time buckets (e.g., per minute) | Simple; may allow 2x burst at bucket boundary |
+| **Sliding window log** | Track timestamp of each request; count within sliding window | Accurate; higher memory usage |
+| **Sliding window counter** | Weighted average of current and previous bucket | Good balance of accuracy and efficiency |
+| **Token bucket** | Tokens refill at fixed rate; each request consumes one token | Allows controlled bursts; widely used |
+| **Leaky bucket** | Requests queued and processed at fixed rate | Smooths traffic; no bursts allowed |
+
+### Quota Enforcement by Plan
+
+| Plan | Rate Limit | Daily Quota | Burst | Overage Policy |
+|------|-----------|-------------|-------|---------------|
+| Free | 10 req/min | 1,000/day | None | Hard block (429) |
+| Starter | 100 req/min | 50,000/day | 200/sec for 5s | Hard block |
+| Professional | 500 req/min | 500,000/day | 1,000/sec for 10s | Soft limit (allow + alert + charge overage) |
+| Enterprise | Custom | Custom | Custom | Negotiated SLA |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Edge stack (CDN, WAF, LB) | Ch 4: Networking Fundamentals |
+| Authentication and authorization patterns | Security chapters |
+| Service mesh and sidecar routing | F11: Deployment & DevOps |
+| Per-tenant data isolation | Ch 5: Databases Deep Dive |
+| Gateway in interview designs | F12: Interview Thinking |
+
 ## Common Mistakes
 - Turning the gateway into a giant orchestration and business-rules layer.
 - Mirroring internal services one-to-one so clients still feel internal complexity.

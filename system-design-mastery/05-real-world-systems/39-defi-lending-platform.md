@@ -3,6 +3,9 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 39 of 60
+**Last reviewed:** March 2026. DeFi protocols evolve rapidly — verify smart contract patterns, token economics, and regulatory status against current sources.
+
+**⚠️ Disclaimer:** This chapter is an *architectural reference for system design education*. It does NOT constitute financial, legal, or security advice. DeFi protocols handle real assets and have resulted in billions of dollars in losses from exploits, bugs, and economic attacks. Any production implementation requires professional security audits, legal review, and independent risk assessment. The designs described are illustrative and should not be deployed without rigorous verification.
 
 ---
 
@@ -5901,6 +5904,112 @@ Designing a DeFi lending platform requires mastery across multiple domains:
 The key insight is that DeFi lending protocols operate in a uniquely adversarial environment where every user is a potential attacker, every transaction is public, and bugs are worth billions. This demands defense-in-depth at every layer: formal verification of core invariants, multi-source oracles with circuit breakers, governance with timelocks and guardians, and comprehensive monitoring with automated response.
 
 The evolution from simple single-asset pools to multi-chain, multi-asset protocols with flash loans, E-Mode, and cross-chain governance represents one of the most complex system design challenges in the blockchain industry.
+
+## DeFi Threat Model
+
+### Attack Surface
+
+| Threat | Vector | Historical Example | Mitigation |
+|--------|--------|-------------------|-----------|
+| **Reentrancy** | Malicious contract calls back into protocol during state change | The DAO ($60M, 2016) | Checks-effects-interactions; reentrancy guards; formal verification |
+| **Oracle manipulation** | Attacker moves spot price on DEX to trigger liquidations | Mango Markets ($114M, 2022) | TWAP oracles; multi-source aggregation; circuit breakers on deviation |
+| **Flash loan attack** | Borrow + manipulate + profit in single atomic transaction | bZx, Cream Finance (multiple) | Protocol-level flash loan guards; time-weighted prices; borrowing caps |
+| **Governance attack** | Acquire enough tokens to pass malicious proposal | Beanstalk ($182M, 2022) | Timelock on execution (24-72h); guardian veto; quorum requirements |
+| **Bridge exploit** | Compromised cross-chain bridge drains locked assets | Wormhole ($320M), Ronin ($625M) | Multi-sig with diverse signers; optimistic verification; limits on bridged value |
+| **Economic design flaw** | Incentive misalignment causes bank run or death spiral | UST/LUNA ($40B collapse, 2022) | Conservative collateral ratios; stress testing; circuit breakers |
+| **Admin key compromise** | Attacker obtains upgrade key or admin role | Multiple smaller protocols | Multi-sig (4-of-7+); timelock; renounce admin where possible |
+
+### Risk Controls Matrix
+
+| Control | Pre-Deployment | Runtime | Emergency |
+|---------|---------------|---------|-----------|
+| **Formal verification** | Verify core invariants (total supply, collateral ratio) | N/A | N/A |
+| **Security audits** | 2+ independent audits | Annual re-audit after upgrades | Emergency audit after incident |
+| **Bug bounty** | Launch before mainnet | Ongoing (Immunefi, $1M+ for critical) | Increase bounty during elevated risk |
+| **Timelock** | Set 24-48h on all governance actions | Monitor pending proposals | Guardian can veto during timelock |
+| **Circuit breakers** | Define thresholds for auto-pause | Price deviation > 30% → pause market | Manual pause via guardian multi-sig |
+| **Rate limits** | Set max borrow/withdraw per block | Monitor utilization spikes | Emergency caps on individual positions |
+| **Monitoring** | Deploy alerting before mainnet | 24/7 on-chain event monitoring | Auto-response scripts for critical events |
+
+---
+
+## On-Chain Event Observability
+
+### Monitoring Architecture
+
+```
+BLOCKCHAIN (Ethereum / L2)
+  → Event logs emitted by smart contracts
+    ↓
+EVENT INDEXER (The Graph / custom indexer)
+  → Parse events: Deposit, Borrow, Repay, Liquidation, OracleUpdate, GovernanceProposal
+    ↓
+KAFKA / STREAM PROCESSOR
+  → Real-time aggregation: TVL, utilization rate, health factors
+    ↓
+ALERTING + DASHBOARDS
+  → Grafana dashboards: protocol TVL, market utilization, oracle freshness
+  → PagerDuty alerts: liquidation cascade, oracle deviation, unusual withdrawals
+```
+
+### Alert Thresholds
+
+| Signal | Threshold | Severity | Action |
+|--------|-----------|----------|--------|
+| **Oracle price deviation** (spot vs TWAP) | > 10% in 5 minutes | P0 | Pause affected market; investigate |
+| **Oracle staleness** | No update in > 30 minutes | P0 | Fall back to secondary oracle; alert |
+| **Market utilization** | > 95% for any asset | P1 | Monitor for bank run; prepare emergency measures |
+| **Large withdrawal** (> 5% of TVL) | Single transaction | P1 | Investigate; check for exploit pattern |
+| **Liquidation cascade** | > 100 liquidations in 1 block | P1 | Check oracle health; assess systemic risk |
+| **Governance proposal** (any) | New proposal submitted | P2 | Review proposal; assess risk; prepare community response |
+| **TVL drop** | > 20% in 24 hours | P1 | Assess market conditions vs exploit vs organic withdrawal |
+
+---
+
+## Smart Contract Upgrade Governance
+
+| Pattern | How | Security | Flexibility |
+|---------|-----|----------|-------------|
+| **Immutable** | No upgrades possible | Highest (no admin risk) | None (bugs are permanent) |
+| **Proxy (UUPS/Transparent)** | Logic contract swappable via proxy | Medium (admin key risk) | High (full logic changes) |
+| **Proxy + Timelock** | Upgrade queued for 24-72h before execution | Medium-High (public review period) | High |
+| **Proxy + Timelock + Guardian** | Timelock + guardian can veto | High (dual approval) | High |
+| **Diamond (EIP-2535)** | Modular facets; upgrade individual functions | Medium | Very high (granular) |
+
+### Upgrade Safety Checklist
+
+- [ ] Upgrade proposal includes diff of changed code
+- [ ] At least 1 independent audit of upgrade
+- [ ] Timelock period allows community review (minimum 24h; 72h for critical changes)
+- [ ] Guardian multi-sig can veto during timelock
+- [ ] Storage layout verified (no slot collisions between old and new logic)
+- [ ] Simulation of upgrade on fork before mainnet execution
+- [ ] Monitoring increased during 24h post-upgrade window
+
+---
+
+## Authoritative References
+
+| Resource | Scope |
+|----------|-------|
+| **NIST IR 8202** | Blockchain Technology Overview |
+| **OpenZeppelin Contracts** | Audited, standard smart contract libraries |
+| **Trail of Bits — Building Secure Smart Contracts** | Practical security patterns and anti-patterns |
+| **Aave V3 Technical Paper** | Production lending protocol architecture |
+| **Compound V2 Whitepaper** | Interest rate model and liquidation design |
+| **Chainlink CCIP Documentation** | Cross-chain interoperability and oracle patterns |
+| **Rekt.news** | Comprehensive database of DeFi exploits and post-mortems |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Blockchain fundamentals and limits | Ch 36: Blockchain & Distributed Systems |
+| Financial ledger design | Ch 19: Fintech & Payments |
+| Smart contract security checklist | Ch 36 (Operational Risks section) |
+| Oracle as external dependency | Ch 12: Fault Tolerance (circuit breakers) |
+| Event streaming for monitoring | Ch 8: Message Queues; Ch 16: EDA |
+| Governance and access control | Ch A8: Security & Authentication |
 
 ---
 

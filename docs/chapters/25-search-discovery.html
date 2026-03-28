@@ -4977,6 +4977,73 @@ d. Redis node down → failover to replica, investigate node failure
 <li><strong>10% of searches return zero results. How do you diagnose and fix this?</strong> Cover query analysis, synonym expansion, and monitoring.</li>
 <li><strong>Design personalized search that avoids filter bubbles.</strong> Cover user signals, blending, and exploration injection.</li>
 </ol>
+<h2 id="indexing-pipeline">Indexing Pipeline — Reference Architecture</h2>
+<pre><code>SOURCES [Product DB CDC] [Content CMS] [User-Generated] [Logs]
+  ↓ Kafka / CDC
+PIPELINE: Validate → Extract → Enrich → Embed → Write keyword + vector index
+  Real-time (< 60s) | Batch (nightly) | Backfill (on-demand)
+  ↓
+INDEX: [Keyword: ES/BM25] + [Vector: HNSW]  → Hybrid via RRF</code></pre>
+<hr>
+<h2 id="freshness-relevance">Freshness vs Relevance Rubric</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Scenario</th><th>Freshness</th><th>Relevance</th><th>Strategy</th></tr></thead>
+<tbody>
+<tr><td>E-commerce</td><td>High</td><td>High</td><td>Real-time CDC; ML re-ranking</td></tr>
+<tr><td>News</td><td>Very high</td><td>Medium</td><td>Near-real-time; recency boost</td></tr>
+<tr><td>Enterprise KB</td><td>Low</td><td>Very high</td><td>Batch; semantic matching</td></tr>
+<tr><td>Log search</td><td>Critical</td><td>Low</td><td>Append-only; no ranking</td></tr>
+</tbody>
+</table></div>
+<h3 id="freshness-slos">Index Freshness SLOs</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Index</th><th>Target</th><th>Alert</th></tr></thead>
+<tbody>
+<tr><td>Product catalog</td><td>&lt; 60s</td><td>&gt; 3 min</td></tr>
+<tr><td>Content</td><td>&lt; 5 min</td><td>&gt; 15 min</td></tr>
+<tr><td>Autocomplete</td><td>&lt; 1 hour</td><td>&gt; 3 hours</td></tr>
+<tr><td>Vector embeddings</td><td>&lt; 24 hours</td><td>&gt; 48 hours</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="hybrid-retrieval">Vector Search and Hybrid Retrieval</h2>
+<pre><code>Query → BM25 (top 100) + Vector ANN (top 100)
+  → RRF fusion → top 20 → ML re-ranker (< 50ms) → top 10</code></pre>
+<p>Add vector search when: zero-result rate &gt; 10%, CTR on #1 &lt; 20%, users search concepts not exact terms.</p>
+<hr>
+<h2 id="ranking-rollout">Ranking Update — Staged Rollout</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Stage</th><th>Traffic</th><th>Duration</th><th>Rollback If</th></tr></thead>
+<tbody>
+<tr><td>Shadow</td><td>0% (log only)</td><td>1 week</td><td>NDCG drops &gt; 5%</td></tr>
+<tr><td>Canary</td><td>1%</td><td>3 days</td><td>CTR drops &gt; 3%</td></tr>
+<tr><td>Ramp</td><td>10→25→50%</td><td>1 week/step</td><td>Any &gt; 2% decline</td></tr>
+<tr><td>Full</td><td>100%</td><td>Ongoing</td><td>Sustained decline</td></tr>
+</tbody>
+</table></div>
+<h3 id="search-latency-budget">Query Latency Budget (p99 &lt; 150ms)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Budget</th></tr></thead>
+<tbody>
+<tr><td>Query understanding</td><td>&lt; 10ms</td></tr>
+<tr><td>BM25 retrieval</td><td>&lt; 30ms</td></tr>
+<tr><td>Vector ANN</td><td>&lt; 20ms</td></tr>
+<tr><td>Fusion + re-rank</td><td>&lt; 50ms</td></tr>
+<tr><td>Personalization</td><td>&lt; 20ms</td></tr>
+<tr><td>Serialization</td><td>&lt; 20ms</td></tr>
+</tbody>
+</table></div>
+<h3 id="search-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Vector search for RAG</td><td><a href="F12-system-design-interview-thinking.html">F12 §7.7</a></td></tr>
+<tr><td>Caching</td><td><a href="06-caching-systems.html">Ch 6</a></td></tr>
+<tr><td>CDC for indexing</td><td><a href="05-databases-deep-dive.html">Ch 5</a>, <a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>A/B testing</td><td><a href="24-analytics-data-platforms.html">Ch 24</a></td></tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="final-recap_1">Final Recap</h2>
 <p>Search &amp; Discovery combines <strong>information retrieval fundamentals</strong> (inverted indices, BM25, TF-IDF) with <strong>modern ML ranking</strong> (learning-to-rank, embeddings, neural re-rankers) and <strong>specialized search modes</strong> (geo, faceted, semantic). The key insight is that search is not one problem but a <strong>pipeline</strong>: query understanding → retrieval → ranking → personalization → presentation. Each stage has different latency budgets and model complexity.</p>
         </div>
@@ -5264,6 +5331,10 @@ d. Redis node down → failover to replica, investigate node failure
 <li><a href="#interview-angle_1">Interview Angle</a></li>
 <li><a href="#evolution-roadmap-v1-v2-v3_1">Evolution Roadmap (V1 -&gt; V2 -&gt; V3)</a></li>
 <li><a href="#practice-questions_1">Practice Questions</a></li>
+<li><a href="#indexing-pipeline">Indexing Pipeline</a></li>
+<li><a href="#freshness-relevance">Freshness vs Relevance</a></li>
+<li><a href="#hybrid-retrieval">Vector Search &amp; Hybrid Retrieval</a></li>
+<li><a href="#ranking-rollout">Ranking Staged Rollout</a></li>
 <li><a href="#final-recap_1">Final Recap</a></li>
 </ul>
 </div>

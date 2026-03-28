@@ -3,6 +3,8 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 28 of 60
+**Last reviewed:** March 2026. Security guidance evolves with new threats — verify against current OWASP, NIST, and vendor documentation.
+**Complements:** Chapter A8 (Security & Authentication primer) covers identity and access architecture. This chapter covers security as infrastructure systems.
 
 ---
 
@@ -4105,6 +4107,156 @@ flowchart LR
 4. **Design DDoS protection for a high-traffic API (50K RPS legitimate, up to 5M RPS attack).** Cover multi-layer defense, detection, and mitigation.
 5. **Design a secrets management system with automated rotation for 500 microservices.** Cover Vault architecture, rotation strategies, and emergency revocation.
 6. **Design an account takeover detection system.** Cover device fingerprinting, impossible travel detection, and step-up authentication.
+
+## Threat Model Template
+
+Every security architecture should begin with a threat model, not a tool selection. Use STRIDE or this simplified template.
+
+### STRIDE-per-Component
+
+| Threat | What It Means | Example | Mitigation Pattern |
+|--------|-------------|---------|-------------------|
+| **S**poofing | Attacker impersonates a user or service | Stolen JWT used from different device | MFA; short-lived tokens; device binding |
+| **T**ampering | Data modified in transit or at rest | API request body altered | TLS in transit; HMAC signatures; checksums at rest |
+| **R**epudiation | Actor denies performing an action | Admin deletes data, claims they didn't | Append-only audit logs; hash chain integrity |
+| **I**nformation Disclosure | Unauthorized data access | PII leaked in error messages or logs | Redact PII in logs; least-privilege access; encryption |
+| **D**enial of Service | System made unavailable | Volumetric DDoS; application-layer flood | WAF; rate limiting; CDN absorption; auto-scaling |
+| **E**levation of Privilege | Low-privilege user gains admin access | Broken access control on admin API | RBAC enforcement; API authorization checks; audit |
+
+### Threat Model Worksheet
+
+```
+System: [Name]
+Data sensitivity: [Public / Internal / Confidential / Regulated]
+External surface: [Public API / Internal only / Partner API]
+
+For each component (API, DB, queue, cache, third-party):
+  1. What data does it handle?
+  2. Who can access it? (authn + authz)
+  3. What happens if it's compromised? (impact)
+  4. What are the STRIDE threats?
+  5. What mitigations are in place?
+  6. What mitigations are missing? (action items)
+```
+
+---
+
+## Zero Trust Implementation Patterns
+
+Zero trust means: **never trust the network; always verify the request**. Every request is authenticated and authorized regardless of network location.
+
+| Principle | Traditional (Perimeter) | Zero Trust |
+|-----------|------------------------|-----------|
+| **Trust boundary** | VPN/firewall = trusted inside | No implicit trust; every request verified |
+| **Authentication** | Once at perimeter | Per-request (short-lived tokens, mTLS) |
+| **Authorization** | Coarse (network-level ACLs) | Fine-grained (per-resource, per-action) |
+| **Lateral movement** | Easy once inside the perimeter | Blocked; each service authenticates independently |
+| **Secrets** | Shared credentials, long-lived | Ephemeral, per-workload, auto-rotated |
+
+### Zero Trust Architecture Components
+
+```
+Every request:
+  1. Authenticate principal (user: JWT/OIDC; service: mTLS/workload identity)
+  2. Authorize action (policy engine: OPA/Cedar evaluates principal + resource + context)
+  3. Encrypt in transit (mTLS between all services, even "internal")
+  4. Log for audit (every access decision recorded with principal, action, resource, outcome)
+  5. Limit blast radius (least privilege; scoped tokens; short TTLs)
+```
+
+### Implementation Checklist
+
+- [ ] All service-to-service calls use mTLS (service mesh or application-level)
+- [ ] No service relies on network location for trust (no "internal = trusted")
+- [ ] All API calls carry identity tokens validated per-request
+- [ ] Authorization policy is centralized and auditable (OPA/Cedar, not scattered if/else)
+- [ ] Secrets are ephemeral and auto-rotated (Vault, cloud IAM roles)
+- [ ] All access decisions are logged with principal, action, resource, and outcome
+- [ ] Lateral movement between services requires explicit authorization
+
+---
+
+## Audit Logging and Compliance Mapping
+
+### Audit Log Requirements by Regulation
+
+| Regulation | What Must Be Logged | Retention | Tamper Protection |
+|-----------|-------------------|-----------|------------------|
+| **SOX** | Financial data access; admin actions; config changes | 7 years | Hash chain; append-only; segregation of duties for log access |
+| **PCI-DSS** | All access to cardholder data; auth attempts; config changes | 1 year (3 months immediately accessible) | Centralized, tamper-evident; daily log review |
+| **HIPAA** | PHI access; user auth; system activity | 6 years | Access controls on logs; integrity verification |
+| **GDPR** | Personal data processing activities; consent records; data access | Duration of processing + reasonable period | DPO access; exportable for data subject requests |
+| **SOC 2** | System access; change management; incident response | Per trust service criteria (typically 1 year) | Independent log storage; regular integrity checks |
+
+### Audit Log Schema
+
+```json
+{
+  "event_id": "audit-uuid-123",
+  "timestamp": "2026-03-15T14:32:01.847Z",
+  "principal": { "type": "user", "id": "usr-456", "ip": "203.0.113.42", "device": "..." },
+  "action": "read",
+  "resource": { "type": "customer_record", "id": "cust-789" },
+  "outcome": "allowed",
+  "policy_version": "v2.3",
+  "context": { "tenant_id": "t-001", "session_id": "sess-abc" },
+  "previous_hash": "sha256:abc123..."
+}
+```
+
+---
+
+## Secure-by-Default Design Patterns
+
+### API Security Defaults
+
+| Pattern | Default Behavior | Override Requires |
+|---------|-----------------|------------------|
+| **Authentication required** | All endpoints require valid token | Explicit `@public` annotation + security review |
+| **Authorization checked** | Every request evaluated against policy | No override; defense-in-depth |
+| **Rate limiting active** | Per-client rate limit on all endpoints | Custom limits require justification |
+| **Input validation** | Schema validation on all request bodies | No override |
+| **Error messages opaque** | Never expose stack traces, SQL, or internal paths | Debug mode only in non-production |
+| **CORS restrictive** | No cross-origin by default | Explicit allowlist per domain |
+| **Security headers set** | HSTS, X-Content-Type-Options, X-Frame-Options, CSP | Per-endpoint override with review |
+
+### Data Security Defaults
+
+| Pattern | Default | Override |
+|---------|---------|---------|
+| **Encryption at rest** | All data encrypted (AES-256 / KMS) | Never disable for regulated data |
+| **Encryption in transit** | TLS 1.3 for all connections | No override |
+| **PII classified and tagged** | Auto-detection at write time | Manual review for edge cases |
+| **Retention policy applied** | Per-data-category lifecycle rules | Extension requires compliance approval |
+| **Deletion = soft delete** | 30-day grace period before hard delete | Immediate hard delete only for legal hold release |
+| **Backups encrypted** | Same KMS key as source data | Never unencrypted backups |
+
+---
+
+## Authoritative References
+
+| Resource | Scope | URL Pattern |
+|----------|-------|-------------|
+| **OWASP Top 10** | Web application security risks | owasp.org/www-project-top-ten |
+| **OWASP API Security Top 10** | API-specific threats | owasp.org/www-project-api-security |
+| **NIST Cybersecurity Framework** | Risk management, controls | nist.gov/cyberframework |
+| **NIST 800-63** (Digital Identity) | Authentication assurance levels | pages.nist.gov/800-63-3 |
+| **NIST 800-207** (Zero Trust) | Zero trust architecture | csrc.nist.gov/publications/detail/sp/800-207 |
+| **CIS Benchmarks** | Hardening guides per platform | cisecurity.org/cis-benchmarks |
+| **MITRE ATT&CK** | Adversary tactics and techniques | attack.mitre.org |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Identity and OAuth 2.1 | Ch A8: Security & Authentication |
+| API gateway auth and rate limiting | Ch 15: API Gateway Pattern |
+| Supply-chain security (SBOM, signing) | F11: Deployment & DevOps §1.5 |
+| Regulatory requirements templates | Ch 2: Types of Requirements |
+| Fraud detection ML pipeline | Ch 19: Fintech & Payments |
+| Observability and audit | F10: Observability & Operations |
+
+---
 
 ## Final Recap
 

@@ -1143,6 +1143,111 @@
 <li>Prefer BFFs when client experiences differ meaningfully.</li>
 <li>Treat the gateway as critical infrastructure with strong observability and reliability expectations.</li>
 </ul>
+<h2 id="gateway-vs-mesh-vs-ingress">Gateway vs Ingress vs Service Mesh</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>Ingress Controller</th><th>API Gateway</th><th>Service Mesh</th></tr></thead>
+<tbody>
+<tr><td><strong>Scope</strong></td><td>External → cluster</td><td>External → application</td><td>Service-to-service within cluster</td></tr>
+<tr><td><strong>Primary job</strong></td><td>Host/path routing, TLS termination</td><td>Auth, rate limiting, transformation, aggregation</td><td>mTLS, retries, circuit breakers, observability</td></tr>
+<tr><td><strong>Who configures</strong></td><td>Platform / infra team</td><td>API / product team</td><td>Platform team</td></tr>
+<tr><td><strong>Examples</strong></td><td>Nginx Ingress, Traefik, ALB Ingress</td><td>Kong, AWS API GW, Apigee, Envoy</td><td>Istio, Linkerd, Consul Connect</td></tr>
+</tbody>
+</table></div>
+<pre><code>External users → INGRESS (TLS, routing)
+  → API GATEWAY (auth, rate limits, versioning)
+    → SERVICE MESH (mTLS, retries, circuit breakers)
+      → BACKEND SERVICES</code></pre>
+<p><strong>Common mistake:</strong> Implementing rate limiting in both gateway AND mesh, causing double-counting. Choose one enforcement point per policy.</p>
+<hr>
+<h2 id="gateway-ha">Gateway Failure Modes and High Availability</h2>
+<p>The gateway is a choke point — if it fails, everything behind it is unreachable.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Failure Mode</th><th>Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Process crash</strong></td><td>All traffic blocked</td><td>Multiple replicas behind LB; fast health check failover</td></tr>
+<tr><td><strong>Overload</strong></td><td>Latency spike → cascading timeouts</td><td>HPA autoscaling; load shedding; queue limits</td></tr>
+<tr><td><strong>Fan-out timeout</strong></td><td>Aggregation hangs on slowest backend</td><td>Per-backend timeout; partial response; circuit breaker</td></tr>
+<tr><td><strong>Config error</strong></td><td>Traffic misrouted or 404</td><td>Canary config deploy; validation in CI; instant rollback</td></tr>
+<tr><td><strong>TLS cert expiry</strong></td><td>All HTTPS fails</td><td>Automated renewal (cert-manager); expiry alerting &lt; 14 days</td></tr>
+<tr><td><strong>Single region</strong></td><td>Regional outage = total outage</td><td>Multi-region gateways; DNS failover</td></tr>
+</tbody>
+</table></div>
+<h3 id="gateway-ha-arch">Gateway HA Architecture</h3>
+<pre><code>DNS (latency-based / failover)
+  → Region A: LB → Gateway Replicas (3+ pods, PDB minAvailable=2) → Backends
+  → Region B: LB → Gateway Replicas (3+ pods) → Backends
+
+HA: HPA on CPU (60%), health /healthz every 10s, 3 failures → remove
+Rate limit state: shared Redis (not in-memory per pod)</code></pre>
+<hr>
+<h2 id="api-versioning">API Contract and Versioning</h2>
+<h3 id="versioning-strategies">Versioning Strategies</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How</th><th>Pros</th><th>Cons</th></tr></thead>
+<tbody>
+<tr><td><strong>URL path</strong> (<code>/v1/users</code>)</td><td>Version in URL</td><td>Explicit, easy to route, cacheable</td><td>URL pollution</td></tr>
+<tr><td><strong>Header</strong> (<code>Accept: vnd.api.v2</code>)</td><td>Version in header</td><td>Clean URLs</td><td>Less visible</td></tr>
+<tr><td><strong>Query param</strong> (<code>?version=2</code>)</td><td>Version as param</td><td>Simple to add</td><td>Mixes with query logic</td></tr>
+<tr><td><strong>Evolve in place</strong></td><td>Only backward-compatible changes</td><td>One version to maintain</td><td>Breaking changes impossible</td></tr>
+</tbody>
+</table></div>
+<p><strong>Recommendation:</strong> URL path for public APIs; evolve-in-place for internal service-to-service (with contract testing).</p>
+<h3 id="compatibility-rules">Backward Compatibility Rules</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Meaning</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Add, don't remove</td><td>New fields added; old remain</td><td>Add <code>email_verified</code>; keep <code>email</code></td></tr>
+<tr><td>New fields optional</td><td>Existing clients still work</td><td><code>preferred_name</code> defaults to null</td></tr>
+<tr><td>Don't change types</td><td>String stays string</td><td>Need int? Add new field</td></tr>
+<tr><td>Don't change semantics</td><td>UTC stays UTC</td><td>Don't silently switch to local TZ</td></tr>
+<tr><td>Deprecate then remove</td><td>6-12 month sunset</td><td><code>X-Deprecated: true</code> header</td></tr>
+</tbody>
+</table></div>
+<h3 id="api-lifecycle">API Lifecycle</h3>
+<pre><code>v1 (current) → v2 (coexists) → v1 deprecated (6-12 months) → v1 removed
+At most 2 versions active. Each has docs, tests, and monitoring.</code></pre>
+<hr>
+<h2 id="quota-management">Per-Tenant Rate Limiting and Quota Management</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Concept</th><th>What It Controls</th><th>Window</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Rate limiting</strong></td><td>Requests per second/minute</td><td>Short</td><td>100 req/min per API key</td></tr>
+<tr><td><strong>Quota</strong></td><td>Total per billing period</td><td>Long</td><td>10K/day free; 1M/day enterprise</td></tr>
+<tr><td><strong>Burst</strong></td><td>Short spike above limit</td><td>Seconds</td><td>200/sec for 5s, then 100/sec</td></tr>
+</tbody>
+</table></div>
+<h3 id="rate-limit-algorithms">Rate Limiting Algorithms</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Algorithm</th><th>How It Works</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>Fixed window</strong></td><td>Count per time bucket</td><td>Simple; may allow 2x burst at boundary</td></tr>
+<tr><td><strong>Sliding window counter</strong></td><td>Weighted average of current + previous bucket</td><td>Good balance of accuracy and efficiency</td></tr>
+<tr><td><strong>Token bucket</strong></td><td>Tokens refill at fixed rate</td><td>Controlled bursts; widely used</td></tr>
+<tr><td><strong>Leaky bucket</strong></td><td>Queue processed at fixed rate</td><td>Smooth traffic; no bursts</td></tr>
+</tbody>
+</table></div>
+<h3 id="plan-enforcement">Quota by Plan</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Plan</th><th>Rate Limit</th><th>Daily Quota</th><th>Overage</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>10 req/min</td><td>1,000/day</td><td>Hard block (429)</td></tr>
+<tr><td>Starter</td><td>100 req/min</td><td>50,000/day</td><td>Hard block</td></tr>
+<tr><td>Professional</td><td>500 req/min</td><td>500,000/day</td><td>Soft limit + overage charge</td></tr>
+<tr><td>Enterprise</td><td>Custom</td><td>Custom</td><td>Negotiated SLA</td></tr>
+</tbody>
+</table></div>
+<pre><code>Request → Gateway → Redis: INCR tenant:{id}:minute:{now}
+  If count &gt; limit → 429 + X-RateLimit-Remaining + Retry-After headers</code></pre>
+<h3 id="gateway-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Edge stack (CDN, WAF, LB)</td><td><a href="04-networking-fundamentals.html">Ch 4: Networking</a></td></tr>
+<tr><td>Service mesh and sidecars</td><td><a href="F11-deployment-devops.html">F11: Deployment</a></td></tr>
+<tr><td>Per-tenant data isolation</td><td><a href="05-databases-deep-dive.html">Ch 5: Databases</a></td></tr>
+<tr><td>Gateway in interview designs</td><td><a href="F12-system-design-interview-thinking.html">F12: Interview Thinking</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Turning the gateway into a giant orchestration and business-rules layer.</li>
@@ -1268,6 +1373,10 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#gateway-vs-mesh-vs-ingress">Gateway vs Ingress vs Mesh</a></li>
+<li><a href="#gateway-ha">Gateway Failure Modes &amp; HA</a></li>
+<li><a href="#api-versioning">API Contract &amp; Versioning</a></li>
+<li><a href="#quota-management">Rate Limiting &amp; Quota Management</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

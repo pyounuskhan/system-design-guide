@@ -1143,6 +1143,129 @@
 <li>Expect replay, duplicates, and lag when building downstream projections.</li>
 <li>Do not let event-driven become an excuse for unclear responsibilities.</li>
 </ul>
+<h2 id="event-design-checklist">Canonical Event Design Checklist</h2>
+<h3 id="event-template">Event Structure Template</h3>
+<pre><code class="language-json">{
+  "event_id": "evt_abc123",
+  "event_type": "order.placed",
+  "event_version": "1.2",
+  "timestamp": "2025-03-15T14:32:01.847Z",
+  "source": "order-service",
+  "correlation_id": "req_xyz789",
+  "trace_id": "w3c-trace-id-here",
+  "aggregate_id": "order-98765",
+  "payload": { "order_id": "order-98765", "customer_id": "cust-442211", "total_amount": {"value": 149.99, "currency": "USD"} },
+  "metadata": { "produced_by": "order-service-v2.3.1", "environment": "production" }
+}</code></pre>
+<h3 id="event-rules">Event Design Rules</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Why</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Past-tense naming</strong></td><td>Events are facts, not commands</td><td><code>order.placed</code> not <code>place_order</code></td></tr>
+<tr><td><strong>Include event_id (UUID)</strong></td><td>Enables consumer deduplication</td><td>Check before processing</td></tr>
+<tr><td><strong>Include event_version</strong></td><td>Schema evolution without breaking consumers</td><td>Route by version</td></tr>
+<tr><td><strong>Include trace_id</strong></td><td>Distributed tracing across async boundaries</td><td>W3C TraceContext propagation</td></tr>
+<tr><td><strong>Include aggregate_id</strong></td><td>Identifies which entity changed</td><td>Ordering and dedup key</td></tr>
+<tr><td><strong>Typed schema (not raw JSON)</strong></td><td>Validation and evolution require structure</td><td>Avro / Protobuf / JSON Schema</td></tr>
+</tbody>
+</table></div>
+<h3 id="schema-evolution-rules">Schema Evolution Rules</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td>Add optional fields only (with defaults)</td><td>Backward + forward compatible</td></tr>
+<tr><td>Never remove fields (deprecate instead)</td><td>Old consumers don't break</td></tr>
+<tr><td>Never change field types</td><td>Prevents deserialization failures</td></tr>
+<tr><td>Version the event type</td><td>Consumers handle multiple versions</td></tr>
+<tr><td>Schema Registry enforces at publish time</td><td>Rejects breaking changes before they ship</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="eventual-consistency-debugging">Eventual Consistency, Debugging, and Observability</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Challenge</th><th>Why It's Hard</th><th>Solution</th></tr></thead>
+<tbody>
+<tr><td>"Where is my event?"</td><td>Could be in broker, consumer queue, DLQ, or lost</td><td>End-to-end event lineage tracking by event_id</td></tr>
+<tr><td>"Why is the projection wrong?"</td><td>Out-of-order, skipped, or buggy processing</td><td>Compare projection against replayed events</td></tr>
+<tr><td>"Which consumer is slow?"</td><td>Multiple consumers on same topic</td><td>Per-consumer lag monitoring (Kafka consumer group lag)</td></tr>
+<tr><td>"Event processed but no effect"</td><td>Idempotency dedup or conditional write skipped it</td><td>Processing log: event_id + outcome (applied/skipped/failed)</td></tr>
+</tbody>
+</table></div>
+<h3 id="otel-async-tracing">Tracing Across Async Boundaries (OpenTelemetry)</h3>
+<pre><code class="language-python"># PRODUCER: Inject trace context into event headers
+from opentelemetry.propagate import inject
+headers = {}
+inject(headers)  # traceparent + tracestate
+event = {"event_type": "order.placed", "payload": {...}, "headers": headers}
+kafka_producer.send("orders", event)
+
+# CONSUMER: Extract and continue the trace
+from opentelemetry.propagate import extract
+ctx = extract(event["headers"])
+with tracer.start_as_current_span("process_order_placed", context=ctx):
+    update_search_index(event["payload"])
+# Result: single trace spans HTTP request → publish → consume → process</code></pre>
+<hr>
+<h2 id="outbox-in-eda">Outbox Pattern in Event-Driven Architecture</h2>
+<pre><code>Service writes DB + outbox in ONE transaction:
+  BEGIN; INSERT INTO orders (...); INSERT INTO outbox (...); COMMIT;
+Outbox Relay (Debezium or poller) → Publishes to Kafka → Marks published
+Consumers (idempotent) → Process at-least-once, dedup by event_id</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Approach</th><th>Atomicity</th><th>Schema Control</th><th>Complexity</th></tr></thead>
+<tbody>
+<tr><td><strong>Direct publish</strong></td><td>❌ Not atomic</td><td>Full</td><td>Low (unsafe)</td></tr>
+<tr><td><strong>Outbox table</strong></td><td>✅ Same DB txn</td><td>Full (explicit event schema)</td><td>Medium</td></tr>
+<tr><td><strong>CDC (Debezium)</strong></td><td>✅ Reads committed</td><td>Limited (mirrors DB schema)</td><td>Medium-High</td></tr>
+</tbody>
+</table></div>
+<p><strong>Guideline:</strong> Outbox for domain events with explicit schemas. CDC for replicating raw changes to analytics/search.</p>
+<hr>
+<h2 id="eda-vs-sourcing">Event Sourcing vs Event-Driven — Clear Boundaries</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>Event-Driven Architecture</th><th>Event Sourcing</th></tr></thead>
+<tbody>
+<tr><td><strong>Events represent</strong></td><td>Notifications (side-channel)</td><td>Authoritative record (primary store)</td></tr>
+<tr><td><strong>System of record</strong></td><td>Database (events published from DB)</td><td>Event log (state derived by replay)</td></tr>
+<tr><td><strong>Can delete events?</strong></td><td>Yes (DB is truth)</td><td>No (events ARE truth)</td></tr>
+<tr><td><strong>Replay purpose</strong></td><td>Rebuild projections</td><td>Rebuild entity state from scratch</td></tr>
+<tr><td><strong>When to use</strong></td><td>Decoupling, fan-out, async processing</td><td>Audit-heavy, financial ledgers, undo/redo</td></tr>
+<tr><td><strong>Complexity</strong></td><td>Moderate</td><td>High</td></tr>
+</tbody>
+</table></div>
+<p><strong>Decision rule:</strong> Publish facts for others to react → EDA. Need full history as source of truth → Event Sourcing. Most systems need EDA; few need Event Sourcing.</p>
+<hr>
+<h2 id="replay-backfill">Replay and Backfill Strategies</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Scenario</th><th>What You Replay</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>New consumer joins</td><td>All historical events</td><td>Full volume; may take hours/days</td></tr>
+<tr><td>Projection bug fixed</td><td>Events from bug introduction</td><td>Must be idempotent; old state may be inconsistent</td></tr>
+<tr><td>Schema migration</td><td>All events through new deserialization</td><td>Version compatibility must be verified</td></tr>
+<tr><td>Disaster recovery</td><td>All events to rebuild state</td><td>Requires retention covering recovery window</td></tr>
+</tbody>
+</table></div>
+<p><strong>Replay safety:</strong> Consumers must be idempotent; use separate consumer group; rate-limit replay; verify shadow projection before cutover; retain events long enough.</p>
+<h3 id="backfill-pattern">Backfill Pattern</h3>
+<pre><code>1. Create new consumer group ("search-indexer-v2")
+2. Set offset to "earliest"
+3. Process all events → shadow projection
+4. Compare shadow vs live (sample 1000 records)
+5. If correct → switch live to new group
+6. If incorrect → fix, reset, replay again
+7. Decommission old group</code></pre>
+<h3 id="eda-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Outbox and CDC</td><td><a href="05-databases-deep-dive.html">Ch 5</a>, <a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>Schema evolution</td><td><a href="08-message-queues-event-systems.html">Ch 8: Schema Evolution</a></td></tr>
+<tr><td>Delivery semantics</td><td><a href="08-message-queues-event-systems.html">Ch 8: Delivery Semantics</a></td></tr>
+<tr><td>CQRS projections</td><td>Ch 17: CQRS Pattern</td></tr>
+<tr><td>Distributed tracing</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+<tr><td>Saga orchestration</td><td><a href="13-distributed-transactions.html">Ch 13</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Publishing vague or unstable event payloads.</li>
@@ -1268,6 +1391,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#event-design-checklist">Event Design Checklist &amp; Schema Evolution</a></li>
+<li><a href="#eventual-consistency-debugging">Eventual Consistency &amp; Async Observability</a></li>
+<li><a href="#outbox-in-eda">Outbox Pattern in EDA</a></li>
+<li><a href="#eda-vs-sourcing">Event Sourcing vs Event-Driven</a></li>
+<li><a href="#replay-backfill">Replay &amp; Backfill Strategies</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

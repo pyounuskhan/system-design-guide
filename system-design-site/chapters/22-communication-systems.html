@@ -4745,6 +4745,88 @@ Authorization: Bearer &lt;JWT&gt;
 </tr>
 </tbody>
 </table></div>
+<h2 id="ordering-consistency-guide">Ordering and Consistency — Per-Feature Guide</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Feature</th><th>Ordering</th><th>Consistency</th><th>Mechanism</th><th>Lag</th></tr></thead>
+<tbody>
+<tr><td><strong>1:1 messages</strong></td><td>Total per conversation</td><td>Strong</td><td>Server-assigned seq (Redis INCR)</td><td>0</td></tr>
+<tr><td><strong>Group messages</strong></td><td>Total per group</td><td>Strong</td><td>Server seq + membership snapshot</td><td>0 (fan-out 1-5s)</td></tr>
+<tr><td><strong>Broadcast</strong></td><td>Total per channel</td><td>Eventual</td><td>Append-only log + publisher seq</td><td>&lt; 5s</td></tr>
+<tr><td><strong>Typing indicators</strong></td><td>None</td><td>Best-effort</td><td>WebSocket broadcast, no persistence</td><td>Real-time</td></tr>
+<tr><td><strong>Presence</strong></td><td>Last-write-wins</td><td>Eventual</td><td>Heartbeat → Redis TTL</td><td>&lt; 30s</td></tr>
+<tr><td><strong>Read receipts</strong></td><td>Monotonic</td><td>Eventual</td><td>Client reports max-read-seq</td><td>&lt; 5s</td></tr>
+<tr><td><strong>Reactions</strong></td><td>Unordered set</td><td>Eventual</td><td>Deduplicate by (user, emoji)</td><td>&lt; 2s</td></tr>
+<tr><td><strong>Multi-device sync</strong></td><td>Catch-up by seq gap</td><td>Strong per device</td><td>Device tracks last-seen-seq</td><td>On reconnect</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="e2e-architecture">E2E Encryption Architecture</h2>
+<pre><code>Signal Protocol (X3DH + Double Ratchet):
+
+Registration: each device generates identity key + signed pre-key + 100 one-time pre-keys
+Session (X3DH): Alice fetches Bob's key bundle → DH exchange → shared secret → init ratchet
+Message: each message gets unique key via Double Ratchet → forward + future secrecy
+
+Server sees: sender_id, conversation_id, timestamp, encrypted_blob
+Server CANNOT see: message content, media, reactions (for E2E conversations)</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Challenge</th><th>Solution</th></tr></thead>
+<tbody>
+<tr><td><strong>Multi-device</strong></td><td>Encrypt to ALL recipient devices separately</td></tr>
+<tr><td><strong>Key exhaustion</strong></td><td>Fall back to signed pre-key</td></tr>
+<tr><td><strong>New device</strong></td><td>Uploads keys; cannot decrypt old messages</td></tr>
+<tr><td><strong>Verification</strong></td><td>Safety numbers (hash of identity keys) verified out-of-band</td></tr>
+<tr><td><strong>Group E2E</strong></td><td>Sender key protocol distributed via pairwise channels</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="message-tracing">Message Lifecycle Tracing</h2>
+<pre><code>Trace spans for 1:1 message (send → deliver → read):
+
+[1] client.send: compose(10ms) → encrypt(5ms) → ws_send(15ms)
+[2] server: auth(3ms) → assign_seq(2ms) → persist(8ms) → fan_out(5ms)
+[3] deliver: lookup_connection(2ms) → push_ws(10ms) or push_notif(50ms)
+[4] client.receive: ws_recv(5ms) → decrypt(5ms) → render(10ms) → ack(5ms)
+[5] read_receipt: send_read(5ms) → server → sender
+
+Total: ~120ms online, ~300ms offline (via push)</code></pre>
+<p>Implementation: inject OpenTelemetry trace context into Kafka headers; extract in delivery worker to continue the trace.</p>
+<hr>
+<h2 id="crdt-patterns">CRDT and Local-First Patterns</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Use in Messaging</th></tr></thead>
+<tbody>
+<tr><td><strong>LWW-Register</strong></td><td>Profile fields, display name</td></tr>
+<tr><td><strong>G-Counter</strong></td><td>Unread count (each device increments)</td></tr>
+<tr><td><strong>OR-Set</strong></td><td>Reaction set on a message</td></tr>
+<tr><td><strong>RGA</strong></td><td>Collaborative document editing</td></tr>
+</tbody>
+</table></div>
+<p>Use CRDTs for multi-device sync and collaborative features. NOT for message ordering (server-assigned seq is simpler).</p>
+<hr>
+<h2 id="push-governance">Push Notification Governance</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Control</th><th>Implementation</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Per-user rate limit</td><td>Max 50 push/day</td><td>Prevent fatigue</td></tr>
+<tr><td>Quiet hours</td><td>No push 10 PM-8 AM local</td><td>Respect attention</td></tr>
+<tr><td>Priority</td><td>DM: high; group: medium; broadcast: low</td><td>High wakes device; low batched</td></tr>
+<tr><td>Delivery analytics</td><td>Track sent/delivered/opened/dismissed</td><td>Measure engagement</td></tr>
+<tr><td>Opt-out granularity</td><td>Per conversation type + notification type</td><td>User control prevents uninstall</td></tr>
+<tr><td>Collapse key</td><td>"3 new messages from Alice"</td><td>Reduce spam</td></tr>
+</tbody>
+</table></div>
+<h3 id="comms-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>WebSocket management</td><td><a href="04-networking-fundamentals.html">Ch 4</a></td></tr>
+<tr><td>Event-driven fan-out</td><td><a href="16-event-driven-architecture.html">Ch 16</a></td></tr>
+<tr><td>Notification platform</td><td><a href="F12-system-design-interview-thinking.html">F12 §6.5</a></td></tr>
+<tr><td>Consistency models</td><td><a href="11-consistency-cap-theorem.html">Ch 11</a></td></tr>
+<tr><td>Async tracing</td><td><a href="F10-observability-operations.html">F10</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Communication Systems combine the hardest real-time infrastructure problems: persistent connections at 50M scale, message ordering guarantees, E2E encryption, offline synchronization, multi-channel delivery, and video conferencing. The key insight is that <strong>different message types require different architectures</strong> — 1:1 chat, group chat, broadcast channels, typing indicators, and push notifications each have distinct delivery patterns, persistence requirements, and scaling characteristics.</p>
@@ -4962,6 +5044,11 @@ Authorization: Bearer &lt;JWT&gt;
 <li><a href="#a9-error-code-reference-all-apis">A.9 — Error Code Reference (All APIs)</a></li>
 </ul>
 </li>
+<li><a href="#ordering-consistency-guide">Ordering &amp; Consistency Per-Feature</a></li>
+<li><a href="#e2e-architecture">E2E Encryption Architecture</a></li>
+<li><a href="#message-tracing">Message Lifecycle Tracing</a></li>
+<li><a href="#crdt-patterns">CRDT &amp; Local-First Patterns</a></li>
+<li><a href="#push-governance">Push Notification Governance</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 </ul>
 </div>

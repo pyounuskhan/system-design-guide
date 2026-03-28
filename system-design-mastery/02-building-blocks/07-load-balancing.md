@@ -123,6 +123,193 @@ A retail homepage is a useful case because it mixes static assets, dynamic conte
 - Use traffic routing as part of change management and incident mitigation.
 - Remember that load balancing does not remove the need to fix downstream bottlenecks.
 
+## L4 vs L7 — Detailed Trade-offs
+
+The choice between Layer 4 and Layer 7 load balancing is one of the most consequential infrastructure decisions. It affects latency, visibility, routing flexibility, and operational complexity.
+
+| Dimension | L4 (Transport) | L7 (Application) |
+|-----------|----------------|-------------------|
+| **What it sees** | IP address, port, TCP/UDP headers | Full HTTP request: method, path, headers, cookies, body |
+| **Routing decisions** | Source/destination IP, port | URL path, hostname, header values, cookies, query params |
+| **Performance** | Faster (no payload inspection) | Slightly slower (parses HTTP) but usually negligible |
+| **TLS termination** | Passes through (or terminates without inspection) | Terminates and inspects, enabling content-based routing |
+| **Use cases** | TCP services (databases, message brokers, non-HTTP protocols) | HTTP APIs, web apps, microservice routing, canaries |
+| **Health checks** | TCP connect / port check | HTTP endpoint check (`/healthz` returning 200) |
+| **Session affinity** | IP hash (coarse) | Cookie-based (precise per-user) |
+| **Observability** | Limited (connection count, bytes) | Rich (HTTP status codes, latency per path, request rate per endpoint) |
+| **Examples** | AWS NLB, HAProxy (TCP mode), MetalLB | AWS ALB, Nginx, Envoy, Traefik, HAProxy (HTTP mode) |
+
+**Decision rule:** Use L4 for non-HTTP protocols and maximum throughput. Use L7 for HTTP services where you need routing rules, observability, or deployment strategies.
+
+### The Traffic Management Stack: LB + Gateway + Service Mesh
+
+Modern architectures often layer three traffic management components. Understanding where each fits prevents duplication and misconfiguration.
+
+```
+┌────────────────────────────────────────────────────┐
+│  EXTERNAL TRAFFIC (users, third-party clients)     │
+└──────────────────────┬─────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────┐
+│  LOAD BALANCER (L4/L7)                              │
+│  • Distributes traffic across instances             │
+│  • TLS termination                                  │
+│  • Health checks + failover                         │
+│  Examples: ALB, NLB, Nginx, Envoy front proxy       │
+└──────────────────────┬─────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────┐
+│  API GATEWAY                                        │
+│  • Authentication / authorization                   │
+│  • Rate limiting / throttling                       │
+│  • Request transformation / validation              │
+│  • API versioning + routing                         │
+│  Examples: Kong, AWS API Gateway, Apigee            │
+└──────────────────────┬─────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────┐
+│  SERVICE MESH (sidecar proxies)                     │
+│  • Service-to-service mTLS                          │
+│  • Retries, timeouts, circuit breakers              │
+│  • Observability (distributed traces, metrics)      │
+│  • Traffic splitting (canary between services)      │
+│  Examples: Istio, Linkerd, Consul Connect           │
+└────────────────────────────────────────────────────┘
+```
+
+**When do you need each?**
+
+| Component | Add When | Skip When |
+|-----------|----------|-----------|
+| Load Balancer | Always — any multi-instance service needs one | Never skip |
+| API Gateway | External-facing APIs, multi-tenant rate limiting, centralized auth | Internal-only services with built-in auth |
+| Service Mesh | 10+ microservices needing uniform mTLS, observability, and traffic policies | Monolith, small service count (< 5), team can't absorb operational cost |
+
+---
+
+## Consistent Hashing and Overload Protection
+
+### Consistent Hashing for Stateful Routing
+
+When backends maintain local state (caches, sessions, connection affinity), consistent hashing routes the same key to the same backend — and minimizes redistribution when backends are added or removed.
+
+```
+Traditional hashing: hash(key) % N backends
+  Problem: adding 1 backend remaps ~100% of keys → cache storm
+
+Consistent hashing: keys mapped to a ring; each backend owns a segment
+  Adding 1 backend remaps only ~1/N of keys → minimal disruption
+```
+
+| Algorithm | Key Redistribution on Node Change | Uniformity | Complexity |
+|-----------|----------------------------------|-----------|------------|
+| Modulo hash (`hash % N`) | ~100% (all keys remap) | Depends on hash | Trivial |
+| Consistent hashing (ring) | ~1/N (only affected range) | Can be uneven without virtual nodes | Low |
+| Consistent hashing + virtual nodes | ~1/N (evenly distributed) | Good | Low-Medium |
+| Rendezvous (highest random weight) | ~1/N | Good | Low |
+
+**Use consistent hashing when:** cache sharding, session affinity, distributed storage, or any scenario where key→backend stability matters.
+
+### Overload Protection Policies
+
+Load balancers can actively protect backends from being overwhelmed, rather than just distributing traffic blindly.
+
+| Policy | How It Works | When to Use |
+|--------|-------------|-------------|
+| **Max connections per backend** | Reject new connections once limit is reached | Protect databases, connection-limited services |
+| **Request rate limiting** | Cap requests per second per client or per backend | API protection, prevent single client from monopolizing |
+| **Queue depth limiting** | Reject when pending request queue exceeds threshold | Prevent latency spiraling under overload |
+| **Circuit breaking** | Stop sending to a backend after consecutive failures | Isolate failing instances; allow recovery |
+| **Load shedding (HTTP 503)** | Return 503 immediately when system capacity is exceeded | Protect critical paths by refusing low-priority work |
+| **Adaptive concurrency** | Dynamically adjust max in-flight requests based on observed latency | Self-tuning; works well with variable request cost |
+
+---
+
+## Global Load Balancing and Multi-Region Failover
+
+Global load balancing (GLB) operates above regional load balancers to route traffic across geographic regions. It is the first layer users interact with and determines which region serves each request.
+
+### Global LB Architecture
+
+```
+User in London → DNS (latency-based routing)
+  → EU region LB → EU backend instances
+
+User in Tokyo → DNS (latency-based routing)
+  → APAC region LB → APAC backend instances
+
+EU region fails → GLB health check detects failure
+  → DNS failover routes EU users to US region (higher latency, but available)
+```
+
+### Failover Patterns
+
+| Pattern | Recovery Time | Data Consistency | Cost | Best For |
+|---------|--------------|-----------------|------|----------|
+| **Active-Active** | ~0 (traffic already served in both regions) | Requires cross-region replication (eventual consistency) | Highest (2x infra) | Global consumer products requiring low latency everywhere |
+| **Active-Passive** | 30s-3min (DNS TTL + health check) | Primary region is authoritative; standby uses replicated data | Lower (standby can be smaller) | Apps with strong consistency needs; DR capability |
+| **Active-Active with regional primaries** | ~0 for reads; seconds for writes (routed to primary region) | Each region owns some data; cross-region only for non-local data | Medium-High | Multi-region SaaS with data residency requirements |
+
+### GLB Decision Rubric
+
+| Question | If Yes | If No |
+|----------|--------|-------|
+| Do users need < 100ms latency globally? | Active-active in 2-3 regions | Single region + CDN for static content |
+| Is data residency required (GDPR, etc.)? | Regional primaries with no cross-border replication | Any region can serve any user |
+| Can the business tolerate minutes of downtime for region failure? | Active-passive (cheaper) | Active-active (always available) |
+| Is the workload read-heavy? | Active-active with read replicas per region | Consider write-region affinity |
+
+---
+
+## Anti-Patterns in Load Balancing
+
+### Retry Amplification
+
+When a load balancer retries a failed request, and the backend also retries its downstream calls, and *those* services retry too — the total request count explodes exponentially.
+
+```
+Without retry budgets:
+  Client → LB (retries 3x) → Service A (retries 3x) → Service B (retries 3x)
+  Total requests to Service B: 3 × 3 × 3 = 27 attempts for 1 user request
+
+With retry budgets:
+  Client → LB (retries 2x) → Service A (retries 1x) → Service B (no retry)
+  Total: 2 × 1 × 1 = 2 attempts — controlled amplification
+```
+
+**Prevention rules:**
+1. Only retry at one layer (prefer the layer closest to the user)
+2. Set a retry budget: max 10-20% additional traffic from retries system-wide
+3. Never retry non-idempotent requests
+4. Use exponential backoff with jitter at every retry point
+5. Propagate deadlines — if the caller's timeout has passed, don't retry
+
+### Request Hedging Caveats
+
+Hedging sends the same request to multiple backends simultaneously and uses the first response. It reduces tail latency (p99) but doubles or triples backend load.
+
+| Aspect | Benefit | Risk |
+|--------|---------|------|
+| Tail latency | Significantly reduced p99 | Backend load increases proportionally |
+| Simple queries | Works well for cheap, idempotent reads | Never hedge writes or expensive queries |
+| Backend cost | Worth it for critical low-latency paths | Wasteful for average-latency requests |
+
+**Hedging safety rules:**
+- Only hedge idempotent, read-only requests
+- Add a delay before sending the hedge (e.g., wait until p50 latency has passed)
+- Set a maximum hedge rate (e.g., hedge at most 5% of requests)
+- Monitor backend utilization — if backends are already at 80%+, hedging will make things worse
+
+### Other Anti-Patterns
+
+| Anti-Pattern | What Goes Wrong | Fix |
+|-------------|----------------|-----|
+| **Thundering herd on failover** | All traffic moves to surviving backends simultaneously | Gradual failover ramp-up; pre-warm standby capacity |
+| **Ignoring connection draining** | In-flight requests are dropped during deploys | Enable connection draining (30-60s grace period) |
+| **Sticky sessions everywhere** | Uneven load, harder failover, defeats horizontal scaling | Move state to shared store (Redis, DB); use stateless tokens |
+| **Health check too aggressive** | Flapping backends oscillate in/out of rotation | Use longer intervals (10-30s) with consecutive failure threshold (3 failures before removal) |
+| **No backend weight awareness** | Heterogeneous instances (some 4 CPU, some 16 CPU) get equal traffic | Use weighted round robin matching instance capacity |
+
 ## Common Mistakes
 - Assuming any balancing algorithm works equally well for all workloads.
 - Leaving important session or cache state on local instances and then forcing sticky sessions everywhere.

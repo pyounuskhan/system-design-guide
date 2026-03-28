@@ -4001,6 +4001,166 @@ flowchart LR
 
 ---
 
+## Fanout Strategy Decision Matrix
+
+The fanout strategy is the single most consequential architecture decision for a social platform. This matrix covers when to use each approach.
+
+| Strategy | How It Works | Write Cost | Read Cost | Feed Freshness | Best For |
+|----------|-------------|-----------|----------|---------------|----------|
+| **Fanout-on-Write (push)** | On post creation, write to every follower's feed cache | O(followers) per post | O(1) — pre-computed | Instant (milliseconds) | Regular users (< 10K followers) |
+| **Fanout-on-Read (pull)** | On feed load, query posts from all followed accounts | O(1) per post | O(following) per read | Slight delay (query time) | Mega-creators (> 100K followers) |
+| **Hybrid** | Push for regular users; pull for mega-creators | Bounded by threshold | Most reads served from cache | Near-instant for most users | Production systems at scale |
+
+### Hybrid Fanout Decision Logic
+
+```
+User creates a post →
+  Count followers:
+    < 10K followers → PUSH (fanout-on-write)
+      Write to each follower's feed cache in Redis
+      Async via Kafka consumer workers (bounded parallelism)
+
+    ≥ 10K followers → MARK AS PULL
+      Do NOT fanout to follower caches
+      Store in "mega-creator posts" index
+
+  Feed read request →
+    1. Read pre-computed feed from Redis (push results)
+    2. Query "mega-creator posts" for accounts this user follows
+    3. Merge and rank (ML re-ranking)
+    4. Return blended feed
+```
+
+### Fanout Cost Analysis
+
+```
+Scenario: 500M DAU, average 300 follows/user, 2 posts/user/day
+
+Pure fanout-on-write:
+  500M users × 2 posts × 300 followers = 300 BILLION feed writes/day
+  → 3.5 million writes/sec → unsustainable for all users
+
+Hybrid (10K follower threshold):
+  99% of users (< 10K followers): push
+  1% (mega-creators): pull at read time
+  Push writes: ~3 billion/day (99% × 300B/100) → manageable
+  Pull queries at read: ~5M/day (readers of mega-content)
+  → 100x reduction in write volume vs pure push
+```
+
+---
+
+## Consistency Model — Per-Feature Guide
+
+Different features require different consistency guarantees. This table extends the consistency model section with actionable implementation guidance.
+
+| Feature | Consistency | Implementation | User Impact If Stale | Acceptable Lag |
+|---------|-----------|---------------|---------------------|---------------|
+| **Own post visibility** | Read-your-writes | Read from write DB for posting user's session | User doesn't see their own post → confusion | 0 (immediate) |
+| **Feed content** | Eventual | Redis fanout cache + async merge | Missing recent post from friend | < 10 seconds |
+| **Feed ranking** | Eventual | Pre-computed ranking scores refreshed periodically | Slightly suboptimal order | < 5 minutes |
+| **Like count (display)** | Approximate | Redis INCR (atomic counter) → async DB sync | Off by a few counts | < 30 seconds |
+| **Like count (analytics)** | Eventually exact | Periodic reconciliation (Redis → DB) | Accurate within hour | < 1 hour |
+| **Comment list** | Eventually consistent | Write to DB → CDC → cache invalidation | New comment appears after short delay | < 5 seconds |
+| **Follow/unfollow** | Eventual | Write to graph DB → async feed cache update | Unfollowed user's content appears briefly | < 30 seconds |
+| **Profile update** | Read-your-writes | Read from write DB for updating user; cache for others | Others see old avatar briefly | < 60 seconds |
+| **Message delivery** | At-least-once | Persistent queue + delivery ack | Message delayed, never lost | < 2 seconds |
+| **Post deletion** | Strong (soft delete) | Immediate DB flag → async cache cleanup | Deleted post visible briefly in feeds | < 10 seconds |
+| **Block/mute** | Strong for blocker | Immediate filter applied to blocked user's requests | Blocked user can still see content briefly in cache | < 5 seconds |
+
+---
+
+## Content Moderation and Safety Blueprint
+
+Content safety is not a feature — it is infrastructure. The moderation pipeline must process every piece of user-generated content before or immediately after publication.
+
+### Three-Layer Moderation Architecture
+
+```
+┌───────────────────────────────────────────────────────┐
+│  LAYER 1: PRE-PUBLICATION ML (< 200ms)                │
+│  • Image: nudity/violence classifier (CNN)             │
+│  • Text: hate speech / spam / self-harm detector (LLM) │
+│  • Video: frame sampling + image classifier             │
+│  • Link: URL reputation check (safe browsing API)       │
+│  Decision: PASS / BLOCK / REDUCE_DISTRIBUTION           │
+└──────────────────────┬────────────────────────────────┘
+                       │ Published content (passed or flagged)
+┌──────────────────────▼────────────────────────────────┐
+│  LAYER 2: POST-PUBLICATION ASYNC (minutes to hours)    │
+│  • Deep video analysis (full transcoding + audio scan)  │
+│  • Behavioral signals (engagement velocity → viral?)    │
+│  • Graph analysis (coordinated sharing = inauthentic?)  │
+│  • User reports accumulating                            │
+│  Decision: ESCALATE / REDUCE_REACH / REMOVE             │
+└──────────────────────┬────────────────────────────────┘
+                       │ Escalated content
+┌──────────────────────▼────────────────────────────────┐
+│  LAYER 3: HUMAN REVIEW (hours to days)                 │
+│  • Policy specialists for edge cases                    │
+│  • Appeals review (user contests removal)               │
+│  • Regulatory escalation (CSAM → NCMEC, terrorism →     │
+│    law enforcement)                                     │
+│  Decision: CONFIRM_REMOVAL / REINSTATE / RESTRICT       │
+└───────────────────────────────────────────────────────┘
+```
+
+### Moderation SLOs
+
+| Content Type | Pre-Pub Check | Post-Pub Scan | Human Review SLA | Regulatory SLA |
+|-------------|--------------|--------------|-----------------|---------------|
+| Text post | < 100ms | < 10 min | < 24 hours | N/A |
+| Image | < 200ms | < 30 min | < 24 hours | CSAM: < 1 hour (NCMEC report) |
+| Video | Frame sample < 500ms | Full scan < 2 hours | < 48 hours | Terrorism: < 1 hour (EU TCO) |
+| Live stream | Real-time frame check | Continuous during stream | On-call during stream | Immediate escalation |
+
+### Privacy Controls Architecture
+
+| Control | Implementation | User Expectation |
+|---------|---------------|-----------------|
+| **Account privacy** (public/private) | Privacy flag on profile; follow requests require approval for private accounts | Private account content not indexed, not visible to non-followers |
+| **Post audience** (public/friends/custom) | Audience scope stored per post; enforced at read time | Post visible only to selected audience |
+| **Block** | Bidirectional: blocked user cannot see blocker's content or interact | Immediate effect on all surfaces |
+| **Mute** | Unidirectional: muted user's content hidden from muter's feed | No notification to muted user |
+| **Data download** | Export all user data (GDPR Article 20) | Available within 72 hours |
+| **Account deletion** | Soft delete → 30-day grace → hard delete (scrub from search, feeds, graph) | Data removed from all surfaces; content attributed to "Deleted User" |
+
+---
+
+## Feed Freshness and Latency SLOs
+
+| Metric | SLO Target | Measurement | Alert Threshold |
+|--------|-----------|-------------|----------------|
+| Feed load latency (p99) | < 500ms | Time from API request to full feed response | > 800ms for 5+ min |
+| Feed freshness (new post visibility) | < 10 seconds | Time from post creation to appearance in follower feeds | > 30 seconds sustained |
+| Notification delivery (push) | < 5 seconds | Time from event to device receipt | > 15 seconds |
+| Media upload → playable | < 30 seconds (images), < 5 minutes (video) | Time from upload complete to CDN-available | Degradation > 2x target |
+| Search index freshness | < 60 seconds | Time from post creation to searchable | > 3 minutes |
+| Moderation pre-pub latency | < 200ms | Time added to post creation by ML check | > 500ms (user-perceived delay) |
+
+### Feed Quality Metrics
+
+| Metric | What It Measures | Target |
+|--------|-----------------|--------|
+| **Feed engagement rate** | % of feed items that receive any interaction (like, comment, click) | > 5% (healthy feed relevance) |
+| **Empty feed rate** | % of feed loads returning 0 items | < 0.1% (cold start handling) |
+| **Stale feed rate** | % of feed loads where newest item is > 1 hour old | < 2% |
+| **Fanout lag (p99)** | 99th percentile of time from post to all followers' caches updated | < 30 seconds |
+| **Mega-creator merge latency** | Additional time to merge pull-based mega-creator posts into feed | < 100ms |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Caching strategies for feeds | Ch 6: Caching Systems |
+| Event-driven fanout | Ch 16: Event-Driven Architecture |
+| CQRS for read/write separation | Ch 17: CQRS Pattern |
+| Notification platform design | F12 §6.5 (Mock Interview 5) |
+| Content moderation ML | Domain-specific ML chapters |
+| Privacy and regulatory requirements | Ch 2: Types of Requirements |
+
+---
+
 ## Final Recap
 
 Social Media & Content Platforms represent the most architecturally diverse domain in system design:

@@ -1,9 +1,10 @@
-# 39. Kubernetes & DevOps
+# A7. Kubernetes & DevOps
 
 ## Part Context
-**Part:** Part 6 - Advanced Architecture  
-**Position:** Chapter 39 of 60
-**Why this part exists:** This section focuses on how systems are actually deployed, operated, and evolved after the architecture diagram is approved.  
+**Part:** Part 6 - Advanced Architecture
+**Position:** Chapter A7 (Advanced Architecture — Kubernetes & DevOps Primer)
+**Complements:** F11: Deployment & DevOps (deep chapter) covers CI/CD pipelines, supply-chain security, progressive delivery, and release safety in production depth. This chapter provides the conceptual primer for the Advanced Architecture sequence.
+**Why this part exists:** This section focuses on how systems are actually deployed, operated, and evolved after the architecture diagram is approved.
 **This chapter builds toward:** container orchestration, deployment safety, platform thinking, and operational delivery discipline
 
 ## Overview
@@ -130,6 +131,207 @@ Assume a retail platform has a checkout API, an inventory service, a background 
 - Treat platform standards as leverage: they make many teams safer at once.
 - Pair autoscaling with application design that tolerates churn and cold starts.
 - Remember that Kubernetes solves deployment mechanics, not poor service boundaries or weak reliability design.
+
+## Reference Platform Blueprint
+
+A Kubernetes-based internal developer platform (IDP) should provide standardized capabilities that remove repeated toil across all teams. Here is the minimum viable platform.
+
+### Platform Component Map
+
+```
+┌────────────────────────────────────────────────────────┐
+│  Developer Experience Layer                             │
+│  • Service templates (cookiecutter / Backstage)         │
+│  • Developer portal (Backstage catalog)                 │
+│  • Self-service namespace + resource provisioning        │
+└──────────────────────┬─────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────┐
+│  CI/CD Layer                                            │
+│  • Build: GitHub Actions / GitLab CI                    │
+│  • Scan: Trivy (images), Semgrep (SAST), Grype (SCA)   │
+│  • Sign: cosign (keyless via OIDC)                      │
+│  • Deploy: Argo CD (GitOps reconciliation)              │
+└──────────────────────┬─────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────┐
+│  Runtime Layer (Kubernetes)                              │
+│  • Ingress: Nginx / Envoy Gateway                       │
+│  • Service mesh: Istio / Linkerd (mTLS, retries)        │
+│  • Autoscaling: HPA (CPU/custom metrics), Cluster AS    │
+│  • Secrets: External Secrets Operator + Vault            │
+│  • Policy: Kyverno / OPA Gatekeeper                     │
+└──────────────────────┬─────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────┐
+│  Observability Layer                                     │
+│  • Metrics: Prometheus + Grafana                         │
+│  • Logs: Loki (or ELK)                                   │
+│  • Traces: Tempo / Jaeger (via OTel Collector)           │
+│  • Alerting: Alertmanager → PagerDuty                    │
+└────────────────────────────────────────────────────────┘
+```
+
+### Platform Maturity Levels
+
+| Level | What You Have | Impact |
+|-------|-------------|--------|
+| **L0: Manual** | kubectl apply, manual image builds, no CI | High risk, slow, inconsistent |
+| **L1: Automated CI/CD** | Automated build + test + deploy per service | Consistent builds, faster delivery |
+| **L2: GitOps + Observability** | Argo CD reconciliation, Prometheus + Grafana, structured logging | Auditable deploys, production visibility |
+| **L3: Self-Service Platform** | Service templates, developer portal, policy enforcement, secret rotation | Teams onboard fast, platform absorbs complexity |
+| **L4: Full IDP** | Cost attribution, multi-cluster governance, progressive delivery, chaos testing | Engineering efficiency at scale |
+
+---
+
+## Infrastructure as Code (IaC) and GitOps — Concrete Examples
+
+### IaC: Terraform for Cloud Resources
+
+```hcl
+# Terraform: provision an RDS database for a service
+resource "aws_db_instance" "orders_db" {
+  identifier           = "orders-db-prod"
+  engine               = "postgres"
+  engine_version       = "15.4"
+  instance_class       = "db.r6g.xlarge"
+  allocated_storage    = 100
+  storage_encrypted    = true
+  multi_az             = true     # HA across availability zones
+  backup_retention_period = 14    # 14-day point-in-time recovery
+
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  db_subnet_group_name   = aws_db_subnet_group.private.name
+
+  tags = {
+    Team        = "orders"
+    Environment = "production"
+    ManagedBy   = "terraform"
+  }
+}
+```
+
+**IaC principles:**
+- All infrastructure defined in code, versioned in Git
+- Changes go through PR review (same as application code)
+- `terraform plan` shows diff before `terraform apply`
+- State stored remotely (S3 + DynamoDB lock) — never local
+
+### GitOps: Argo CD Application
+
+```yaml
+# Argo CD Application: deploy orders-service from Git
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orders-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/myorg/k8s-config
+    path: environments/production/orders-service
+    targetRevision: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orders
+  syncPolicy:
+    automated:
+      prune: true        # Remove resources deleted from Git
+      selfHeal: true     # Revert manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true
+```
+
+**GitOps principles:**
+- Git is the single source of truth for cluster state
+- No manual `kubectl apply` in production — ever
+- Argo CD continuously reconciles desired (Git) vs actual (cluster)
+- Rollback = `git revert` → Argo CD auto-syncs
+
+---
+
+## Supply-Chain Security and Policy-as-Code
+
+### Supply-Chain Security in the Platform
+
+| Control | How It Works | Tool |
+|---------|-------------|------|
+| **SBOM generation** | Every build produces a Software Bill of Materials | Syft, Trivy |
+| **Image signing** | Every image is cryptographically signed | cosign (Sigstore, keyless via OIDC) |
+| **Admission enforcement** | Cluster rejects unsigned or unscanned images | Kyverno, OPA Gatekeeper |
+| **Vulnerability scanning** | Block images with critical CVEs from deploying | Trivy (in CI) + Kyverno (at admission) |
+| **SLSA provenance** | Build metadata proves image was built by trusted CI | SLSA GitHub Actions generator |
+
+### Policy-as-Code Examples
+
+```yaml
+# Kyverno: require all pods to have resource limits
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resource-limits
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-limits
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      validate:
+        message: "All containers must have CPU and memory limits set."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"
+```
+
+```yaml
+# Kyverno: only allow images from trusted registry
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: validate-registries
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      validate:
+        message: "Images must come from myregistry.io"
+        pattern:
+          spec:
+            containers:
+              - image: "myregistry.io/*"
+```
+
+### Multi-Cluster Governance
+
+| Concern | Single Cluster | Multi-Cluster |
+|---------|---------------|---------------|
+| Policy enforcement | Kyverno/OPA per cluster | Centralized policy repo deployed to all clusters via GitOps |
+| Secret management | External Secrets Operator per cluster | Vault with per-cluster auth paths |
+| Observability | Local Prometheus + Grafana | Centralized Grafana with remote-write from each cluster (Mimir/Thanos) |
+| Cost attribution | Namespace-level labels | Cluster + namespace labels; per-cluster cost reports |
+| Deployment | Argo CD per cluster | Argo CD with multi-cluster targeting (ApplicationSet) |
+
+### Cross-References to Deep Content
+
+| Topic | Where to Go |
+|-------|-------------|
+| Full CI/CD pipeline with supply-chain security | F11: Deployment & DevOps §1.5 (Supply-Chain Security) |
+| Progressive delivery (Flagger, Argo Rollouts) | F11: Progressive Delivery |
+| Release safety checklists by risk level | F11: Release Safety Checklists |
+| Container image best practices (multi-stage, non-root) | F11 §3.1 (Docker Fundamentals) |
+| Helm chart management | F11 §3.4 (Helm) |
+| Service mesh deep dive (Istio vs Linkerd) | F11 §3.5 (Service Mesh) |
 
 ## Common Mistakes
 - Treating Kubernetes as a goal instead of an execution environment.

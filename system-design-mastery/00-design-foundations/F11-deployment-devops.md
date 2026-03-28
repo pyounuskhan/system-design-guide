@@ -884,9 +884,150 @@ Security scanning should be integrated into every CI pipeline. Three categories 
 | DAST | Post-deploy to staging | Runtime vulnerabilities | Slow (10-30 min) | No (alert) |
 | License check | Every PR | License compliance | Fast (< 30s) | Yes (copyleft in proprietary) |
 
+## 1.5 Supply-Chain Security
+
+Modern software is assembled from thousands of open-source dependencies, base images, and build tools. A compromise at any point in this chain can inject malicious code into production. Supply-chain security treats the build and delivery pipeline as an attack surface and applies cryptographic verification, provenance tracking, and policy enforcement to every artifact.
+
+### The Supply-Chain Threat Model
+
+```
+Developer → Source Code → Build System → Artifact → Registry → Deployment
+    ↑            ↑             ↑            ↑           ↑           ↑
+  Compromised  Tampered     Hijacked    Modified    Poisoned    Swapped
+   account      repo        CI runner    binary      image       config
+```
+
+**Real-world supply-chain attacks:**
+
+| Attack | Vector | Impact |
+|--------|--------|--------|
+| SolarWinds (2020) | Build system compromise — malicious code injected during CI | 18,000+ organizations, US government agencies |
+| Codecov (2021) | Bash uploader script modified in CI | Secrets exfiltrated from CI environments |
+| ua-parser-js (2021) | npm package maintainer account hijack | Cryptominer injected into 7M+ weekly downloads |
+| Log4Shell (2021) | Unpatched transitive dependency | Remote code execution in ~35% of Java applications |
+| 3CX (2023) | Compromised upstream dependency signed by legitimate key | Supply-chain attack through signed, trusted software |
+
+### SLSA Framework (Supply-chain Levels for Software Artifacts)
+
+SLSA (pronounced "salsa") is a security framework by Google that defines four levels of supply-chain integrity, from basic to hardened. It provides a checklist for securing the build and distribution process.
+
+| Level | Requirements | What It Prevents |
+|-------|-------------|-----------------|
+| SLSA 1 | Build process is documented; provenance metadata exists | Ad-hoc builds from developer laptops |
+| SLSA 2 | Build runs on a hosted, authenticated CI service; provenance is signed | Tampered builds from compromised dev machines |
+| SLSA 3 | Build runs in an isolated, ephemeral environment; provenance is non-falsifiable | Compromised CI workers persisting across builds |
+| SLSA 4 | Hermetic build (no network access); two-person review on source | Insider threats, network-based build injection |
+
+**Target**: Most organizations should aim for SLSA 3 within 12 months. SLSA 4 is for high-security workloads (financial, healthcare, government).
+
+### Software Bill of Materials (SBOM)
+
+An SBOM is a machine-readable inventory of every component in a software artifact — libraries, versions, licenses, and their transitive dependencies. It answers: "what is inside this binary?"
+
+**SBOM formats:**
+
+| Format | Maintained By | Strengths |
+|--------|-------------|-----------|
+| SPDX | Linux Foundation | ISO standard (ISO/IEC 5962:2021), broad tooling |
+| CycloneDX | OWASP | Lightweight, designed for security use cases |
+| SWID Tags | ISO/NIST | Enterprise software identification |
+
+**Generating SBOMs in CI:**
+
+```bash
+# Generate SBOM from container image using Syft
+syft packages myapp:v1.2.3 -o spdx-json > sbom.spdx.json
+
+# Generate SBOM from source directory
+syft dir:./src -o cyclonedx-json > sbom.cdx.json
+
+# Scan SBOM for known vulnerabilities using Grype
+grype sbom:./sbom.spdx.json --fail-on critical
+
+# Attach SBOM to container image as OCI artifact
+oras attach myregistry.io/myapp:v1.2.3 \
+  --artifact-type application/spdx+json \
+  sbom.spdx.json
+```
+
+**SBOM lifecycle in the pipeline:**
+
+| Stage | Action | Tool |
+|-------|--------|------|
+| Build | Generate SBOM from source + dependencies | Syft, Trivy, cdxgen |
+| Scan | Check SBOM against CVE databases | Grype, Trivy, OSV-Scanner |
+| Store | Attach SBOM to image as OCI artifact | ORAS, cosign attach |
+| Policy | Enforce SBOM completeness + no critical CVEs | OPA/Gatekeeper admission policy |
+| Audit | Query SBOMs when new CVEs are disclosed | Dependency-Track, GUAC |
+
+### Artifact Signing and Verification
+
+Signing artifacts cryptographically proves they were built by a trusted pipeline and have not been tampered with in transit.
+
+**Sigstore — keyless signing for containers:**
+
+Sigstore eliminates the operational burden of managing signing keys. It uses ephemeral keys tied to CI identity (e.g., GitHub Actions OIDC) and stores signatures in a tamper-proof transparency log (Rekor).
+
+```bash
+# Sign a container image with cosign (keyless, uses CI OIDC identity)
+cosign sign --yes myregistry.io/myapp:v1.2.3
+
+# Verify signature before deployment
+cosign verify myregistry.io/myapp:v1.2.3 \
+  --certificate-identity="https://github.com/myorg/myapp/.github/workflows/build.yml@refs/heads/main" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+
+# Sign and attach SLSA provenance
+cosign attest --predicate provenance.json --type slsaprovenance \
+  myregistry.io/myapp:v1.2.3
+```
+
+**Kubernetes admission enforcement:**
+
+```yaml
+# Kyverno policy: only allow signed images from trusted CI
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signatures
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: verify-cosign-signature
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      verifyImages:
+        - imageReferences: ["myregistry.io/*"]
+          attestors:
+            - entries:
+                - keyless:
+                    subject: "https://github.com/myorg/*"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor:
+                      url: https://rekor.sigstore.dev
+```
+
+### Supply-Chain Security Checklist
+
+| # | Control | SLSA Level | Priority |
+|---|---------|-----------|----------|
+| 1 | Pin dependency versions (lockfiles committed) | 1 | P0 |
+| 2 | Run SCA scan on every PR (Trivy, Grype, Dependabot) | 1 | P0 |
+| 3 | Build on hosted CI (not developer laptops) | 2 | P0 |
+| 4 | Generate SBOM for every release artifact | 2 | P1 |
+| 5 | Sign container images with cosign (keyless) | 2 | P1 |
+| 6 | Enforce signature verification at admission (Kyverno/OPA) | 2 | P1 |
+| 7 | Use ephemeral, isolated CI runners | 3 | P1 |
+| 8 | Generate and verify SLSA provenance | 3 | P2 |
+| 9 | Scan for malicious packages (Socket.dev, Phylum) | 3 | P2 |
+| 10 | Require two-person review for dependency updates | 3 | P2 |
+| 11 | Air-gapped / hermetic builds for critical services | 4 | P3 |
+
 ---
 
-## 1.5 Artifact Management
+## 1.6 Artifact Management
 
 ### What Is an Artifact?
 
@@ -2872,6 +3013,376 @@ config-repo/
 
 ---
 
+## Reference CI/CD Pipeline — End-to-End Blueprint
+
+The following diagram shows a production-grade CI/CD pipeline from commit to production, incorporating all the practices discussed in this chapter: testing, security scanning, supply-chain verification, multi-environment promotion, and GitOps deployment.
+
+```mermaid
+graph TB
+    subgraph Develop ["Developer Workflow"]
+        D1["Developer pushes<br/>to feature branch"]
+        D2["PR opened →<br/>triggers CI"]
+    end
+
+    subgraph CI ["CI Pipeline (GitHub Actions / GitLab CI)"]
+        C1["Lint + Format<br/>(eslint, black, gofmt)"]
+        C2["Unit Tests<br/>(fast, isolated)"]
+        C3["SAST Scan<br/>(Semgrep, CodeQL)"]
+        C4["SCA Scan<br/>(Trivy, Grype)"]
+        C5["Build Container<br/>Image (multi-stage)"]
+        C6["Integration Tests<br/>(docker-compose)"]
+        C7["Generate SBOM<br/>(Syft)"]
+        C8["Sign Image<br/>(cosign keyless)"]
+        C9["Push to Registry<br/>(tagged + signed)"]
+    end
+
+    subgraph Promote ["Environment Promotion"]
+        P1["Dev / Preview<br/>auto-deploy on PR"]
+        P2["Staging<br/>auto-deploy on merge"]
+        P3["Production<br/>canary → full rollout"]
+    end
+
+    subgraph GitOps ["GitOps (Argo CD)"]
+        G1["Config repo updated<br/>(image tag bumped)"]
+        G2["Argo CD detects drift"]
+        G3["Sync + Reconcile<br/>desired → actual"]
+    end
+
+    subgraph Verify ["Post-Deploy Verification"]
+        V1["Smoke tests"]
+        V2["SLO burn-rate check<br/>(5 min window)"]
+        V3["Canary metrics<br/>comparison"]
+        V4{Pass?}
+        V5["Promote to 100%"]
+        V6["Auto-rollback"]
+    end
+
+    D1 --> D2
+    D2 --> C1 --> C2 --> C3
+    C3 --> C4
+    C4 --> C5 --> C6
+    C6 --> C7 --> C8 --> C9
+    C9 --> P1
+    P1 -.->|"merge to main"| P2
+    P2 --> G1 --> G2 --> G3
+    G3 --> P3
+    P3 --> V1 --> V2 --> V3 --> V4
+    V4 -->|Yes| V5
+    V4 -->|No| V6
+```
+
+**Pipeline stage timing targets:**
+
+| Stage | Target Duration | Gate? |
+|-------|----------------|-------|
+| Lint + Format | < 30 seconds | Yes — block on failure |
+| Unit Tests | < 3 minutes | Yes — block on failure |
+| SAST Scan | < 2 minutes | Yes — block on critical/high |
+| SCA Scan | < 1 minute | Yes — block on critical CVEs |
+| Build Image | < 3 minutes | Yes — block on failure |
+| Integration Tests | < 5 minutes | Yes — block on failure |
+| SBOM + Sign | < 1 minute | Yes — block on failure |
+| **Total CI** | **< 15 minutes** | |
+| Staging deploy | < 5 minutes | Auto on merge |
+| Production canary | 5-30 minutes | Metrics-gated promotion |
+
+---
+
+## Multi-Environment Promotion Policies
+
+Promotion policies define the rules for how an artifact moves from one environment to the next. Without explicit policies, teams either skip validation (shipping bugs) or create bottlenecks (waiting for manual approvals).
+
+### The Environment Ladder
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Dev / Preview    → auto on PR push                       │
+│  ↓ merge to main                                          │
+│  Staging          → auto on merge, full integration tests  │
+│  ↓ policy gate                                            │
+│  Pre-Production   → load test + compliance scan           │
+│  ↓ approval gate                                          │
+│  Production       → canary 1% → 10% → 50% → 100%        │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Promotion Rules by Environment
+
+| Transition | Trigger | Gate | Approval | Rollback |
+|-----------|---------|------|----------|----------|
+| Code → Dev | PR push | CI passes (lint, test, scan) | None (automatic) | Delete preview env |
+| Dev → Staging | Merge to main | All CI gates pass | None (automatic) | Redeploy previous image |
+| Staging → Pre-Prod | Staging tests pass | Integration + contract tests pass | None or team lead | Redeploy previous image |
+| Pre-Prod → Production | Pre-prod validation passes | SLO burn-rate check, load test, compliance scan | SRE + service owner (for high-risk) | Canary rollback or full rollback |
+
+### Environment Parity Principles
+
+| Principle | Implementation |
+|-----------|---------------|
+| Same artifact everywhere | Build once, promote the same immutable image through all envs |
+| Same infrastructure template | Terraform/Pulumi modules shared across envs, differ only in variables |
+| Same config structure | ConfigMaps/Secrets follow identical schemas; values differ per env |
+| Proportional data | Staging has anonymized production data subset for realistic testing |
+| Feature-flag parity | Flags that are on in production must also be on in staging (unless explicitly testing off-state) |
+
+### Promotion Policy Configuration (Argo CD ApplicationSet)
+
+```yaml
+# Argo CD ApplicationSet — environment promotion
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: myapp-environments
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: dev-cluster
+            autoSync: "true"
+            approval: "none"
+          - env: staging
+            cluster: staging-cluster
+            autoSync: "true"
+            approval: "none"
+          - env: production
+            cluster: prod-cluster
+            autoSync: "false"     # Manual sync for production
+            approval: "required"
+  template:
+    metadata:
+      name: "myapp-{{env}}"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/myorg/k8s-config
+        path: "environments/{{env}}/myapp"
+        targetRevision: main
+      destination:
+        server: "{{cluster}}"
+        namespace: myapp
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+```
+
+---
+
+## Progressive Delivery — Analysis and Automation
+
+Progressive delivery extends deployment strategies with automated analysis, metric-driven decisions, and risk-aware rollout. Where a basic canary deployment splits traffic, progressive delivery adds intelligence: "should this canary be promoted, paused, or rolled back — and the system decides automatically."
+
+### Progressive Delivery Components
+
+```mermaid
+graph LR
+    D["Deploy canary<br/>(1% traffic)"] --> M["Metric Collection<br/>(latency, errors, saturation)"]
+    M --> A["Analysis Engine<br/>(Flagger / Argo Rollouts)"]
+    A -->|Pass| P["Promote<br/>(increase traffic %)"]
+    A -->|Fail| R["Rollback<br/>(shift 100% to stable)"]
+    A -->|Inconclusive| W["Wait + Extend<br/>(collect more data)"]
+    P --> M
+```
+
+### Flagger — Progressive Delivery for Kubernetes
+
+Flagger automates canary analysis and promotion using service mesh (Istio/Linkerd) or ingress controller (Nginx/Contour) for traffic shifting.
+
+```yaml
+# Flagger Canary resource with automated analysis
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: myapp
+  namespace: prod
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: myapp
+  service:
+    port: 80
+  analysis:
+    # Progressive traffic shift schedule
+    interval: 1m          # Check metrics every 1 minute
+    threshold: 5          # Max failed checks before rollback
+    maxWeight: 50         # Maximum canary traffic percentage
+    stepWeight: 10        # Increase traffic by 10% per step
+    # Metric checks for promotion decisions
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99.0       # Must maintain 99%+ success rate
+        interval: 1m
+      - name: request-duration
+        thresholdRange:
+          max: 500        # p99 latency must stay under 500ms
+        interval: 1m
+    # Custom metrics (e.g., business metrics)
+    webhooks:
+      - name: load-test
+        type: rollout
+        url: http://flagger-loadtester/
+        metadata:
+          cmd: "hey -z 1m -q 10 -c 2 http://myapp-canary.prod/"
+```
+
+### Argo Rollouts — Progressive Delivery Analysis
+
+```yaml
+# Argo Rollouts with automated analysis
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: myapp
+spec:
+  strategy:
+    canary:
+      steps:
+        - setWeight: 5
+        - pause: { duration: 5m }
+        - analysis:
+            templates:
+              - templateName: success-rate
+            args:
+              - name: service-name
+                value: myapp
+        - setWeight: 20
+        - pause: { duration: 5m }
+        - analysis:
+            templates:
+              - templateName: success-rate
+        - setWeight: 50
+        - pause: { duration: 10m }
+        - analysis:
+            templates:
+              - templateName: success-rate
+        - setWeight: 100
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+spec:
+  metrics:
+    - name: success-rate
+      interval: 1m
+      successCondition: result[0] >= 0.99
+      failureLimit: 3
+      provider:
+        prometheus:
+          address: http://prometheus:9090
+          query: |
+            sum(rate(http_requests_total{service="{{args.service-name}}",status!~"5.."}[5m]))
+            / sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))
+```
+
+### Progressive Delivery Tool Comparison
+
+| Feature | Flagger | Argo Rollouts |
+|---------|---------|---------------|
+| Traffic splitting | Istio, Linkerd, Nginx, Contour, AWS App Mesh | Istio, Nginx, ALB, SMI |
+| Analysis engine | Built-in metric checks + webhooks | AnalysisTemplate with Prometheus/Datadog/Kayenta |
+| Rollback | Automatic on metric failure | Automatic on analysis failure |
+| Blue-green | Supported | Supported |
+| A/B testing | Via Istio header-based routing | Via header/cookie routing |
+| Integration with Argo CD | Separate tool | Native Argo ecosystem |
+| Maturity | CNCF project, production-ready | CNCF project, production-ready |
+
+---
+
+## Release Safety Checklists — Keyed to Risk Levels
+
+Not all deployments carry the same risk. A CSS color change does not need the same scrutiny as a payment service migration. Risk-tiered checklists ensure proportional rigor: low-risk changes deploy fast, high-risk changes get additional gates.
+
+### Risk Classification Matrix
+
+| Risk Level | Definition | Examples |
+|-----------|-----------|---------|
+| **Low** | No user-facing behavior change, no data model change, no dependency change | Config tweak, CSS fix, log message update, doc change |
+| **Medium** | User-facing behavior change with feature flag, non-breaking API change | New UI feature behind flag, adding an API field, performance optimization |
+| **High** | Breaking API change, database migration, new external dependency, payment/auth flow change | Schema migration, third-party integration, auth changes, pricing logic |
+| **Critical** | Infrastructure change, security patch, data migration, multi-service coordinated deploy | Kubernetes upgrade, encryption key rotation, cross-service protocol change |
+
+### Checklist by Risk Level
+
+**Low Risk — Fast Track**
+- [ ] CI passes (lint, test, scan)
+- [ ] PR reviewed by at least 1 engineer
+- [ ] Auto-deploy to staging, verify smoke tests
+- [ ] Deploy to production (rolling update or auto-canary)
+- [ ] Verify: no error rate spike in 5 minutes
+
+**Medium Risk — Standard**
+- [ ] CI passes (all gates)
+- [ ] PR reviewed by at least 2 engineers
+- [ ] Feature flag enabled in staging, tested manually
+- [ ] Deploy to production behind feature flag (0% → gradual rollout)
+- [ ] Verify: SLO burn-rate check passes over 15 minutes
+- [ ] Gradual flag rollout: 1% → 10% → 50% → 100%
+- [ ] Runbook exists for rollback (toggle flag off)
+
+**High Risk — Guarded**
+- [ ] CI passes (all gates including integration + contract tests)
+- [ ] PR reviewed by 2+ engineers including service owner
+- [ ] Load test in staging / pre-production
+- [ ] Database migration tested against production-clone data
+- [ ] SLO error budget check: > 50% remaining before deploying
+- [ ] Deploy during business hours (avoid Friday afternoon)
+- [ ] Canary at 1% for 30 minutes with active monitoring
+- [ ] SRE on standby during rollout
+- [ ] Rollback plan documented and tested
+- [ ] Customer support notified of potential impact
+
+**Critical Risk — Full Ceremony**
+- [ ] All High Risk items above, plus:
+- [ ] Architecture review / RFC approved
+- [ ] Dry-run in pre-production with production-equivalent traffic
+- [ ] Coordinated deploy schedule published to all affected teams
+- [ ] Rollback rehearsal completed (actually test the rollback)
+- [ ] SLO error budget check: > 75% remaining
+- [ ] Incident response team pre-staged
+- [ ] Status page update drafted (ready to publish)
+- [ ] Executive notification sent
+
+### Deployment Risk and SLO Integration
+
+Deployment risk should be directly tied to SLO error budgets. The remaining error budget determines how much risk the team can afford to take.
+
+| Error Budget Remaining | Allowed Deployment Risk | Deployment Cadence |
+|----------------------|------------------------|-------------------|
+| > 75% | Any risk level | Normal velocity |
+| 50-75% | Low + Medium risk only | Normal velocity, High risk needs SRE review |
+| 25-50% | Low risk only | Reduced velocity, all Medium+ changes require rollback plan review |
+| < 25% | Emergency fixes only | Deployment freeze except P0 reliability fixes |
+| Exhausted (0%) | Full freeze | All engineering effort on reliability |
+
+**Automated risk gating in CI:**
+
+```yaml
+# GitHub Actions step: check error budget before deploying
+- name: Check SLO error budget
+  run: |
+    BUDGET=$(curl -s "http://prometheus:9090/api/v1/query" \
+      --data-urlencode "query=slo_error_budget_remaining{service=\"$SERVICE\"}" \
+      | jq '.data.result[0].value[1]' -r)
+
+    RISK_LEVEL="${{ github.event.inputs.risk_level }}"
+
+    if [[ "$RISK_LEVEL" == "high" && $(echo "$BUDGET < 0.50" | bc -l) -eq 1 ]]; then
+      echo "::error::Error budget below 50% ($BUDGET). High-risk deploys blocked."
+      exit 1
+    fi
+
+    if [[ "$RISK_LEVEL" == "medium" && $(echo "$BUDGET < 0.25" | bc -l) -eq 1 ]]; then
+      echo "::error::Error budget below 25% ($BUDGET). Medium-risk deploys blocked."
+      exit 1
+    fi
+
+    echo "Error budget: $BUDGET — $RISK_LEVEL deployment allowed."
+```
+
 ---
 
 # Architectural Decision Records (ADRs)
@@ -3372,6 +3883,12 @@ This connects to container orchestration:
 
 8. **Every deployment needs a rollback plan.** Whether it is switching back to the blue environment, reverting a canary, or toggling a feature flag, the ability to quickly undo a bad deployment is what separates resilient systems from fragile ones.
 
+9. **Supply-chain security is non-negotiable.** Generate SBOMs, sign artifacts with Sigstore/cosign, enforce signature verification at Kubernetes admission, and aim for SLSA Level 3. The build pipeline is an attack surface.
+
+10. **Risk-tiered release checklists prevent both over-engineering and under-engineering.** Low-risk changes deploy fast; high-risk changes get proportional scrutiny. Tie deployment gates to SLO error budgets — when budget is low, velocity slows.
+
+11. **Progressive delivery automates the promotion decision.** Tools like Flagger and Argo Rollouts use real-time metric analysis to promote, pause, or rollback canaries without human intervention.
+
 ---
 
 ## Deployment & DevOps Mental Model
@@ -3420,6 +3937,10 @@ flowchart TD
 | DB Migration | Expand-contract pattern | Never rename/drop columns in one step |
 | Secrets | External Secrets Operator + Vault | Never commit secrets to Git |
 | Rollback | Every deployment needs a rollback plan | Automated rollback on error rate spike |
+| Supply Chain | SBOM + signing + SLSA provenance | Verify every artifact before it runs |
+| Progressive Delivery | Automated canary analysis (Flagger/Argo Rollouts) | Metrics decide promote vs. rollback |
+| Risk Checklists | Low/Medium/High/Critical risk tiers | Proportional rigor per deployment |
+| Env Promotion | Dev → Staging → Pre-Prod → Production | Same artifact, policy gates between envs |
 
 ---
 
@@ -3504,6 +4025,13 @@ These benchmarks provide a target for engineering organizations to measure their
 | **Service mesh** | An infrastructure layer that manages service-to-service communication with proxies (Istio, Linkerd) |
 | **Sidecar** | A container that runs alongside the main application container in the same pod |
 | **Trunk-based development** | A branching strategy where all developers commit to a single main branch with short-lived feature branches |
+| **SBOM** | Software Bill of Materials — a machine-readable inventory of all components in a software artifact |
+| **Sigstore** | An open-source project providing keyless signing, verification, and transparency for software artifacts |
+| **SLSA** | Supply-chain Levels for Software Artifacts — a framework defining four levels of build integrity |
+| **cosign** | A tool from Sigstore for signing and verifying container images using keyless or key-based methods |
+| **Flagger** | A Kubernetes-native progressive delivery tool that automates canary analysis and traffic shifting |
+| **Progressive delivery** | An extension of continuous delivery that adds automated analysis and risk-aware rollout decisions |
+| **Promotion policy** | Rules defining how and when an artifact advances from one environment to the next |
 | **VPA** | Vertical Pod Autoscaler — adjusts CPU and memory requests/limits for containers |
 
 ---

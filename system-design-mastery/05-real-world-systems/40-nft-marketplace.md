@@ -3,6 +3,9 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 40 of 60
+**Last reviewed:** March 2026. The NFT ecosystem evolves rapidly — token standards, marketplace dynamics, and regulatory posture change frequently. Verify against current sources.
+
+**⚠️ Disclaimer:** This chapter is an *architectural reference for system design education*. It does NOT constitute financial or legal advice. NFT marketplaces handle real digital assets. Any production implementation requires security audits, legal review for IP/securities compliance, and independent risk assessment.
 
 ---
 
@@ -4405,6 +4408,93 @@ Blur Protocol: https://docs.blur.foundation
 Chainabuse: https://www.chainabuse.com
 Flashbots: https://docs.flashbots.net
 ```
+
+## Metadata Integrity — Hashing, Pinning, and Provenance
+
+NFT metadata (name, description, image, attributes) is typically stored off-chain. If metadata can be changed or lost, the NFT becomes meaningless.
+
+### Metadata Storage Patterns
+
+| Pattern | How | Integrity | Availability | Cost |
+|---------|-----|-----------|-------------|------|
+| **IPFS + pinning** | Content-addressed storage; hash in token URI | High (hash guarantees content) | Depends on pinning (Pinata, Filebase, own node) | Low-Medium |
+| **Arweave** | Permanent storage; pay once, stored forever | High (immutable) | High (incentivized storage network) | Medium (one-time) |
+| **Centralized server** | HTTPS URL to marketplace server | None (URL content can change) | Depends on operator | Lowest |
+| **On-chain** | Metadata stored in contract storage | Highest (blockchain immutability) | Blockchain availability | Very high (gas costs) |
+
+### Metadata Integrity Checklist
+
+- [ ] Token URI points to content-addressed storage (IPFS CID or Arweave txID), NOT a mutable HTTPS URL
+- [ ] Image/media hash stored in metadata JSON; clients can verify integrity
+- [ ] Pinning service redundancy (at least 2 pinning providers or self-hosted + service)
+- [ ] Metadata freeze: after mint, metadata should be immutable (no `setTokenURI` without governance)
+- [ ] Provenance chain: track creator → mint → first sale → current owner on-chain
+- [ ] Collection-level metadata (contract name, description, royalty info) stored immutably
+
+---
+
+## Marketplace Abuse and Rate Limiting
+
+| Abuse Type | Vector | Detection | Mitigation |
+|-----------|--------|-----------|-----------|
+| **Wash trading** | Creator buys own NFTs to inflate price/volume | Same wallet or linked wallets trading back and forth | Graph analysis on buyer-seller relationships; flag and exclude from rankings |
+| **Counterfeit/stolen art** | Mint someone else's art as NFT | Image similarity matching (perceptual hash) | DMCA process; automated image fingerprinting against known art databases |
+| **Bid manipulation** | Place high bid then cancel before acceptance | Bid escrow (funds locked on bid) | Require on-chain escrow; penalize cancellation |
+| **Spam minting** | Flood marketplace with low-quality/spam NFTs | Volume anomaly per wallet; content quality scoring | Rate limit mints per wallet; require stake/fee for listing; content review queue |
+| **Phishing listings** | Fake collection mimicking popular project | Collection name/image similarity check | Verified collection badges; similarity alerts; report mechanism |
+
+### Rate Limits
+
+| Action | Limit | Window | Enforcement |
+|--------|-------|--------|-------------|
+| Mint | 50 per wallet per day | 24 hours | On-chain check or marketplace API limit |
+| List | 100 per wallet per day | 24 hours | API rate limit |
+| Bid | 200 per wallet per day | 24 hours | API rate limit + escrow requirement |
+| API queries | 100 req/min per API key | 1 minute | API gateway |
+| Image upload | 10 per minute | 1 minute | Upload service rate limit |
+
+---
+
+## Content Moderation and Takedowns
+
+| Challenge | Implementation |
+|-----------|---------------|
+| **Illegal content minted as NFT** | Pre-mint image scan (ML classifier); post-mint reports + human review queue |
+| **Copyright infringement** | DMCA takedown process; perceptual hash matching against registered works |
+| **On-chain vs off-chain removal** | Cannot remove on-chain token; CAN delist from marketplace UI + unpin metadata from IPFS |
+| **Jurisdictional variation** | Geo-based content filtering; legal compliance per market |
+| **Appeals process** | Creator can dispute takedown; human review within 5 business days |
+
+**Key insight:** Marketplace cannot delete on-chain data, but CAN:
+1. Remove listing from marketplace search/browse
+2. Unpin metadata from IPFS (content becomes unavailable unless pinned elsewhere)
+3. Block wallet from marketplace UI
+4. Report to law enforcement for illegal content
+
+---
+
+## Marketplace Observability SLOs
+
+| Metric | SLO | Alert | Why |
+|--------|-----|-------|-----|
+| **Listing page load** | < 1 second (p99) | > 3 seconds | User engagement drops |
+| **Mint confirmation** | < 30 seconds (blockchain finality) | > 2 minutes | User anxiety; retry risk |
+| **Bid placement** | < 5 seconds (API + chain submission) | > 15 seconds | User abandons bid |
+| **Indexer freshness** | < 30 seconds from on-chain event to marketplace display | > 2 minutes | Users don't see their mint/purchase |
+| **Image/media load** | < 2 seconds (IPFS gateway or CDN) | > 5 seconds | Broken browsing experience |
+| **Search relevance** | Zero-result rate < 5% | > 10% | Discovery fails |
+| **Wash trading detection** | Flag within 24 hours | > 72 hours | Misleading volume rankings |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Blockchain fundamentals | Ch 36: Blockchain & Distributed Systems |
+| Smart contract security | Ch 36 (Operational Risks); Ch 39 (DeFi Threat Model) |
+| Event indexing and streaming | Ch 8: Message Queues; Ch 16: EDA |
+| Content moderation patterns | Ch 20: Social Media (Moderation Blueprint) |
+| Object storage and CDN | Ch 9: Storage Systems |
+| Rate limiting algorithms | Ch 15: API Gateway Pattern |
 
 ---
 

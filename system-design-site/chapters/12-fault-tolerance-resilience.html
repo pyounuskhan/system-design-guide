@@ -1143,6 +1143,137 @@
 <li>Preserve business correctness first, then improve user experience around it with graceful degradation.</li>
 <li>Make failure states visible to both machines and humans.</li>
 </ul>
+<h2 id="resilience-cookbook">Resilience Patterns Cookbook</h2>
+<h3 id="pattern-timeouts">Pattern 1: Timeouts</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Parameter</th><th>Guidance</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Connection timeout</td><td>1-3 seconds</td><td>Detect unreachable host fast</td></tr>
+<tr><td>Request timeout</td><td>5-30s (per endpoint)</td><td>Based on dependency p99 + buffer</td></tr>
+<tr><td>Cascading rule</td><td>Each layer shorter than caller</td><td>Gateway 30s → Svc A 10s → Svc B 3s → DB 1s</td></tr>
+</tbody>
+</table></div>
+<h3 id="pattern-retries">Pattern 2: Retries with Backoff + Jitter</h3>
+<pre><code class="language-python">import random, time
+def call_with_retry(func, max_retries=3, base_delay=1.0):
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except TransientError:
+            if attempt == max_retries:
+                raise
+            delay = base_delay * (2 ** attempt)  # 1s, 2s, 4s
+            jitter = random.uniform(0, delay * 0.5)
+            time.sleep(delay + jitter)</code></pre>
+<p><strong>Rules:</strong> Only retry idempotent ops; 10-20% retry budget; propagate deadlines; never retry 4xx.</p>
+<h3 id="pattern-circuit-breaker">Pattern 3: Circuit Breaker</h3>
+<pre><code>CLOSED (normal) → failures &lt; threshold → allow all
+    ↓ threshold exceeded
+OPEN (tripped) → reject all → return fallback
+    ↓ after cooldown (30s)
+HALF-OPEN → allow 1 test request
+    → success → CLOSED | failure → OPEN</code></pre>
+<h3 id="pattern-bulkhead">Pattern 4: Bulkheads</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Type</th><th>How It Works</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Thread pool</strong></td><td>Separate pool per dependency</td><td>Payment: 20 threads; Search: 50 threads</td></tr>
+<tr><td><strong>Connection pool</strong></td><td>Separate pool per dependency</td><td>Orders DB: 50 conns; Analytics DB: 20 conns</td></tr>
+<tr><td><strong>Queue</strong></td><td>Separate queue per priority</td><td>High: OTP; Low: marketing</td></tr>
+<tr><td><strong>Tenant</strong></td><td>Per-tenant resource limits</td><td>Enterprise: dedicated DB; Free: shared</td></tr>
+</tbody>
+</table></div>
+<h3 id="pattern-load-shedding">Pattern 5: Load Shedding</h3>
+<pre><code>IF load &gt; 90%: Reject analytics, degrade recommendations, protect checkout
+IF load &gt; 95%: Reject non-essential reads, serve cached catalog, protect active checkouts
+Response: HTTP 503 + Retry-After: 30</code></pre>
+<h3 id="pattern-degradation-map">Pattern 6: Graceful Degradation Map</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Priority</th><th>Feature</th><th>Degradation</th><th>Trigger</th></tr></thead>
+<tbody>
+<tr><td>P0 (never)</td><td>Checkout, payment, auth</td><td>Full functionality always</td><td>—</td></tr>
+<tr><td>P1 (last)</td><td>Order history, settings</td><td>Serve from cache</td><td>DB latency &gt; 2s</td></tr>
+<tr><td>P2 (early)</td><td>Recommendations</td><td>Generic/cached suggestions</td><td>Error rate &gt; 10%</td></tr>
+<tr><td>P3 (first)</td><td>Analytics, A/B tracking</td><td>Silently drop</td><td>Load &gt; 80%</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="failure-mode-checklist">Failure-Mode Checklist</h2>
+<p><strong>Per-dependency:</strong></p>
+<ul>
+<li>Timeout defined (shorter than caller's)</li>
+<li>Retry policy (max retries, backoff, idempotency safety)</li>
+<li>Circuit breaker (threshold, cooldown, fallback)</li>
+<li>Bulkhead (separate thread/connection pool)</li>
+<li>Fallback defined for total unavailability</li>
+<li>Monitoring + alert + runbook</li>
+</ul>
+<p><strong>System-level:</strong></p>
+<ul>
+<li>Degradation map documented</li>
+<li>Load shedding policy defined</li>
+<li>Idempotency verified for all retryable writes</li>
+<li>Retry budget enforced (10-20%)</li>
+<li>Deadline propagation implemented</li>
+<li>Chaos testing scheduled</li>
+</ul>
+<hr>
+<h2 id="retry-storm-example">Retry Storm — Worked Example</h2>
+<h3 id="without-resilience">Without Resilience (Cascade)</h3>
+<pre><code>T+0s:   Provider slows to 5s (was 200ms)
+T+5s:   Payment Service threads block (timeout = 30s default)
+T+15s:  API Gateway retries → 3,000 req/sec (3x amplification)
+T+20s:  Payment Service overwhelmed
+T+25s:  API Gateway thread pool fills → unrelated services fail
+T+30s:  Full outage — all services down
+Recovery: 15-30 minutes</code></pre>
+<h3 id="with-resilience">With Resilience (Contained)</h3>
+<pre><code>T+0s:   Provider slows to 5s
+T+2s:   Timeout triggers at 2s
+T+3s:   Circuit breaker opens → fallback: "Payment pending"
+T+3s:   Retry: 1 attempt, 2s backoff → 1.5x amplification (not 3x)
+T+5s:   Bulkhead limits payment threads to 20 → Search, Cart unaffected
+T+60s:  Provider recovers → half-open test succeeds → circuit closes
+T+65s:  Pending payments retried via background queue (idempotent)
+Impact: payment delayed 1-2 min; everything else unaffected; auto-recovery</code></pre>
+<hr>
+<h2 id="chaos-testing">Chaos Testing as a Learning Tool</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Experiment</th><th>What You Inject</th><th>What You Validate</th></tr></thead>
+<tbody>
+<tr><td>Kill instance</td><td>Terminate one pod</td><td>LB routes around it; no user impact</td></tr>
+<tr><td>Slow dependency</td><td>Add 5s latency</td><td>Timeout + circuit breaker + fallback work</td></tr>
+<tr><td>Fill disk</td><td>Write to 95% full</td><td>Alerts fire; log rotation works</td></tr>
+<tr><td>Network partition</td><td>Block traffic between services</td><td>System handles per design</td></tr>
+<tr><td>Kill the cache</td><td>Flush Redis</td><td>DB handles load; no thundering herd</td></tr>
+<tr><td>Exhaust connections</td><td>Open without releasing</td><td>Pool limit prevents cascade; alert fires</td></tr>
+</tbody>
+</table></div>
+<p><strong>Safety rules:</strong> Start in staging; have a kill switch; define steady-state hypothesis; monitor SLOs; run during business hours; document results.</p>
+<hr>
+<h2 id="resilience-slo">Resilience and SLOs — Error Budget Connection</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>SLO Concern</th><th>Resilience Pattern</th></tr></thead>
+<tbody>
+<tr><td>Availability (99.9%)</td><td>Circuit breakers, bulkheads, load shedding</td></tr>
+<tr><td>Latency (p99 &lt; 500ms)</td><td>Timeouts, fallbacks, caching</td></tr>
+<tr><td>Correctness (0 duplicates)</td><td>Idempotency keys, reconciliation jobs</td></tr>
+<tr><td>Durability (no data loss)</td><td>WAL, outbox pattern, at-least-once delivery</td></tr>
+</tbody>
+</table></div>
+<pre><code>SLO → Error budget → Resilience patterns → Chaos testing → Observability → Incident response</code></pre>
+<h3 id="resilience-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Network timeout/retry policies</td><td><a href="04-networking-fundamentals.html">Ch 4: Networking</a></td></tr>
+<tr><td>Retry amplification</td><td><a href="07-load-balancing.html">Ch 7: Load Balancing</a></td></tr>
+<tr><td>Idempotent consumption</td><td><a href="08-message-queues-event-systems.html">Ch 8: Message Queues</a></td></tr>
+<tr><td>SLO/error budget definitions</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+<tr><td>Chaos engineering integration</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+<tr><td>Deployment rollback</td><td><a href="F11-deployment-devops.html">F11: Deployment</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Retrying aggressively without backoff and turning small failures into larger outages.</li>
@@ -1268,6 +1399,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#resilience-cookbook">Resilience Patterns Cookbook</a></li>
+<li><a href="#failure-mode-checklist">Failure-Mode Checklist</a></li>
+<li><a href="#retry-storm-example">Retry Storm — Worked Example</a></li>
+<li><a href="#chaos-testing">Chaos Testing</a></li>
+<li><a href="#resilience-slo">Resilience &amp; SLOs</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

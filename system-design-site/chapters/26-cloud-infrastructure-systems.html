@@ -5380,6 +5380,88 @@ spec:
 <li><strong>Design a CDN for a video streaming platform.</strong> Cover multi-tier caching, origin shield, cache invalidation, and cost optimization.</li>
 <li><strong>Design a DNS system with failover.</strong> Cover resolution chain, caching, TTL trade-offs, and health-check-based failover.</li>
 </ol>
+<h2 id="cloud-agnostic-arch">Cloud-Agnostic Reference Architecture</h2>
+<pre><code>EDGE: DNS + CDN + WAF/DDoS
+NETWORKING: VPC (public→private→isolated subnets) + NAT + Service Mesh
+COMPUTE: Containers (K8s) | Serverless | VMs | Batch
+DATA: Relational | NoSQL | Cache | Object Storage | Streaming | Search
+OPERATIONS: Observability | CI/CD | Secrets | IaC | Policy</code></pre>
+<h3 id="service-mapping">Cloud Service Mapping</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Abstraction</th><th>AWS</th><th>GCP</th><th>Azure</th></tr></thead>
+<tbody>
+<tr><td>Container orchestration</td><td>EKS</td><td>GKE</td><td>AKS</td></tr>
+<tr><td>Serverless</td><td>Lambda</td><td>Cloud Functions</td><td>Azure Functions</td></tr>
+<tr><td>Relational DB</td><td>Aurora / RDS</td><td>Cloud SQL / Spanner</td><td>Azure SQL / Cosmos</td></tr>
+<tr><td>Object storage</td><td>S3</td><td>GCS</td><td>Azure Blob</td></tr>
+<tr><td>Streaming</td><td>MSK / Kinesis</td><td>Pub/Sub</td><td>Event Hubs</td></tr>
+<tr><td>CDN</td><td>CloudFront</td><td>Cloud CDN</td><td>Azure CDN / Front Door</td></tr>
+<tr><td>Secrets</td><td>Secrets Manager</td><td>Secret Manager</td><td>Key Vault</td></tr>
+<tr><td>IaC (cross-cloud)</td><td colspan="3">Terraform / Pulumi</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="well-architected">Well-Architected Framework Alignment</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Pillar</th><th>Core Question</th></tr></thead>
+<tbody>
+<tr><td><strong>Operational Excellence</strong></td><td>Can we deploy, monitor, and improve?</td></tr>
+<tr><td><strong>Security</strong></td><td>How do we protect data and workloads?</td></tr>
+<tr><td><strong>Reliability</strong></td><td>How do we recover from failures?</td></tr>
+<tr><td><strong>Performance</strong></td><td>Are we using resources efficiently?</td></tr>
+<tr><td><strong>Cost</strong></td><td>Are we spending proportional to value?</td></tr>
+<tr><td><strong>Sustainability</strong></td><td>Are we minimizing environmental impact?</td></tr>
+</tbody>
+</table></div>
+<p><strong>Official guides:</strong> AWS Well-Architected (aws.amazon.com/architecture/well-architected), GCP Architecture Framework (cloud.google.com/architecture/framework), Azure Well-Architected (learn.microsoft.com/azure/well-architected).</p>
+<hr>
+<h2 id="landing-zones">Multi-Cloud Governance and Landing Zones</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>What It Provides</th><th>Tool</th></tr></thead>
+<tbody>
+<tr><td><strong>Account structure</strong></td><td>Isolation per team/env</td><td>AWS Orgs / GCP Org / Azure Mgmt Groups</td></tr>
+<tr><td><strong>Network baseline</strong></td><td>VPC + subnets + peering + DNS</td><td>Terraform modules / Landing Zone Accelerator</td></tr>
+<tr><td><strong>Identity</strong></td><td>SSO, federated identity, RBAC</td><td>IAM Identity Center / Workforce Identity / Azure AD</td></tr>
+<tr><td><strong>Security</strong></td><td>Threat detection, config rules, encryption</td><td>Control Tower / Assured Workloads / Azure Blueprints</td></tr>
+<tr><td><strong>Cost controls</strong></td><td>Budgets, tagging, reserved capacity</td><td>AWS Budgets / GCP Billing / Azure Cost Mgmt</td></tr>
+<tr><td><strong>Policy enforcement</strong></td><td>Prevent non-compliant resources</td><td>SCPs / Org Policies / Azure Policy</td></tr>
+</tbody>
+</table></div>
+<h3 id="policy-as-code">Policy-as-Code</h3>
+<pre><code class="language-yaml"># OPA/Gatekeeper: require team + environment labels on all K8s resources
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredLabels
+spec:
+  match:
+    kinds: [{apiGroups: [""], kinds: ["Namespace", "Deployment"]}]
+  parameters:
+    labels: ["team", "environment", "cost-center"]</code></pre>
+<hr>
+<h2 id="decision-template">Cost / Performance / Risk Template</h2>
+<p><strong>Example: Database Selection</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Decision</th><th>Aurora PostgreSQL</th><th>Cloud Spanner</th><th>CockroachDB (self-hosted)</th></tr></thead>
+<tbody>
+<tr><td>Cost (100K QPS)</td><td>~$3,500/mo</td><td>~$7,000/mo</td><td>~$5,000/mo</td></tr>
+<tr><td>Latency (p99 read)</td><td>5ms</td><td>10ms (global)</td><td>8ms</td></tr>
+<tr><td>Availability</td><td>99.99%</td><td>99.999%</td><td>99.99%</td></tr>
+<tr><td>Ops complexity</td><td>Low (managed)</td><td>Low (managed)</td><td>High (self-hosted)</td></tr>
+<tr><td>Lock-in</td><td>Medium (AWS)</td><td>High (GCP)</td><td>Low (open-source)</td></tr>
+<tr><td><strong>Recommendation</strong></td><td>Default for AWS</td><td>If global strong consistency</td><td>If multi-cloud portability</td></tr>
+</tbody>
+</table></div>
+<h3 id="cloud-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Kubernetes / platform</td><td><a href="39-kubernetes-devops.html">A7</a></td></tr>
+<tr><td>Multi-region patterns</td><td><a href="07-load-balancing.html">Ch 7</a></td></tr>
+<tr><td>Cost optimization</td><td><a href="41-cost-optimization.html">A9</a></td></tr>
+<tr><td>Security &amp; identity</td><td><a href="40-security-authentication.html">A8</a></td></tr>
+<tr><td>IaC &amp; GitOps</td><td><a href="F11-deployment-devops.html">F11</a></td></tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Cloud &amp; Infrastructure Systems are the <strong>invisible foundation</strong> that every application depends on. The 12 subsystems span traffic routing (LB, API Gateway, DNS, CDN), compute management (Kubernetes, serverless, job scheduling), data storage (object, block, file), and network isolation (VPC, service mesh). The key insight: <strong>infrastructure failures cascade</strong> -- a DNS outage is a total outage, a load balancer misconfiguration is a traffic blackhole. Designing these systems with redundancy, health checking, and graceful degradation is what makes applications reliable.</p>
         </div>
@@ -5601,6 +5683,10 @@ spec:
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 -&gt; V2 -&gt; V3)</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
+<li><a href="#cloud-agnostic-arch">Cloud-Agnostic Reference Architecture</a></li>
+<li><a href="#well-architected">Well-Architected Alignment</a></li>
+<li><a href="#landing-zones">Landing Zones &amp; Governance</a></li>
+<li><a href="#decision-template">Cost / Performance / Risk Template</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 </ul>
 </div>

@@ -125,6 +125,235 @@ Order processing shows why asynchronous design matters. A user should not wait w
 - Treat observability and replay as first-class requirements in async systems.
 - Remember that queues move complexity; they do not remove it.
 
+## Delivery Semantics — What "Exactly-Once" Really Means
+
+Delivery semantics define how many times a message is guaranteed to be delivered. This is the single most misunderstood concept in messaging systems.
+
+### The Three Guarantees
+
+| Guarantee | Definition | Practical Reality | When to Use |
+|-----------|-----------|-------------------|-------------|
+| **At-most-once** | Message delivered zero or one time; may be lost | Fire-and-forget; fastest; no retries | Metrics, analytics, logging (loss of a few events is acceptable) |
+| **At-least-once** | Message delivered one or more times; never lost, may duplicate | The default for most production systems; requires idempotent consumers | Orders, payments, notifications, any business-critical workflow |
+| **Exactly-once** | Message delivered exactly one time; never lost, never duplicated | Does not exist as a pure network guarantee; achieved only via idempotent processing or transactional dedup | Kafka transactions (within Kafka); Flink checkpointing (within stream processor) |
+
+### The Exactly-Once Myth
+
+True exactly-once delivery across a distributed system (producer → broker → consumer → side effects) is impossible without cooperation from all participants. What systems labeled "exactly-once" actually provide is **effectively-once**: at-least-once delivery combined with idempotent processing that makes duplicates invisible to business logic.
+
+```
+"Exactly-once" in practice:
+  Producer → Broker: at-least-once (retries on ack failure)
+  Broker → Consumer: at-least-once (redelivery on consumer crash)
+  Consumer → Side Effects: IDEMPOTENT (dedup ensures no duplicate effect)
+  Result: each message's EFFECT happens exactly once, even if delivery happens multiple times
+```
+
+**Practical implication:** Always design consumers as if they will receive duplicates. "Exactly-once" is a consumer-side responsibility, not a broker-side guarantee.
+
+---
+
+## Ordering Guarantees and Partition Scopes
+
+Message ordering is another frequently misunderstood concept. Most systems guarantee ordering only within a scope, not globally.
+
+### Ordering by System
+
+| System | Ordering Guarantee | Scope | Implication |
+|--------|-------------------|-------|-------------|
+| **Kafka** | Ordered within partition | Per-partition (by partition key) | Messages with same key are ordered; different keys may be processed out of order |
+| **SQS (Standard)** | Best-effort ordering | None | Messages may arrive out of order; use SQS FIFO for ordering |
+| **SQS FIFO** | Strict ordering | Per-message-group-ID | Ordered within group; different groups are independent |
+| **RabbitMQ** | Ordered per queue | Per-queue (single consumer) | Multiple consumers on same queue lose ordering |
+| **Pulsar** | Ordered within partition | Per-key (like Kafka) | Key-shared subscriptions maintain per-key order |
+| **Redis Streams** | Ordered per stream | Per-stream | Single stream = total order; consumer groups maintain order per consumer |
+
+### Choosing a Partition Key
+
+The partition key determines which messages are co-located and ordered together. Choose it based on the business entity that requires ordering:
+
+| Use Case | Partition Key | Why |
+|----------|--------------|-----|
+| Order processing | `order_id` | All events for one order are processed in sequence |
+| User activity stream | `user_id` | Per-user events are ordered; different users can process in parallel |
+| Payment processing | `payment_id` | Ensures debit and credit for same payment are ordered |
+| Chat messages | `conversation_id` | Messages within a conversation stay in order |
+| IoT telemetry | `device_id` | Per-device readings are ordered; devices are independent |
+
+**Warning:** Using a high-cardinality key (e.g., `request_id`) effectively removes ordering. Using a low-cardinality key (e.g., `country`) creates hot partitions.
+
+---
+
+## Idempotent Consumption — Patterns and Concrete Examples
+
+Since at-least-once delivery means duplicates are inevitable, every consumer must be idempotent: processing the same message twice must produce the same result as processing it once.
+
+### Pattern 1: Idempotency Key with Deduplication Store
+
+```python
+# Consumer stores processed message IDs; skips duplicates
+def process_message(message):
+    idempotency_key = message.headers["idempotency-key"]  # e.g., "order-789-shipped"
+
+    # Check if already processed
+    if redis.exists(f"processed:{idempotency_key}"):
+        log.info(f"Duplicate detected, skipping: {idempotency_key}")
+        return  # Acknowledge message, do nothing
+
+    # Process the message
+    send_email(message.payload)
+    update_database(message.payload)
+
+    # Mark as processed (with TTL matching your dedup window)
+    redis.set(f"processed:{idempotency_key}", "1", ex=86400)  # 24h dedup window
+```
+
+**Idempotency key examples by domain:**
+
+| Domain | Idempotency Key | Format |
+|--------|----------------|--------|
+| Payment | `payment:{payment_id}:charge` | Unique per payment attempt |
+| Order | `order:{order_id}:created` | Unique per order lifecycle event |
+| Notification | `notify:{user_id}:{event_type}:{entity_id}` | Prevents duplicate notifications per event |
+| Inventory | `inventory:{sku}:{operation_id}` | Prevents double-deduction |
+| Email | `email:{recipient}:{template_id}:{trigger_entity_id}` | Prevents duplicate sends |
+
+### Pattern 2: Database Upsert (Natural Idempotency)
+
+```sql
+-- Idempotent by design: INSERT ON CONFLICT does nothing if already exists
+INSERT INTO processed_orders (order_id, status, updated_at)
+VALUES ('order-789', 'shipped', NOW())
+ON CONFLICT (order_id) DO UPDATE SET
+  status = EXCLUDED.status,
+  updated_at = EXCLUDED.updated_at
+WHERE processed_orders.updated_at < EXCLUDED.updated_at;
+-- The WHERE clause ensures we don't overwrite with older data (out-of-order protection)
+```
+
+### Pattern 3: Conditional Writes (Optimistic Concurrency)
+
+```python
+# Only apply if current state matches expected state
+def process_status_update(order_id, new_status, expected_version):
+    result = db.execute("""
+        UPDATE orders
+        SET status = %s, version = version + 1
+        WHERE id = %s AND version = %s
+    """, (new_status, order_id, expected_version))
+
+    if result.rowcount == 0:
+        log.warn(f"Stale update for {order_id}, skipping (already processed)")
+        # Message is a duplicate or out-of-order — safe to skip
+```
+
+---
+
+## The Outbox Pattern — Safe Event Publishing
+
+When a service must write to its database AND publish an event, the naive dual-write approach is unsafe. The transactional outbox pattern solves this by writing both in a single database transaction.
+
+*(This pattern is also covered in Chapter 5: Databases Deep Dive. It is included here because it is essential to messaging architecture.)*
+
+### The Problem
+
+```
+Service writes to database → SUCCESS
+Service publishes to Kafka → FAILS (network error, broker down)
+Result: database updated, but no event published → downstream out of sync
+```
+
+### The Solution
+
+```
+┌───────────────────────────────────────┐
+│  Single Database Transaction           │
+│                                        │
+│  1. UPDATE orders SET status='shipped' │
+│  2. INSERT INTO outbox (               │
+│       event_type, aggregate_id,        │
+│       payload, created_at)             │
+│     VALUES ('OrderShipped', 'ord-789', │
+│       '{"tracking": "..."}', NOW())    │
+│                                        │
+│  COMMIT (both or neither)              │
+└───────────────────────────────────────┘
+         │
+         ▼ (async, at-least-once)
+┌───────────────────────────────────────┐
+│  Outbox Relay                          │
+│  • Polls outbox table (or uses CDC)    │
+│  • Publishes to Kafka topic            │
+│  • Marks rows as published             │
+│  • Handles retries                     │
+└───────────────────────────────────────┘
+         │
+         ▼
+┌───────────────────────────────────────┐
+│  Downstream Consumers                  │
+│  (idempotent, at-least-once)           │
+└───────────────────────────────────────┘
+```
+
+### Outbox vs CDC vs Dual-Write
+
+| Approach | Consistency | Complexity | Best For |
+|----------|-----------|------------|----------|
+| **Dual-write** (write DB + publish event separately) | Unsafe — either can fail independently | Low | Never use for critical data |
+| **Outbox table** (write both in same DB transaction) | Safe — atomic commit | Medium (needs relay process) | Domain events, cross-service sync |
+| **CDC (Debezium)** (capture DB changes from WAL) | Safe — reads committed data only | Medium-High (needs WAL access) | Replicating all changes, keeping search/analytics in sync |
+
+---
+
+## Schema Evolution and Event Contracts
+
+As systems evolve, event schemas change. Without a schema evolution strategy, a producer update can break every consumer — the messaging equivalent of a breaking API change.
+
+### The Problem
+
+```
+v1 Producer publishes: { "order_id": "123", "total": 49.99 }
+v2 Producer publishes: { "order_id": "123", "total": { "amount": 49.99, "currency": "USD" } }
+
+v1 Consumer expects "total" to be a number → CRASH when it receives an object
+```
+
+### Schema Evolution Rules
+
+| Rule | What It Means | Example |
+|------|-------------|---------|
+| **Backward compatible** | New schema can read old data | Adding a new optional field; old messages still work |
+| **Forward compatible** | Old schema can read new data | Old consumers ignore unknown fields |
+| **Full compatible** | Both backward and forward | Add optional fields only; never remove or rename |
+
+### Schema Evolution Strategies
+
+| Strategy | How It Works | Tool Support |
+|----------|-------------|-------------|
+| **Schema Registry** | Central registry validates schema changes; rejects breaking changes at publish time | Confluent Schema Registry (Avro, Protobuf, JSON Schema) |
+| **Versioned topics** | Separate topic per schema version (`orders.v1`, `orders.v2`); consumers migrate at their own pace | Any broker; manual routing |
+| **Envelope pattern** | Event contains version field + payload; consumer routes by version | Application-level; no special tooling |
+| **Consumer-driven contracts** | Consumers declare what fields they need; producer tests against consumer expectations | Pact, contract testing frameworks |
+
+### Practical Schema Evolution Checklist
+
+- [ ] All events use a schema (Avro, Protobuf, or JSON Schema) — not untyped JSON
+- [ ] Schema Registry enforces compatibility checks before publish
+- [ ] New fields are always optional with sensible defaults
+- [ ] Fields are never removed — deprecated fields remain but are documented as unused
+- [ ] Field types are never changed (e.g., `int` → `string`) — add a new field instead
+- [ ] Consumer tests include backward/forward compatibility scenarios
+- [ ] Dead-letter queue catches messages that fail deserialization (schema mismatch)
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Outbox and CDC in depth | Chapter 5: Databases Deep Dive |
+| Event-driven architecture patterns (Saga, CQRS) | F9: Event-Driven Architecture |
+| Observability for async pipelines (lag, DLQ monitoring) | F10: Observability & Operations |
+| Kafka deep dive (partitions, consumer groups, rebalancing) | Domain-specific chapters |
+
 ## Common Mistakes
 - Adding a queue without defining delivery semantics or failure handling.
 - Using an event stream for work that should really be completed once by one worker pool.

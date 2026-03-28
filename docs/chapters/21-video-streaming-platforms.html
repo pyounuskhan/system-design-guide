@@ -4994,6 +4994,82 @@ CREATE INDEX idx_saga_entity ON saga_instances(entity_id);
 <hr>
 <h2 id="evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 → V2 → V3)</h2>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/21-video-streaming-platforms-diagram-29.svg" alt="Diagram 29 for Video &amp; Streaming Platforms" loading="lazy"></figure>
+<h2 id="qoe-blueprint">QoE Measurement Blueprint</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>What It Measures</th><th>SLO Target</th><th>Alert Threshold</th></tr></thead>
+<tbody>
+<tr><td><strong>Video Start Time</strong></td><td>Play-press to first frame</td><td>&lt; 2s (p95)</td><td>&gt; 4s</td></tr>
+<tr><td><strong>Rebuffer Rate</strong></td><td>% play time spent buffering</td><td>&lt; 0.5%</td><td>&gt; 1%</td></tr>
+<tr><td><strong>Rebuffer Frequency</strong></td><td>Events per hour</td><td>&lt; 1/hour</td><td>&gt; 3/hour</td></tr>
+<tr><td><strong>Bitrate Stability</strong></td><td>Quality switches per session</td><td>&lt; 2</td><td>&gt; 5</td></tr>
+<tr><td><strong>Average Bitrate</strong></td><td>Mean delivered bitrate</td><td>&gt; 4 Mbps (1080p)</td><td>&lt; 2 Mbps</td></tr>
+<tr><td><strong>Playback Failure Rate</strong></td><td>% plays that fail entirely</td><td>&lt; 0.1%</td><td>&gt; 0.5%</td></tr>
+<tr><td><strong>Time to Quality</strong></td><td>First frame to target res</td><td>&lt; 5s</td><td>&gt; 10s</td></tr>
+</tbody>
+</table></div>
+<p><strong>Feedback loop:</strong> Client reports QoE every 30s → Kafka → Flink aggregation → Grafana (per-region, per-ISP, per-device). High rebuffer → investigate CDN PoP. High VST → pre-warm cache.</p>
+<hr>
+<h2 id="multi-cdn">Multi-CDN and Origin Protection</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How</th><th>When</th></tr></thead>
+<tbody>
+<tr><td><strong>Primary + failover</strong></td><td>One CDN default; switch on failure</td><td>Cost-sensitive</td></tr>
+<tr><td><strong>Split by geography</strong></td><td>CDN-A Americas, CDN-B EMEA, CDN-C APAC</td><td>Regional optimization</td></tr>
+<tr><td><strong>Load-balanced</strong></td><td>Steer by real-time performance</td><td>Premium delivery</td></tr>
+</tbody>
+</table></div>
+<h3 id="origin-protection">Origin Protection</h3>
+<pre><code>Origin shield: Edge miss → regional shield cache → only shield hits true origin
+  90%+ "misses" served by shield without origin request
+Request coalescing: 100 concurrent requests for same segment → 1 origin fetch
+Cache warming: pre-warm top 10 PoPs before new content release</code></pre>
+<h3 id="cdn-cache-key">CDN Cache Key &amp; Invalidation</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Cache key</td><td><code>/{content_id}/{profile}/{segment}.ts</code> — no user params</td></tr>
+<tr><td>Invalidation</td><td>Purge by content_id on takedown; TTL for manifests (5-30s); segments immutable</td></tr>
+<tr><td>DRM tokens</td><td>NOT part of cache key — validated at edge separately</td></tr>
+<tr><td>Geo-restriction</td><td>Edge checks IP against geo-fence; same cached segment served or blocked</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="content-security-drm">Content Security and DRM</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Stream ripping</strong></td><td>Content pirated</td><td>DRM (Widevine/FairPlay/PlayReady); encrypted segments</td></tr>
+<tr><td><strong>Token sharing</strong></td><td>Unauthorized access</td><td>Short-lived signed URLs (5 min); IP binding; concurrent limits</td></tr>
+<tr><td><strong>Screen recording</strong></td><td>OS-level capture</td><td>HDCP; forensic watermarking</td></tr>
+<tr><td><strong>Hotlinking</strong></td><td>Third-party embedding</td><td>Signed URLs; referer checks; domain allowlist</td></tr>
+</tbody>
+</table></div>
+<pre><code>DRM License Flow:
+  Client → fetch manifest → detect DRM → request license (device cert + entitlement)
+  → Server checks subscription + geo + concurrent → returns decryption key
+  License: 24h offline, session-based streaming</code></pre>
+<hr>
+<h2 id="streaming-cost-estimation">Capacity and Cost Estimation</h2>
+<pre><code>Storage: 50K titles × 12 renditions × 4 GB = 2.4 PB + 3x replication = 7.5 PB
+  Cost: ~$35K/month (with lifecycle tiering)
+
+CDN Egress: 10M concurrent × 5 Mbps = 50 Tbps peak
+  Monthly: ~6.5 EB → ~$65M/month at $0.01/GB
+  (Why Netflix builds Open Connect)
+
+Transcoding: 1K titles/month × 12 renditions × $16/title = $16K/month
+  (Small fraction — CDN dominates cost)</code></pre>
+<h3 id="streaming-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>CDN cache strategy</td><td><a href="06-caching-systems.html">Ch 6</a></td></tr>
+<tr><td>Storage lifecycle</td><td><a href="09-storage-systems.html">Ch 9</a></td></tr>
+<tr><td>Multi-region deployment</td><td><a href="07-load-balancing.html">Ch 7</a></td></tr>
+<tr><td>Cost optimization</td><td><a href="41-cost-optimization.html">Ch A9</a></td></tr>
+<tr><td>Observability SLOs</td><td><a href="F10-observability-operations.html">F10</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Video &amp; Streaming Platforms combine the most compute-intensive processing (transcoding), the most bandwidth-intensive delivery (CDN), and the most latency-sensitive real-time systems (live streaming) in a single product:</p>
@@ -5760,6 +5836,10 @@ https://cdn.example.com/vid_1a2b3c/2160p/playlist.m3u8?tok=sig_mno
 </ul>
 </li>
 <li><a href="#evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 → V2 → V3)</a></li>
+<li><a href="#qoe-blueprint">QoE Measurement Blueprint</a></li>
+<li><a href="#multi-cdn">Multi-CDN &amp; Origin Protection</a></li>
+<li><a href="#content-security-drm">Content Security &amp; DRM</a></li>
+<li><a href="#streaming-cost-estimation">Capacity &amp; Cost Estimation</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
 <li><a href="#appendix-comprehensive-api-specifications">Appendix: Comprehensive API Specifications</a><ul>

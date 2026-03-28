@@ -1143,6 +1143,122 @@
 <li>Treat observability, platform tooling, and service governance as prerequisites for microservices.</li>
 <li>Evolve architecture in steps, not slogans.</li>
 </ul>
+<h2 id="readiness-checklist">Microservices Readiness Checklist</h2>
+<p>Before extracting services, verify your org can absorb the cost. If most answers are "no," invest in the modular monolith.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>Prerequisite</th><th>Why It Matters</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>CI/CD per service</strong></td><td>Without independent deploys, coordinated releases defeat the purpose</td></tr>
+<tr><td>2</td><td><strong>Distributed tracing</strong></td><td>Cross-service debugging is guesswork without it</td></tr>
+<tr><td>3</td><td><strong>Service discovery + LB</strong></td><td>Hardcoded addresses break under scaling</td></tr>
+<tr><td>4</td><td><strong>Centralized logging/metrics</strong></td><td>Correlating issues across services requires one pane</td></tr>
+<tr><td>5</td><td><strong>Contract testing</strong></td><td>One team's deploy breaking another is the #1 microservices pain</td></tr>
+<tr><td>6</td><td><strong>On-call per service</strong></td><td>"Shared on-call for 20 services" is not viable</td></tr>
+<tr><td>7</td><td><strong>Secret management</strong></td><td>More services = more secret surface area</td></tr>
+<tr><td>8</td><td><strong>Health checks + circuit breakers</strong></td><td>One slow service cascades without isolation</td></tr>
+<tr><td>9</td><td><strong>Data ownership clarity</strong></td><td>Shared DB = distributed monolith with extra hops</td></tr>
+<tr><td>10</td><td><strong>Team autonomy</strong></td><td>If every deploy needs a meeting, microservices add friction</td></tr>
+</tbody>
+</table></div>
+<p><strong>Scoring:</strong> 8-10 ready → proceed. 5-7 → invest in platform first. &lt; 5 → stay on modular monolith.</p>
+<hr>
+<h2 id="modular-monolith-blueprint">Modular Monolith — Concrete Blueprint</h2>
+<pre><code>monolith/
+├── modules/
+│   ├── orders/
+│   │   ├── api/          # HTTP handlers
+│   │   ├── domain/       # Business logic, entities
+│   │   ├── persistence/  # Repository implementations
+│   │   ├── events/       # Events this module publishes
+│   │   └── contracts/    # Public interfaces for other modules
+│   ├── inventory/  ...
+│   ├── payments/   ...
+│   └── notifications/ ...
+├── shared/
+│   ├── auth/    events/    config/
+└── main.py      # Composition root</code></pre>
+<h3 id="module-rules">Module Boundary Rules</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Meaning</th><th>Enforcement</th></tr></thead>
+<tbody>
+<tr><td><strong>No cross-module DB access</strong></td><td>Orders cannot query inventory tables</td><td>Linter / ArchUnit tests</td></tr>
+<tr><td><strong>Calls through contracts only</strong></td><td><code>inventory.contracts.reserve()</code></td><td>Interface-only imports</td></tr>
+<tr><td><strong>Each module owns its tables</strong></td><td>No shared tables</td><td>Schema naming convention</td></tr>
+<tr><td><strong>Events for side effects</strong></td><td>In-process event bus, no network</td><td>Code review</td></tr>
+<tr><td><strong>Module is extractable</strong></td><td>Contracts become future service API</td><td>Quarterly review</td></tr>
+</tbody>
+</table></div>
+<h3 id="mono-vs-micro-compare">Modular Monolith vs Microservices</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>Modular Monolith</th><th>Microservices</th></tr></thead>
+<tbody>
+<tr><td>Deployment</td><td>One artifact</td><td>Many artifacts</td></tr>
+<tr><td>Communication</td><td>In-process (nanoseconds)</td><td>Network (milliseconds)</td></tr>
+<tr><td>Transactions</td><td>Local ACID across modules</td><td>Distributed (saga, outbox)</td></tr>
+<tr><td>Operational cost</td><td>Low</td><td>High (per-service CI/CD, monitoring)</td></tr>
+<tr><td>Team autonomy</td><td>Moderate</td><td>High</td></tr>
+<tr><td>Best for</td><td>1-3 teams, &lt; 50 engineers</td><td>5+ teams, &gt; 50 engineers, stable boundaries</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="migration-map">Migration Capability Map</h2>
+<h3 id="extraction-signals">When to Extract a Module</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Signal</th><th>What It Means</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>Needs independent scaling</td><td>100x traffic difference between modules</td><td>Extract and scale independently</td></tr>
+<tr><td>Different deploy cadence</td><td>One module: 5x/week; rest: monthly</td><td>Extract for independent deploys</td></tr>
+<tr><td>Different reliability needs</td><td>Payment: 99.99%; recommendations: 99.9%</td><td>Extract with dedicated SLO</td></tr>
+<tr><td>Different technology needs</td><td>ML module needs Python+GPU; rest is Go</td><td>Extract to separate runtime</td></tr>
+<tr><td>Clear, stable API boundary</td><td>Contracts well-defined, rarely change</td><td>Good extraction candidate</td></tr>
+</tbody>
+</table></div>
+<h3 id="migration-anti-patterns">Migration Anti-Patterns</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Anti-Pattern</th><th>What Goes Wrong</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><strong>Big-bang rewrite</strong></td><td>6-month rewrite; old system still running</td><td>Strangler fig: extract incrementally</td></tr>
+<tr><td><strong>Extract everything at once</strong></td><td>3 services → 30 in 3 months; operational chaos</td><td>Extract one; stabilize; repeat</td></tr>
+<tr><td><strong>Shared database</strong></td><td>Services share DB → distributed monolith</td><td>Each service owns its data; use events/CDC</td></tr>
+<tr><td><strong>Synchronous chains</strong></td><td>A → B → C → D → E sync calls</td><td>Async where possible; collapse hops</td></tr>
+<tr><td><strong>No platform first</strong></td><td>Services before CI/CD, tracing, monitoring</td><td>Build platform capabilities first</td></tr>
+<tr><td><strong>"Do nothing" when pressure is real</strong></td><td>Avoids extraction despite clear pain</td><td>Acknowledge pressure; plan incremental extraction</td></tr>
+</tbody>
+</table></div>
+<h3 id="do-nothing-option">The "Do Nothing" Option</h3>
+<p>"Do nothing" is a valid decision when documented explicitly:</p>
+<blockquote>"We evaluated extracting notifications. Given 8 engineers, weekly deploys, and 5K QPS, the operational cost exceeds the benefit. Re-evaluate at 50K QPS or when a dedicated team forms."</blockquote>
+<hr>
+<h2 id="platform-engineering">Platform Engineering as Prerequisite</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Capability</th><th>What Teams Get</th><th>Without It</th></tr></thead>
+<tbody>
+<tr><td><strong>Service templates</strong></td><td>New service scaffolded in &lt; 1 hour</td><td>Days/weeks per service setup</td></tr>
+<tr><td><strong>Centralized observability</strong></td><td>Logs, metrics, traces correlated</td><td>Each team runs own monitoring</td></tr>
+<tr><td><strong>Deployment pipelines</strong></td><td>Push-button with canary + rollback</td><td>Each team builds own pipeline</td></tr>
+<tr><td><strong>Service mesh</strong></td><td>mTLS, retries, circuit breakers automatic</td><td>Each team implements differently</td></tr>
+<tr><td><strong>Developer portal</strong></td><td>Service catalog, owners, APIs</td><td>"Who owns this?" via Slack</td></tr>
+</tbody>
+</table></div>
+<h3 id="dx-impact">Developer Experience Impact</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Architecture</th><th>New Feature</th><th>New Service</th><th>Debugging Cross-Service</th></tr></thead>
+<tbody>
+<tr><td>Modular monolith</td><td>Fast (one codebase)</td><td>N/A (add module)</td><td>Easy (one process)</td></tr>
+<tr><td>Microservices + platform</td><td>Fast (templates)</td><td>&lt; 1 day</td><td>Moderate (tracing)</td></tr>
+<tr><td>Microservices, no platform</td><td>Slow (infra per service)</td><td>Days-weeks</td><td>Very hard</td></tr>
+</tbody>
+</table></div>
+<h3 id="mono-micro-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>API gateway pattern</td><td>Ch 15: API Gateway</td></tr>
+<tr><td>Service mesh</td><td><a href="F11-deployment-devops.html">F11: Deployment &amp; DevOps</a></td></tr>
+<tr><td>Event-driven decoupling</td><td><a href="08-message-queues-event-systems.html">Ch 8: Message Queues</a></td></tr>
+<tr><td>Distributed transactions</td><td><a href="13-distributed-transactions.html">Ch 13</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Adopting microservices because they sound senior or modern.</li>
@@ -1268,6 +1384,10 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#readiness-checklist">Microservices Readiness Checklist</a></li>
+<li><a href="#modular-monolith-blueprint">Modular Monolith Blueprint</a></li>
+<li><a href="#migration-map">Migration Capability Map &amp; Anti-Patterns</a></li>
+<li><a href="#platform-engineering">Platform Engineering as Prerequisite</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

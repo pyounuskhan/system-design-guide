@@ -1143,6 +1143,131 @@
 <li>Remember that durability still requires deletion controls, backup thinking, and recovery planning.</li>
 <li>Use CDN strategy as part of storage architecture, not as an afterthought.</li>
 </ul>
+<h2 id="storage-decision-matrix">Storage Decision Matrix</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>Block Storage</th><th>File Storage</th><th>Object Storage</th><th>Archive</th></tr></thead>
+<tbody>
+<tr><td><strong>Abstraction</strong></td><td>Raw disk volumes</td><td>Shared filesystem (NFS/EFS)</td><td>HTTP-addressable objects</td><td>Cold objects, retrieval delay</td></tr>
+<tr><td><strong>Access pattern</strong></td><td>Random read/write, low-latency</td><td>Hierarchical path-based</td><td>Write-once-read-many, HTTP</td><td>Write-once-read-rarely</td></tr>
+<tr><td><strong>Latency</strong></td><td>Sub-millisecond</td><td>Milliseconds</td><td>10-100ms</td><td>Minutes to hours</td></tr>
+<tr><td><strong>Use cases</strong></td><td>DB volumes, OS disks</td><td>Shared config, ML data</td><td>Images, videos, logs, backups</td><td>Compliance, legal hold</td></tr>
+<tr><td><strong>Durability</strong></td><td>99.999% (EBS)</td><td>11 nines (EFS)</td><td>11 nines (S3)</td><td>11 nines</td></tr>
+<tr><td><strong>Cost ($/GB/month)</strong></td><td>$0.08-0.10</td><td>$0.30</td><td>$0.023</td><td>$0.001-0.004</td></tr>
+</tbody>
+</table></div>
+<pre><code>Quick decision:
+  Database/OS disk? → BLOCK    Shared files? → FILE
+  Large blobs via HTTP? → OBJECT    Compliance/cold? → ARCHIVE</code></pre>
+<hr>
+<h2 id="durability-math">Durability Math, SLAs, and Backup/Restore Drills</h2>
+<h3 id="durability-numbers">Understanding Durability Numbers</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Durability</th><th>Meaning</th><th>Expected Loss per 10M Objects/Year</th></tr></thead>
+<tbody>
+<tr><td>99.9% (3 nines)</td><td>1 in 1,000 lost/year</td><td>10,000 objects</td></tr>
+<tr><td>99.99% (4 nines)</td><td>1 in 10,000 lost/year</td><td>1,000 objects</td></tr>
+<tr><td>99.999999999% (11 nines)</td><td>1 in 100B lost/year</td><td>~0 (effectively zero)</td></tr>
+</tbody>
+</table></div>
+<h3 id="durability-vs-backup">Durability ≠ Backup</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Durability Protects?</th><th>Backup Protects?</th></tr></thead>
+<tbody>
+<tr><td>Hardware failure</td><td>✅</td><td>✅</td></tr>
+<tr><td>Accidental deletion</td><td>❌ (deletion is replicated)</td><td>✅ (point-in-time restore)</td></tr>
+<tr><td>App bug corrupts data</td><td>❌ (corruption is replicated)</td><td>✅ (restore from before)</td></tr>
+<tr><td>Ransomware</td><td>❌ (encrypted objects replace originals)</td><td>✅ (immutable backups survive)</td></tr>
+<tr><td>Region-wide outage</td><td>❌ (single-region)</td><td>✅ (cross-region backup)</td></tr>
+</tbody>
+</table></div>
+<h3 id="backup-strategy">Backup Strategy Template</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Data Category</th><th>RPO</th><th>RTO</th><th>Method</th><th>Retention</th></tr></thead>
+<tbody>
+<tr><td>Transactional DB</td><td>&lt; 1 hour</td><td>&lt; 15 min</td><td>Continuous WAL + snapshots</td><td>30 days</td></tr>
+<tr><td>User media</td><td>&lt; 24 hours</td><td>&lt; 4 hours</td><td>Cross-region replication + versioning</td><td>Indefinite</td></tr>
+<tr><td>App config</td><td>&lt; 1 hour</td><td>&lt; 5 min</td><td>Git + automated backup</td><td>Indefinite</td></tr>
+<tr><td>Audit logs</td><td>0 (no loss)</td><td>&lt; 1 hour</td><td>Write-once + cross-region</td><td>7 years</td></tr>
+</tbody>
+</table></div>
+<h3 id="restore-drills">Backup/Restore Drill Checklist</h3>
+<p>Backups that are never tested are hopes, not backups. Schedule drills quarterly.</p>
+<ul>
+<li>Select a backup from the retention window (not the most recent)</li>
+<li>Restore to a non-production environment</li>
+<li>Verify integrity: row counts, checksums, sample queries</li>
+<li>Measure actual RTO vs stated target</li>
+<li>Document gaps; publish results to team</li>
+</ul>
+<hr>
+<h2 id="lifecycle-tiering">Storage Lifecycle Tiering — With Cost Models</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Tier</th><th>Age</th><th>Storage Class</th><th>$/GB/month</th><th>Use Case</th></tr></thead>
+<tbody>
+<tr><td>Hot</td><td>0-7 days</td><td>S3 Standard</td><td>$0.023</td><td>Active uploads, current sessions</td></tr>
+<tr><td>Warm</td><td>7-30 days</td><td>S3 IA</td><td>$0.0125</td><td>Recent analytics, older images</td></tr>
+<tr><td>Cold</td><td>30-90 days</td><td>Glacier Instant</td><td>$0.004</td><td>Compliance data, quarterly reports</td></tr>
+<tr><td>Archive</td><td>90+ days</td><td>Glacier Deep Archive</td><td>$0.001</td><td>7-year audit logs, legal hold</td></tr>
+</tbody>
+</table></div>
+<p><strong>Cost model (10 PB photo platform):</strong> Without tiering: $230K/month. With tiering (10% hot, 20% warm, 30% cold, 40% archive): $64K/month — <strong>72% savings</strong>.</p>
+<hr>
+<h2 id="versioning-ransomware">Object-Store Versioning and Ransomware Resilience</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Feature</th><th>Without Versioning</th><th>With Versioning</th></tr></thead>
+<tbody>
+<tr><td>Overwrite</td><td>Previous data permanently lost</td><td>Previous version preserved</td></tr>
+<tr><td>Delete</td><td>Object permanently removed</td><td>Delete marker; previous versions remain</td></tr>
+<tr><td>Recovery from app bug</td><td>Impossible</td><td>Restore any previous version</td></tr>
+</tbody>
+</table></div>
+<h3 id="ransomware-protection">Ransomware Protection</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Protection</th></tr></thead>
+<tbody>
+<tr><td>Ransomware encrypts objects</td><td><strong>Object Lock (WORM)</strong>: prevents modification/deletion; compliance mode is root-proof</td></tr>
+<tr><td>Attacker deletes all versions</td><td><strong>MFA Delete</strong>: requires MFA to permanently delete</td></tr>
+<tr><td>Compromised credentials</td><td><strong>Versioning + Object Lock</strong>: overwrites create new versions; originals immutable</td></tr>
+<tr><td>Cross-account attack</td><td><strong>Cross-account backup</strong>: replicate to separate account with independent credentials</td></tr>
+</tbody>
+</table></div>
+<pre><code>Immutable Backup Architecture:
+  Production Account           Backup Account (separate creds)
+  S3 (versioned) ──repl──→    S3 (versioned + Object Lock Compliance)
+                               Cannot be deleted by anyone, even root</code></pre>
+<hr>
+<h2 id="geo-replication">Geo-Replication Trade-offs and Data Governance</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>Consistency</th><th>Latency</th><th>Cost</th><th>Use Case</th></tr></thead>
+<tbody>
+<tr><td><strong>Single-region, multi-AZ</strong></td><td>Strong (sync AZ replication)</td><td>Low</td><td>1x</td><td>Most applications (default)</td></tr>
+<tr><td><strong>Cross-region (CRR)</strong></td><td>Eventual (seconds-minutes lag)</td><td>Read from nearest</td><td>2x + egress</td><td>DR, data residency</td></tr>
+<tr><td><strong>Multi-region active-active</strong></td><td>Eventual or conflict resolution</td><td>Low everywhere</td><td>2x+</td><td>Global consumer apps</td></tr>
+</tbody>
+</table></div>
+<h3 id="data-governance">Data Governance Checklist</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Question</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Data residency</td><td>Where must data physically reside?</td><td>Region-locked buckets; disable CRR for regulated data</td></tr>
+<tr><td>Access control</td><td>Who can read/write/delete?</td><td>IAM + bucket policies + S3 Access Points</td></tr>
+<tr><td>Encryption</td><td>What standard is required?</td><td>SSE-S3 (default), SSE-KMS (audit), SSE-C (customer keys)</td></tr>
+<tr><td>Retention</td><td>How long? What triggers deletion?</td><td>Lifecycle rules + legal hold</td></tr>
+<tr><td>Audit</td><td>Who accessed what, when?</td><td>Access Logging + CloudTrail</td></tr>
+<tr><td>Classification</td><td>PII, financial, or public?</td><td>Object tags; enforce policies by tag</td></tr>
+</tbody>
+</table></div>
+<h3 id="storage-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Lifecycle cost models</td><td><a href="03-estimation-capacity-planning.html">Ch 3: Estimation &amp; Capacity Planning</a></td></tr>
+<tr><td>CDN cache key design</td><td><a href="06-caching-systems.html">Ch 6: Caching Systems</a></td></tr>
+<tr><td>Database storage internals</td><td><a href="05-databases-deep-dive.html">Ch 5: Databases Deep Dive</a></td></tr>
+<tr><td>Backup observability</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td></tr>
+<tr><td>Artifact storage in CI/CD</td><td><a href="F11-deployment-devops.html">F11: Deployment &amp; DevOps</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Storing large media blobs in the primary relational database without a strong reason.</li>
@@ -1268,6 +1393,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#storage-decision-matrix">Storage Decision Matrix</a></li>
+<li><a href="#durability-math">Durability, SLAs &amp; Backup Drills</a></li>
+<li><a href="#lifecycle-tiering">Lifecycle Tiering &amp; Cost Models</a></li>
+<li><a href="#versioning-ransomware">Versioning &amp; Ransomware Resilience</a></li>
+<li><a href="#geo-replication">Geo-Replication &amp; Data Governance</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>
