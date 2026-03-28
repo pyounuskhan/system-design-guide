@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 2 - Core System Building Blocks<br>
-<strong>Position:</strong> Chapter 7 of 60
+<strong>Position:</strong> Chapter 7 of 42<br>
 <strong>Why this part exists:</strong> This section moves from framing to mechanics by explaining the infrastructure components that repeatedly appear in real-world systems.<br>
 <strong>This chapter builds toward:</strong> traffic distribution, fault isolation, rollout strategy, and stateless service design</p>
 <h2 id="overview">Overview</h2>
@@ -1143,6 +1143,123 @@
 <li>Use traffic routing as part of change management and incident mitigation.</li>
 <li>Remember that load balancing does not remove the need to fix downstream bottlenecks.</li>
 </ul>
+<h2 id="l4-vs-l7-tradeoffs">L4 vs L7 — Detailed Trade-offs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>L4 (Transport)</th><th>L7 (Application)</th></tr></thead>
+<tbody>
+<tr><td><strong>What it sees</strong></td><td>IP, port, TCP/UDP headers</td><td>Full HTTP: method, path, headers, cookies, body</td></tr>
+<tr><td><strong>Routing</strong></td><td>Source/dest IP, port</td><td>URL path, hostname, header values, cookies</td></tr>
+<tr><td><strong>Performance</strong></td><td>Faster (no payload inspection)</td><td>Slightly slower but usually negligible</td></tr>
+<tr><td><strong>TLS</strong></td><td>Pass-through or terminate without inspection</td><td>Terminates and inspects, enables content routing</td></tr>
+<tr><td><strong>Health checks</strong></td><td>TCP connect / port check</td><td>HTTP endpoint (<code>/healthz</code> returning 200)</td></tr>
+<tr><td><strong>Observability</strong></td><td>Limited (connection count, bytes)</td><td>Rich (HTTP status, latency per path)</td></tr>
+<tr><td><strong>Examples</strong></td><td>AWS NLB, HAProxy (TCP)</td><td>AWS ALB, Nginx, Envoy, Traefik</td></tr>
+</tbody>
+</table></div>
+<p><strong>Decision rule:</strong> L4 for non-HTTP protocols and max throughput. L7 for HTTP services needing routing rules, observability, or deployment strategies.</p>
+<h3 id="traffic-management-stack">The Traffic Management Stack: LB + Gateway + Mesh</h3>
+<pre><code>EXTERNAL TRAFFIC
+        │
+LOAD BALANCER (L4/L7)
+  • Traffic distribution, TLS termination, health checks
+  • Examples: ALB, NLB, Nginx, Envoy front proxy
+        │
+API GATEWAY
+  • Authentication, rate limiting, request transformation
+  • Examples: Kong, AWS API Gateway, Apigee
+        │
+SERVICE MESH (sidecar proxies)
+  • Service-to-service mTLS, retries, circuit breakers
+  • Observability (traces, metrics), traffic splitting
+  • Examples: Istio, Linkerd, Consul Connect</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Add When</th><th>Skip When</th></tr></thead>
+<tbody>
+<tr><td>Load Balancer</td><td>Always — any multi-instance service</td><td>Never skip</td></tr>
+<tr><td>API Gateway</td><td>External APIs, multi-tenant rate limiting, centralized auth</td><td>Internal-only services with built-in auth</td></tr>
+<tr><td>Service Mesh</td><td>10+ microservices needing uniform mTLS, observability</td><td>Monolith, &lt; 5 services, team can't absorb ops cost</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="consistent-hashing">Consistent Hashing and Overload Protection</h2>
+<h3 id="consistent-hashing-detail">Consistent Hashing for Stateful Routing</h3>
+<p>When backends maintain local state, consistent hashing routes the same key to the same backend — minimizing redistribution when backends change.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Algorithm</th><th>Key Redistribution on Change</th><th>Uniformity</th></tr></thead>
+<tbody>
+<tr><td>Modulo hash (<code>hash % N</code>)</td><td>~100% (all keys remap)</td><td>Depends on hash</td></tr>
+<tr><td>Consistent hashing (ring)</td><td>~1/N (only affected range)</td><td>Can be uneven without virtual nodes</td></tr>
+<tr><td>Consistent hashing + virtual nodes</td><td>~1/N (evenly distributed)</td><td>Good</td></tr>
+<tr><td>Rendezvous (highest random weight)</td><td>~1/N</td><td>Good</td></tr>
+</tbody>
+</table></div>
+<h3 id="overload-protection">Overload Protection Policies</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Policy</th><th>How It Works</th><th>When to Use</th></tr></thead>
+<tbody>
+<tr><td><strong>Max connections/backend</strong></td><td>Reject when limit reached</td><td>Databases, connection-limited services</td></tr>
+<tr><td><strong>Rate limiting</strong></td><td>Cap req/sec per client or backend</td><td>API protection</td></tr>
+<tr><td><strong>Queue depth limiting</strong></td><td>Reject when queue exceeds threshold</td><td>Prevent latency spiral</td></tr>
+<tr><td><strong>Circuit breaking</strong></td><td>Stop sending after consecutive failures</td><td>Isolate failing instances</td></tr>
+<tr><td><strong>Load shedding (503)</strong></td><td>Return 503 when capacity exceeded</td><td>Protect critical paths</td></tr>
+<tr><td><strong>Adaptive concurrency</strong></td><td>Dynamically adjust max in-flight based on latency</td><td>Variable request cost</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="global-lb">Global Load Balancing and Multi-Region Failover</h2>
+<p>Global LB operates above regional balancers to route traffic across regions — the first layer users interact with.</p>
+<pre><code>User in London → DNS (latency-based) → EU LB → EU backends
+User in Tokyo → DNS (latency-based) → APAC LB → APAC backends
+EU fails → GLB health check → DNS failover → EU users → US (higher latency, but available)</code></pre>
+<h3 id="failover-patterns">Failover Patterns</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Recovery Time</th><th>Consistency</th><th>Cost</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>Active-Active</strong></td><td>~0</td><td>Eventual (cross-region replication)</td><td>Highest (2x infra)</td><td>Global consumer products</td></tr>
+<tr><td><strong>Active-Passive</strong></td><td>30s-3min</td><td>Primary authoritative</td><td>Lower</td><td>Strong consistency needs, DR</td></tr>
+<tr><td><strong>Regional primaries</strong></td><td>~0 reads; seconds for writes</td><td>Each region owns data subset</td><td>Medium-High</td><td>Multi-region SaaS, data residency</td></tr>
+</tbody>
+</table></div>
+<h3 id="glb-rubric">GLB Decision Rubric</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Question</th><th>If Yes</th><th>If No</th></tr></thead>
+<tbody>
+<tr><td>Users need &lt; 100ms globally?</td><td>Active-active in 2-3 regions</td><td>Single region + CDN</td></tr>
+<tr><td>Data residency required?</td><td>Regional primaries, no cross-border replication</td><td>Any region can serve any user</td></tr>
+<tr><td>Can tolerate minutes of downtime?</td><td>Active-passive (cheaper)</td><td>Active-active</td></tr>
+<tr><td>Read-heavy workload?</td><td>Active-active with read replicas per region</td><td>Write-region affinity</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="anti-patterns">Anti-Patterns in Load Balancing</h2>
+<h3 id="retry-amplification">Retry Amplification</h3>
+<pre><code>Without retry budgets:
+  Client → LB (3x) → Service A (3x) → Service B (3x) = 27 attempts
+
+With retry budgets:
+  Client → LB (2x) → Service A (1x) → Service B (no retry) = 2 attempts</code></pre>
+<p><strong>Prevention:</strong> Retry at one layer only, set a 10-20% retry budget, never retry non-idempotent requests, use backoff+jitter, propagate deadlines.</p>
+<h3 id="request-hedging">Request Hedging Caveats</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Aspect</th><th>Benefit</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>Tail latency</td><td>Significantly reduced p99</td><td>Backend load increases proportionally</td></tr>
+<tr><td>Simple reads</td><td>Works well for cheap idempotent reads</td><td>Never hedge writes or expensive queries</td></tr>
+<tr><td>Backend cost</td><td>Worth it for critical low-latency paths</td><td>Wasteful if backends already at 80%+</td></tr>
+</tbody>
+</table></div>
+<p><strong>Hedging safety:</strong> Only idempotent reads; delay hedge until p50 latency passes; max 5% hedge rate; monitor backend utilization.</p>
+<h3 id="other-anti-patterns">Other Anti-Patterns</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Anti-Pattern</th><th>What Goes Wrong</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td><strong>Thundering herd on failover</strong></td><td>All traffic to surviving backends simultaneously</td><td>Gradual ramp-up; pre-warm standby</td></tr>
+<tr><td><strong>No connection draining</strong></td><td>In-flight requests dropped during deploys</td><td>30-60s drain grace period</td></tr>
+<tr><td><strong>Sticky sessions everywhere</strong></td><td>Uneven load, harder failover</td><td>Move state to shared store; stateless tokens</td></tr>
+<tr><td><strong>Too-aggressive health checks</strong></td><td>Flapping backends</td><td>10-30s intervals, 3-failure threshold</td></tr>
+<tr><td><strong>No weight awareness</strong></td><td>Hetero instances get equal traffic</td><td>Weighted round robin by capacity</td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Assuming any balancing algorithm works equally well for all workloads.</li>
@@ -1268,6 +1385,17 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#l4-vs-l7-tradeoffs">L4 vs L7 Trade-offs</a><ul>
+<li><a href="#traffic-management-stack">LB + Gateway + Mesh Stack</a></li>
+</ul>
+</li>
+<li><a href="#consistent-hashing">Consistent Hashing &amp; Overload Protection</a></li>
+<li><a href="#global-lb">Global LB &amp; Multi-Region Failover</a></li>
+<li><a href="#anti-patterns">Anti-Patterns</a><ul>
+<li><a href="#retry-amplification">Retry Amplification</a></li>
+<li><a href="#request-hedging">Request Hedging Caveats</a></li>
+</ul>
+</li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 - Real-World System Design Examples
-<strong>Position:</strong> Chapter 35 of 60
+<strong>Position:</strong> Chapter 35 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -5209,6 +5209,147 @@ Cross features (computed inline):
 <li>Study how The Trade Desk's Unified ID 2.0 and LiveRamp's RampID work as post-cookie identity solutions and their trade-offs versus probabilistic matching.</li>
 <li>Investigate the emerging audio advertising ecosystem (Spotify, podcasts) and how it differs architecturally from display and video in terms of measurement, targeting, and auction mechanics.</li>
 </ul>
+<hr>
+<h2 id="bid-request-latency-budget">Bid Request Latency Budget</h2>
+<pre><code>Total budget: &lt; 100ms (exchange timeout for bid response)
+
+  Receive bid request:           2ms
+  Parse + validate:              3ms
+  User lookup (cookie/ID):       5ms (Redis)
+  Audience matching:             10ms (pre-computed segments)
+  Budget + pacing check:         5ms (Redis atomic counter)
+  Bid calculation (ML model):    20ms (feature lookup + inference)
+  Response serialization:        3ms
+  Network to exchange:           20-40ms
+  Total:                         ~70-90ms (within 100ms budget)
+
+  If ANY step exceeds budget → return no-bid (miss the auction, but don't timeout)
+</code></pre>
+<hr>
+<h2 id="ad-fraud-detection-blueprint">Ad Fraud Detection Blueprint</h2>
+<pre><code>LAYER 1: PRE-BID (&lt; 5ms)
+  IP blocklist check; known bot user-agent; datacenter IP detection
+  → Block or deprioritize
+
+LAYER 2: POST-IMPRESSION (real-time)
+  Click velocity (&gt; 10 clicks/min from same user → fraud)
+  Impression-to-click timing (&lt; 100ms = bot click)
+  Device fingerprint consistency
+
+LAYER 3: BATCH ANALYSIS (daily)
+  Click-through rate anomalies per publisher
+  Conversion attribution validation
+  Coordinated click patterns (graph analysis)
+  → Clawback fraudulent spend; blocklist publishers
+</code></pre>
+<h3 id="fraud-metrics">Fraud Metrics</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Target</th>
+<th>Alert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Invalid traffic (IVT) rate</td>
+<td>&lt; 5% of impressions</td>
+<td>&gt; 8%</td>
+</tr>
+<tr>
+<td>Bot detection rate</td>
+<td>&gt; 95% recall</td>
+<td>&lt; 90%</td>
+</tr>
+<tr>
+<td>Click fraud rate</td>
+<td>&lt; 2% of clicks</td>
+<td>&gt; 4%</td>
+</tr>
+<tr>
+<td>Attribution fraud</td>
+<td>&lt; 1% of conversions</td>
+<td>&gt; 2%</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="privacy-and-data-governance">Privacy and Data Governance</h2>
+<p><em>Privacy regulations are evolving rapidly. This is an architectural reference — verify against current law.</em></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Implementation</th>
+<th>Regulation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>User consent for tracking</strong></td>
+<td>Consent management platform (CMP); honor TCF signals</td>
+<td>GDPR, CCPA, ePrivacy</td>
+</tr>
+<tr>
+<td><strong>Cookie deprecation</strong></td>
+<td>Support Topics API, Attribution Reporting API (Privacy Sandbox)</td>
+<td>Chrome Privacy Sandbox (timeline subject to change)</td>
+</tr>
+<tr>
+<td><strong>Data retention</strong></td>
+<td>Impression/click logs: 90 days; aggregated: 2 years; PII: 30 days or consent-scoped</td>
+<td>GDPR Art. 5(1)(e)</td>
+</tr>
+<tr>
+<td><strong>Right to erasure</strong></td>
+<td>Delete user data within 30 days of request; propagate to all downstream</td>
+<td>GDPR Art. 17</td>
+</tr>
+<tr>
+<td><strong>Data minimization</strong></td>
+<td>Collect only what's needed for auction + attribution; no profile enrichment beyond consent</td>
+<td>GDPR Art. 5(1)(c)</td>
+</tr>
+<tr>
+<td><strong>Cross-border transfers</strong></td>
+<td>Standard contractual clauses (SCCs); data residency for EU users</td>
+<td>GDPR Ch. V</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="privacy-preserving-attribution">Privacy-Preserving Attribution</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Approach</th>
+<th>How</th>
+<th>Privacy Level</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Server-side attribution</strong></td>
+<td>First-party data + server signals; no third-party cookies</td>
+<td>Medium-High</td>
+</tr>
+<tr>
+<td><strong>Aggregated reporting</strong></td>
+<td>Only report aggregated conversions (k-anonymity)</td>
+<td>High</td>
+</tr>
+<tr>
+<td><strong>Attribution Reporting API</strong></td>
+<td>Browser-mediated attribution with noise</td>
+<td>High (Privacy Sandbox)</td>
+</tr>
+<tr>
+<td><strong>Data clean rooms</strong></td>
+<td>Encrypted match between advertiser + publisher data</td>
+<td>High</td>
+</tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="navigation">Navigation</h2>
 <ul>

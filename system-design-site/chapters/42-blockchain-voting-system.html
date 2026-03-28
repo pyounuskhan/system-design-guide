@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1013,8 +1013,14 @@
 
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
-<p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 42 of 60</p>
+<p><strong>Part:</strong> Part 5 — Real-World System Design Examples<br>
+<strong>Position:</strong> Chapter 42 of 60<br>
+<strong>Last reviewed:</strong> March 2026.</p>
+<div style="border: 2px solid #d32f2f; padding: 16px; margin: 16px 0; border-radius: 8px; background: #fff3e0;">
+<p><strong>⚠️ Critical Disclaimer:</strong> This chapter is a <strong>system design exercise</strong>. It does NOT endorse Internet voting for public elections.</p>
+<p>The mainstream election-security consensus (NASEM, EAC, leading researchers including Rivest, Appel, Halderman) is that <strong>Internet voting — including blockchain-based — is not currently safe for public elections</strong> due to unsolved threats: endpoint compromise, coercion, denial-of-service, and absence of meaningful recount.</p>
+<p>Paper ballots with risk-limiting audits remain the gold standard for public election integrity.</p>
+</div>
 <hr>
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
@@ -1062,14 +1068,15 @@
 <h2 id="overview">Overview</h2>
 <p>A blockchain-based voting system is one of the most challenging distributed systems to design. It must simultaneously satisfy properties that often conflict: <strong>transparency</strong> (anyone can verify the result) and <strong>privacy</strong> (no one can learn how an individual voted), <strong>accessibility</strong> (every eligible voter can cast a ballot) and <strong>security</strong> (no unauthorized votes are counted), <strong>liveness</strong> (the system must work during the election window) and <strong>safety</strong> (no incorrect tallying can occur).</p>
 <p>This chapter designs a system inspired by platforms like <strong>Voatz</strong> (mobile blockchain voting), <strong>Polys</strong> (Kaspersky's e-voting platform), and <strong>Agora</strong> (blockchain-based vote counting), while addressing the fundamental cryptographic and systems challenges that make remote electronic voting one of the hardest open problems in computer science.</p>
-<h3 id="why-blockchain-for-voting">Why Blockchain for Voting?</h3>
-<p>Traditional electronic voting systems suffer from a fundamental trust problem: voters must trust the system operator to correctly count votes. Blockchain technology offers:</p>
+<h3 id="why-blockchain-for-voting">Why Blockchain for Voting? (With Limitations)</h3>
+<p>Traditional electronic voting systems suffer from a trust problem. Blockchain-based designs attempt to address this by offering:</p>
 <ol>
-<li><strong>Immutability</strong> — once a vote is recorded, it cannot be altered</li>
-<li><strong>Transparency</strong> — the ledger is publicly auditable</li>
-<li><strong>Decentralization</strong> — no single point of failure or control</li>
-<li><strong>Cryptographic guarantees</strong> — mathematical proofs replace trust</li>
+<li><strong>Immutability</strong> — resistant to retroactive alteration <em>(given honest validator majority; does not prevent incorrect recording at the endpoint)</em></li>
+<li><strong>Transparency</strong> — publicly auditable <em>(but vote privacy requires additional crypto layers)</em></li>
+<li><strong>Decentralization</strong> — reduces single-point-of-failure for tally <em>(but does not decentralize voter auth or client devices)</em></li>
+<li><strong>Cryptographic verifiability</strong> — proofs can demonstrate tally correctness <em>(but do not secure compromised endpoints, prevent coercion, or replace paper audit trails)</em></li>
 </ol>
+<p><strong>What blockchain does NOT solve:</strong> client-side malware, voter coercion in uncontrolled environments, denial-of-service disenfranchisement, software independence (requires voter-verified paper record).</p>
 <h3 id="the-e2e-verifiability-challenge">The E2E Verifiability Challenge</h3>
 <p>End-to-end (E2E) verifiable voting requires three properties:</p>
 <ul>
@@ -1106,9 +1113,9 @@
 <tr>
 <td>Agora</td>
 <td>2017</td>
-<td>Sierra Leone presidential election</td>
+<td>Sierra Leone <em>(disputed: Agora claimed involvement; NEC denied official use. Parallel observation, not official tally)</em></td>
 <td>Custom blockchain</td>
-<td>Vote counting verification</td>
+<td>Disputed — see media corrections (2018)</td>
 </tr>
 <tr>
 <td>Follow My Vote</td>
@@ -5960,7 +5967,50 @@ Standards Bodies:
   - W3C: DID and Verifiable Credentials specifications
 </code></pre>
 <hr>
-<p><em>This chapter represents a comprehensive treatment of blockchain-based voting system design, covering the full spectrum from cryptographic primitives to operational deployment. The design prioritizes security and verifiability while acknowledging the fundamental limitations and trade-offs inherent in remote electronic voting. As with all election technology, the goal is not perfection but continuous improvement in service of democratic values.</em></p>
+<h2 id="election-security-consensus">Mainstream Election-Security Consensus</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Source</th><th>Position</th></tr></thead>
+<tbody>
+<tr><td><strong>NASEM (2018)</strong></td><td>"The Internet should not be used for the return of marked ballots."</td></tr>
+<tr><td><strong>Trail of Bits (2020)</strong></td><td>Found critical vulnerabilities in Voatz; recommended against public election use</td></tr>
+<tr><td><strong>MIT / Rivest et al. (2020)</strong></td><td>"Going from Bad to Worse" — blockchain adds complexity without solving fundamental threats</td></tr>
+<tr><td><strong>Verified Voting</strong></td><td>Opposes all Internet ballot return for public elections</td></tr>
+</tbody>
+</table></div>
+<h3 id="paper-vs-blockchain">Paper Ballots vs Blockchain Votes</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Property</th><th>Paper</th><th>Blockchain</th></tr></thead>
+<tbody>
+<tr><td>Software independence</td><td>Physical record auditable</td><td>Must trust software end-to-end</td></tr>
+<tr><td>Coercion resistance</td><td>Secret ballot in polling place</td><td>Voter at home; coercer can watch</td></tr>
+<tr><td>Recount</td><td>Hand count paper</td><td>Re-read same digital data</td></tr>
+<tr><td>DDoS resilience</td><td>Polling places independent</td><td>Internet infrastructure vulnerable</td></tr>
+</tbody>
+</table></div>
+<h3 id="appropriate-uses">Where Blockchain Voting MAY Be Appropriate</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Use Case</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>Corporate shareholder votes</td><td>Low-Medium</td></tr>
+<tr><td>DAO governance</td><td>Low</td></tr>
+<tr><td>Student/club elections</td><td>Low</td></tr>
+<tr><td>Internal org polls (non-binding)</td><td>Low</td></tr>
+</tbody>
+</table></div>
+<p><strong>NOT appropriate for:</strong> National elections, state elections, binding referenda, or any context where coercion or undetectable fraud would undermine democratic legitimacy.</p>
+<h3 id="voting-references">References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Scope</th></tr></thead>
+<tbody>
+<tr><td>NASEM (2018) — <em>Securing the Vote</em></td><td>Election security recommendations</td></tr>
+<tr><td>MIT (2020) — <em>Going from Bad to Worse</em></td><td>Blockchain voting limitations</td></tr>
+<tr><td>Trail of Bits (2020) — Voatz audit</td><td>Production blockchain voting security</td></tr>
+<tr><td>NIST VVSG 2.0</td><td>Voting system standards</td></tr>
+<tr><td>Verified Voting</td><td>Election technology advocacy</td></tr>
+</tbody>
+</table></div>
+<hr>
+<p><em>This chapter is a system design exercise. Paper ballots with risk-limiting audits remain the recommended approach for public elections per mainstream election-security consensus.</em></p>
         </div>
 
         <section class="chapter-pagination">

@@ -3526,6 +3526,58 @@ Option 1 (URL path versioning) combined with Option 4 (additive-only as default 
 - Read about the Workday single-codebase SaaS architecture to understand how forced upgrades simplify multi-tenant operations.
 - Explore ServiceNow's workflow automation patterns to see how low-code platforms handle enterprise process orchestration.
 
+## Multi-Tenant Data Model Templates
+
+| Model | Schema | Isolation | Cost | Best For |
+|-------|--------|-----------|------|----------|
+| **Shared DB, shared schema** | `tenant_id` column on every table | Application-enforced (ORM middleware) | Lowest | Early SaaS, < 100 tenants |
+| **Shared DB, separate schemas** | One schema per tenant in same DB instance | Schema-level (stronger) | Moderate | Mid-tier; moderate compliance |
+| **Separate databases** | One DB instance per tenant | Full infrastructure isolation | Highest | Enterprise; regulated (HIPAA, SOX) |
+| **Hybrid** | Shared for most; dedicated for top-tier | Variable | Variable | Mixed customer tiers |
+
+### Tenant Isolation Checklist
+
+- [ ] Every query includes `tenant_id` — enforce via ORM middleware, not developer discipline
+- [ ] Row-Level Security (RLS) enabled as defense-in-depth
+- [ ] Cross-tenant access negative-tested in CI
+- [ ] Per-tenant encryption keys (KMS)
+- [ ] Noisy-neighbor protection (per-tenant connection pool limits, rate limits)
+- [ ] Tenant-scoped backups (can restore one tenant without affecting others)
+
+---
+
+## Identity Federation Blueprint
+
+```
+External Users → Enterprise IdP (Okta/Azure AD/SAML) → SSO
+  → Platform issues scoped access token (JWT) with: user_id, tenant_id, roles, permissions
+  → API Gateway validates token on every request
+  → Services extract tenant context from token; enforce authZ via policy engine (OPA/Cedar)
+
+Service-to-Service: workload identity (mTLS or cloud IAM roles)
+  → No shared static secrets between services
+```
+
+### Federation Patterns by Customer Tier
+
+| Tier | Auth Method | Provisioning | Session |
+|------|-----------|-------------|---------|
+| Free/self-serve | Email + password; social login | Self-service signup | Short-lived JWT |
+| Professional | SSO via SAML/OIDC | SCIM auto-provisioning | SSO session |
+| Enterprise | Dedicated IdP federation; custom RBAC | SCIM + manual role mapping | SSO + MFA enforced |
+
+---
+
+## Configuration and Change Management
+
+| Concern | Implementation | Cross-Reference |
+|---------|---------------|----------------|
+| Feature flags per tenant | LaunchDarkly / Flipt with tenant targeting | F11: Deployment §2.4 |
+| Config drift detection | GitOps (Argo CD) with self-heal; alert on manual changes | F11 §3.6 (GitOps) |
+| Policy-as-code | OPA/Kyverno enforce guardrails (resource limits, registry restrictions) | Ch A7: Kubernetes & DevOps |
+| Internal developer platform | Service catalog (Backstage); paved-road templates | Ch 14: Monolith vs Microservices |
+| Change approval workflow | PR-based config changes; production requires 2 approvers | F11: Release Safety |
+
 ---
 
 ## Navigation

@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 18 of 60
+<strong>Position:</strong> Chapter 18 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -1077,7 +1077,7 @@
 - <strong>Revenue loss from downtime</strong>: Every minute of checkout downtime costs thousands of dollars.
 - <strong>Overselling destroys trust</strong>: Confirming an order and then cancelling due to stock-out is worse than showing "out of stock" upfront.
 - <strong>Promotions drive traffic spikes</strong>: Flash sales can produce 10-50x normal traffic within seconds.
-- <strong>Fraud eats margin</strong>: Card fraud, coupon abuse, and fake returns can consume 1-3% of gross merchandise value.
+- <strong>Fraud eats margin</strong>: Card fraud, coupon abuse, and fake returns can consume 1-3% of gross merchandise value <em>(illustrative industry range; actual varies by vertical, geography, and controls — see Nilson Report for card fraud benchmarks)</em>.
 - <strong>Regulatory pressure</strong>: PCI-DSS for payments, GDPR/CCPA for customer data, sales tax nexus rules, and consumer protection laws.</p>
 <h3 id="system-boundaries">System Boundaries</h3>
 <p>This chapter covers the <strong>core transactional path</strong>: from product discovery through order completion and post-order handling. It does <strong>not</strong> deeply cover:
@@ -3069,6 +3069,67 @@ CREATE TABLE refunds (
 <td><strong>Eventual</strong> (minutes to hours)</td>
 <td>Batch processing acceptable</td>
 </tr>
+</tbody>
+</table></div>
+<h2 id="slo-targets">SLO Targets and Error Budgets</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Workflow</th><th>SLI</th><th>SLO Target</th><th>Error Budget (30d)</th><th>Architecture Implication</th></tr></thead>
+<tbody>
+<tr><td>Product search</td><td>p99 latency</td><td>&lt; 200ms</td><td>43 min downtime</td><td>Elasticsearch + Redis query cache + CDN</td></tr>
+<tr><td>PDP load</td><td>p99 latency</td><td>&lt; 300ms</td><td>43 min</td><td>Pre-assembled cache; partial response on failure</td></tr>
+<tr><td>Cart operations</td><td>Availability</td><td>99.95%</td><td>21.6 min</td><td>Redis with persistence; DB fallback</td></tr>
+<tr><td>Checkout</td><td>Availability</td><td>99.99%</td><td>4.3 min</td><td>Multi-PSP failover; circuit breakers everywhere</td></tr>
+<tr><td>Payment</td><td>Correctness</td><td>0 double-charges</td><td>N/A</td><td>Idempotency keys; reconciliation</td></tr>
+<tr><td>Order status</td><td>Freshness</td><td>&lt; 30s</td><td>N/A</td><td>Kafka events; push notifications</td></tr>
+<tr><td>Inventory</td><td>Correctness</td><td>&lt; 0.1% oversell</td><td>N/A</td><td>Strong consistency; reservation locks</td></tr>
+</tbody>
+</table></div>
+<h3 id="deployment-gating">Deployment Gating by Error Budget</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Budget Remaining</th><th>Checkout Changes</th><th>Catalog Changes</th><th>Marketing Changes</th></tr></thead>
+<tbody>
+<tr><td>&gt; 75%</td><td>All risk levels</td><td>All</td><td>All</td></tr>
+<tr><td>50-75%</td><td>Medium + Low</td><td>All</td><td>All</td></tr>
+<tr><td>25-50%</td><td>Low only (bugs)</td><td>Low + Medium</td><td>Low only</td></tr>
+<tr><td>&lt; 25%</td><td>Emergency only</td><td>Emergency only</td><td>Freeze</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="checkout-failure-scenarios">Checkout Failure Scenarios</h2>
+<p><strong>Scenario 1: Payment Gateway Timeout</strong> — PSP-A times out → circuit breaker opens → failover to PSP-B with same idempotency key → order completes.</p>
+<p><strong>Scenario 2: Inventory Exhausted</strong> — Reservation fails → buyer notified "item unavailable" → no payment attempted → no compensation needed.</p>
+<p><strong>Scenario 3: Order Creation Fails After Payment</strong> — Payment authorized → OMS returns 500 → saga compensation: void payment + release reservation → buyer notified "please retry, no charge."</p>
+<hr>
+<h2 id="checkout-resilience-catalog">Checkout Resilience Pattern Catalog</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Where Applied</th><th>Config</th><th>Prevents</th></tr></thead>
+<tbody>
+<tr><td><strong>Timeout</strong></td><td>PSP, tax, shipping</td><td>PSP: 5s; Tax: 2s; Ship: 3s</td><td>Thread exhaustion from slow deps</td></tr>
+<tr><td><strong>Retry + backoff</strong></td><td>PSP auth (idempotent)</td><td>Max 2, 1s/2s, jitter</td><td>Transient PSP errors</td></tr>
+<tr><td><strong>Circuit breaker</strong></td><td>Per-PSP, per-carrier, per-tax</td><td>5 failures/30s → open; 30s cool</td><td>Cascade; allows recovery</td></tr>
+<tr><td><strong>Multi-PSP failover</strong></td><td>Payment auth</td><td>PSP-A → PSP-B (same key)</td><td>Single-PSP outage</td></tr>
+<tr><td><strong>Idempotency key</strong></td><td>Payment, inventory, order</td><td><code>checkout:{session}:{step}</code></td><td>Double-charge, oversell</td></tr>
+<tr><td><strong>Saga compensation</strong></td><td>Checkout orchestrator</td><td>Reserve → Auth → Create; reverse</td><td>Partial failure inconsistency</td></tr>
+<tr><td><strong>Load shedding</strong></td><td>Gateway during flash sales</td><td>checkout &gt; cart &gt; browse</td><td>Checkout protected under overload</td></tr>
+<tr><td><strong>Graceful degradation</strong></td><td>PDP, cart</td><td>Hide reviews if slow; cached prices</td><td>Journey continues on partial failure</td></tr>
+<tr><td><strong>Bulkhead</strong></td><td>Thread pools</td><td>Payment: 50; Search: 100</td><td>Payment failure ≠ search failure</td></tr>
+</tbody>
+</table></div>
+<pre><code>Retry budget: 500 req/sec normal → max 50 retries/sec (10%) → 550 total
+If retries exceed 10%, circuit breaker opens</code></pre>
+<hr>
+<h2 id="data-consistency-per-workflow">Data Consistency Per Workflow</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Workflow Step</th><th>Data</th><th>Consistency</th><th>Mechanism</th><th>If Violated</th></tr></thead>
+<tbody>
+<tr><td>Add to cart</td><td>Cart items</td><td>Strong (per user)</td><td>Redis + AOF</td><td>Wrong cart contents</td></tr>
+<tr><td>Reserve inventory</td><td>Stock count</td><td>Strong (linearizable)</td><td><code>SELECT FOR UPDATE</code> / Redis DECR</td><td>Oversell</td></tr>
+<tr><td>Authorize payment</td><td>Payment state</td><td>Strong (per txn)</td><td>PSP idempotency key</td><td>Double-charge</td></tr>
+<tr><td>Create order</td><td>Order record</td><td>Strong</td><td>Single DB write + saga</td><td>Missing order</td></tr>
+<tr><td>Send confirmation</td><td>Notification</td><td>Eventual (at-least-once)</td><td>Kafka → email consumer</td><td>Duplicate email (harmless)</td></tr>
+<tr><td>Update analytics</td><td>Counters</td><td>Eventual (minutes OK)</td><td>Kafka → pipeline</td><td>Delayed dashboards</td></tr>
+<tr><td>Update search</td><td>Availability</td><td>Eventual (&lt; 60s)</td><td>CDC → Elasticsearch</td><td>Sold-out appears briefly</td></tr>
+<tr><td>Process refund</td><td>Refund state</td><td>Strong (per return)</td><td>Ledger + PSP call (idempotent)</td><td>Money stuck</td></tr>
 </tbody>
 </table></div>
 <hr>
@@ -5854,6 +5915,10 @@ CREATE INDEX idx_tracking_events ON tracking_events(tracking_id, carrier_timesta
 <li><a href="#concurrency-control">Concurrency Control</a></li>
 <li><a href="#idempotency-strategy">Idempotency Strategy</a></li>
 <li><a href="#consistency-model">Consistency Model</a></li>
+<li><a href="#slo-targets">SLO Targets &amp; Error Budgets</a></li>
+<li><a href="#checkout-failure-scenarios">Checkout Failure Scenarios</a></li>
+<li><a href="#checkout-resilience-catalog">Checkout Resilience Catalog</a></li>
+<li><a href="#data-consistency-per-workflow">Data Consistency Per Workflow</a></li>
 <li><a href="#distributed-transaction-saga-reconciliation-design">Distributed Transaction / Saga / Reconciliation Design</a></li>
 <li><a href="#security-design">Security Design</a></li>
 <li><a href="#abuse-fraud-governance-controls">Abuse / Fraud / Governance Controls</a></li>

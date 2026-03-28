@@ -132,6 +132,218 @@ A streaming platform demonstrates layered caching well because it handles metada
 - Expect failures, cold starts, and skewed traffic as normal operational conditions.
 - Measure whether the cache is truly protecting the backend instead of only measuring memory usage.
 
+## Cache Invalidation Taxonomy
+
+Cache invalidation is famously one of the two hard problems in computer science. The difficulty arises because different data, different consistency requirements, and different cache layers demand different invalidation strategies. Here is a taxonomy of the five principal approaches.
+
+| Strategy | How It Works | Freshness Guarantee | Complexity | Best For |
+|----------|-------------|-------------------|------------|----------|
+| **TTL-based expiry** | Entry auto-expires after a fixed duration | Bounded staleness (≤ TTL) | Low | Content where staleness within seconds/minutes is acceptable (product catalog, search results) |
+| **Event-driven invalidation** | Backend publishes invalidation event (via Kafka, CDC, webhook) when source data changes | Near-real-time | Medium-High | User-facing data that must reflect writes quickly (profile updates, order status) |
+| **Version/tag-based** | Cache key includes a version number or ETag; new version = new key, old entry naturally evicts | Instant for new reads | Medium | Immutable content with explicit versioning (static assets, API responses with ETag) |
+| **Write-through invalidation** | Cache is updated as part of the write path | Immediate consistency | Medium | Data that is read immediately after write (session state, auth tokens) |
+| **Manual/API purge** | Operator or admin triggers purge via API (e.g., CDN cache purge) | On-demand | Low | Emergency fixes, content takedowns, post-deployment cache busting |
+
+### Choosing an Invalidation Strategy
+
+```
+Is the data immutable after creation?
+  → YES: Use version/tag-based keys (no invalidation needed)
+  → NO: Is near-real-time consistency required?
+    → YES: Use event-driven invalidation (CDC/Kafka)
+    → NO: Is bounded staleness (seconds-minutes) acceptable?
+      → YES: Use TTL with appropriate duration
+      → NO: Use write-through invalidation
+```
+
+### Invalidation in Distributed Cache Layers
+
+| Cache Layer | Invalidation Challenge | Recommended Approach |
+|-------------|----------------------|---------------------|
+| Browser cache | Cannot be invalidated from server side | Use versioned URLs (`/app.js?v=abc123`) or `Cache-Control: max-age` with short TTL |
+| CDN | Purge propagation takes seconds to minutes across global PoPs | Use cache tags or surrogate keys for targeted purge; use short TTL + `stale-while-revalidate` |
+| API gateway | Shared across many services; invalidation must be scoped | Use `Vary` headers correctly; invalidate by key prefix |
+| Application cache (Redis) | Single cluster; invalidation is fast but must be coordinated | Event-driven pub/sub invalidation or TTL with jitter |
+| Database query cache | Can serve stale results after schema changes | Disable or flush on migration; prefer application-level caching |
+
+---
+
+## Stampede Prevention — Patterns and Pseudo-Code
+
+A cache stampede (thundering herd) occurs when a popular cache entry expires and hundreds of concurrent requests simultaneously miss the cache and hit the backend. Three patterns prevent this.
+
+### Pattern 1: Request Coalescing (Singleflight)
+
+Only one request fetches from the backend; all concurrent requests for the same key wait for that single result.
+
+```python
+# Pseudo-code: request coalescing / singleflight
+import threading
+
+in_flight = {}  # key → (lock, result)
+lock = threading.Lock()
+
+def get_with_coalescing(key):
+    # Check cache first
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    with lock:
+        if key in in_flight:
+            # Another request is already fetching — wait for it
+            flight_lock, _ = in_flight[key]
+        else:
+            # I am the first — create a flight lock
+            flight_lock = threading.Event()
+            in_flight[key] = (flight_lock, None)
+
+    if not flight_lock.is_set():
+        # I am the leader — fetch from backend
+        result = database.query(key)
+        cache.set(key, result, ttl=300)
+        in_flight[key] = (flight_lock, result)
+        flight_lock.set()  # Wake all waiters
+    else:
+        # I am a waiter — wait for leader
+        flight_lock.wait(timeout=5)
+
+    _, result = in_flight.pop(key, (None, None))
+    return result
+```
+
+### Pattern 2: Stale-While-Revalidate
+
+Serve the stale cached value immediately while refreshing asynchronously in the background. The user gets a fast (possibly slightly stale) response; the next request gets fresh data.
+
+```python
+# Pseudo-code: stale-while-revalidate
+def get_with_swr(key, ttl=300, stale_ttl=600):
+    entry = cache.get_with_metadata(key)
+
+    if entry is None:
+        # True miss — must fetch synchronously
+        result = database.query(key)
+        cache.set(key, result, ttl=ttl, stale_ttl=stale_ttl)
+        return result
+
+    if entry.age < ttl:
+        # Fresh — serve directly
+        return entry.value
+
+    if entry.age < stale_ttl:
+        # Stale but within grace period — serve stale, refresh async
+        background_refresh(key, ttl, stale_ttl)
+        return entry.value  # stale but fast
+
+    # Expired beyond stale window — must fetch synchronously
+    result = database.query(key)
+    cache.set(key, result, ttl=ttl, stale_ttl=stale_ttl)
+    return result
+
+def background_refresh(key, ttl, stale_ttl):
+    # Run in background thread / async task
+    result = database.query(key)
+    cache.set(key, result, ttl=ttl, stale_ttl=stale_ttl)
+```
+
+**HTTP equivalent:** The `Cache-Control: stale-while-revalidate=60` header tells CDNs and browsers to serve stale content for up to 60 seconds while fetching fresh content in the background.
+
+### Pattern 3: Probabilistic Early Expiration
+
+Before the TTL actually expires, each request has a small probability of refreshing the cache proactively. This spreads refresh load over time instead of concentrating it at TTL expiry.
+
+```python
+# Pseudo-code: probabilistic early refresh (XFetch algorithm)
+import random, math
+
+def get_with_early_refresh(key, ttl=300, beta=1.0):
+    entry = cache.get_with_metadata(key)
+
+    if entry is None:
+        result = database.query(key)
+        cache.set(key, result, ttl=ttl)
+        return result
+
+    # Probabilistic early refresh
+    remaining_ttl = ttl - entry.age
+    refresh_probability = math.exp(-remaining_ttl / (beta * ttl))
+
+    if random.random() < refresh_probability:
+        # Proactively refresh (runs inline or async)
+        result = database.query(key)
+        cache.set(key, result, ttl=ttl)
+        return result
+
+    return entry.value
+```
+
+---
+
+## Cache Key Design Checklist
+
+A poorly designed cache key causes stale data served to wrong users, cache pollution, low hit rates, or security vulnerabilities. Follow this checklist.
+
+### Cache Key Rules
+
+| Rule | Why | Example |
+|------|-----|---------|
+| **Include all discriminating parameters** | Different inputs must produce different cache entries | `user:{user_id}:profile` not just `profile` |
+| **Normalize keys** | Variations of the same input should hit the same entry | Lowercase, trim whitespace, sort query params |
+| **Include version/schema** | Schema changes should not serve stale-format data | `v2:product:{id}` |
+| **Exclude volatile fields** | Timestamps, nonces, or request IDs destroy hit rate | Exclude `request_id`, `timestamp` from key |
+| **Scope by tenant** | Multi-tenant systems must never leak data across tenants | `tenant:{tid}:user:{uid}` |
+| **Scope by auth context** | Cached responses must not leak between permission levels | Include role or permission hash in key for authZ-varying responses |
+| **Use consistent hashing prefix** | Enables efficient cache partitioning and bulk invalidation | `catalog:product:*` for invalidating all products |
+
+### CDN Cache Key Correctness
+
+CDNs cache by URL + headers. Incorrect `Vary` headers or missing query parameters cause one user to see another user's cached response.
+
+| Pitfall | What Goes Wrong | Fix |
+|---------|----------------|-----|
+| Missing `Vary: Authorization` | Authenticated and anonymous users see same cached response | Add `Vary: Authorization` or don't cache auth-dependent responses at CDN |
+| User-specific data cached at CDN | User A sees User B's profile | Never cache personalized responses at CDN; use edge compute to assemble |
+| Query params ignored | `/search?q=cats` and `/search?q=dogs` serve same cache entry | Configure CDN to include query string in cache key |
+| Accept-Language not in Vary | English user sees Spanish response | Add `Vary: Accept-Language` for multilingual sites |
+| Cache key too broad | Low hit rate because every unique URL is a separate entry | Normalize URLs, strip tracking params (`utm_*`), sort query params |
+
+---
+
+## Cache Security Considerations
+
+Caches amplify both performance and risk. A poisoned or leaky cache affects every user who reads from it.
+
+### Cache Poisoning
+
+An attacker manipulates the cache to store malicious content that is then served to all subsequent users.
+
+| Attack Vector | How It Works | Prevention |
+|--------------|-------------|-----------|
+| **HTTP response splitting** | Attacker injects headers that cause CDN to cache attacker-controlled response | Validate and sanitize all response headers; use HTTP/2+ (immune to splitting) |
+| **Cache key manipulation** | Attacker crafts request with unkeyed headers/params that alter response but not cache key | Audit unkeyed headers; include all response-varying inputs in cache key |
+| **Deceptive request routing** | Attacker requests `/admin` page which gets cached and served to other users at CDN | Never cache authenticated admin pages at CDN; use `Cache-Control: private` |
+
+### Authorization Leakage
+
+| Risk | Scenario | Prevention |
+|------|----------|-----------|
+| **Cross-user data leakage** | User A's profile cached and served to User B | Include user ID or session hash in cache key; use `Vary: Cookie` or `Vary: Authorization` |
+| **Privilege escalation via cache** | Admin response cached and served to regular user | Use `Cache-Control: private, no-store` for admin/elevated responses |
+| **Stale permission enforcement** | User's permissions revoked but cached response still shows authorized content | Invalidate cache on permission change; use short TTL for permission-dependent data |
+| **Multi-tenant data leakage** | Tenant A's data cached without tenant scoping and served to Tenant B | Always include tenant ID in cache key; enforce at cache middleware level |
+
+### Security Checklist for Caching
+
+- [ ] Personalized responses use `Cache-Control: private` (not cached at CDN/shared layers)
+- [ ] Auth-dependent responses include auth context in cache key or are not cached
+- [ ] Admin/elevated pages are never cached at shared layers
+- [ ] `Vary` headers correctly reflect all response-varying inputs
+- [ ] Cache keys include tenant ID in multi-tenant systems
+- [ ] Permission changes trigger cache invalidation
+- [ ] Cache entries cannot be forged or injected via unkeyed request fields
+- [ ] Sensitive data (PII, tokens) has short TTL or is not cached
+
 ## Common Mistakes
 - Adding a cache without clarifying the source of truth.
 - Using the same TTL for all data regardless of freshness needs.

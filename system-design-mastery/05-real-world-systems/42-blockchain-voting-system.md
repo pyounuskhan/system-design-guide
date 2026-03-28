@@ -3,6 +3,15 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 42 of 60
+**Last reviewed:** March 2026.
+
+**⚠️ Critical Disclaimer — Read Before Proceeding:**
+
+This chapter is a **system design exercise** exploring the architectural challenges of blockchain-based voting. It does NOT endorse Internet voting for public elections.
+
+**The mainstream election-security consensus** (NASEM, EAC, leading security researchers including Rivest, Appel, and Halderman) is that **Internet voting — including blockchain-based voting — is not currently safe for public elections** due to unsolved threats including endpoint compromise, coercion, denial-of-service, and the absence of a meaningful recount mechanism.
+
+Paper ballots with risk-limiting audits remain the gold standard for public election integrity. The designs in this chapter are valuable for understanding distributed systems, cryptography, and trust models, but should not be interpreted as production-ready for governmental elections without addressing the fundamental limitations documented below.
 
 ---
 
@@ -56,14 +65,21 @@ A blockchain-based voting system is one of the most challenging distributed syst
 
 This chapter designs a system inspired by platforms like **Voatz** (mobile blockchain voting), **Polys** (Kaspersky's e-voting platform), and **Agora** (blockchain-based vote counting), while addressing the fundamental cryptographic and systems challenges that make remote electronic voting one of the hardest open problems in computer science.
 
-### Why Blockchain for Voting?
+### Why Blockchain for Voting? (With Limitations)
 
-Traditional electronic voting systems suffer from a fundamental trust problem: voters must trust the system operator to correctly count votes. Blockchain technology offers:
+Traditional electronic voting systems suffer from a trust problem: voters must trust the system operator to correctly count votes. Blockchain-based designs attempt to address this by offering:
 
-1. **Immutability** — once a vote is recorded, it cannot be altered
-2. **Transparency** — the ledger is publicly auditable
-3. **Decentralization** — no single point of failure or control
-4. **Cryptographic guarantees** — mathematical proofs replace trust
+1. **Immutability** — once a vote is recorded on-chain, it is resistant to retroactive alteration *(given honest majority of validators; does not prevent incorrect recording at the endpoint)*
+2. **Transparency** — the ledger is publicly auditable *(but vote privacy requires additional cryptographic layers that add complexity)*
+3. **Decentralization** — reduces single-point-of-failure risk for the tally *(but does not decentralize voter authentication, client devices, or the software supply chain)*
+4. **Cryptographic verifiability** — mathematical proofs can demonstrate tally correctness *(but proofs do not secure compromised client devices, do not prevent coercion of voters in uncontrolled environments, and do not replace the need for a paper audit trail)*
+
+**What blockchain does NOT solve for voting:**
+- Client-side malware can alter votes before they reach the blockchain
+- Voters in uncontrolled environments (homes) are vulnerable to coercion and vote-buying
+- Denial-of-service attacks can prevent eligible voters from casting ballots
+- Software independence (the ability to detect errors without trusting the software) requires a voter-verified paper record, which Internet voting cannot provide
+- The "last mile" — from voter intent to recorded vote — remains the weakest link, and blockchain does not address it
 
 ### The E2E Verifiability Challenge
 
@@ -75,14 +91,16 @@ End-to-end (E2E) verifiable voting requires three properties:
 
 ### Real-World Context
 
-| System | Year | Scale | Blockchain | Status |
-|--------|------|-------|-----------|--------|
-| Voatz | 2018 | Municipal elections (WV, Denver) | Hyperledger | Controversial, security concerns raised |
-| Polys | 2017 | Corporate + government elections | Ethereum-based | Active in Russia and Europe |
-| Agora | 2017 | Sierra Leone presidential election | Custom blockchain | Vote counting verification |
-| Follow My Vote | 2015 | Prototype | Bitcoin-anchored | Open-source concept |
-| Democracy Earth | 2015 | Liquid democracy experiments | Ethereum | Governance token model |
-| Horizon State | 2017 | Australian union elections | Ethereum | Token-based decision platform |
+| System | Year | Scale | Blockchain | Status / Notes |
+|--------|------|-------|-----------|----------------|
+| Voatz | 2018 | Municipal elections (WV, Denver) | Hyperledger | **Controversial**: MIT researchers found critical vulnerabilities (Trail of Bits audit, 2020); use declined after security scrutiny |
+| Polys | 2017 | Corporate + government elections | Ethereum-based | Active in Russia and Europe; primarily non-governmental use |
+| Agora | 2017 | Sierra Leone | Custom blockchain | **Disputed**: Agora claimed involvement in the 2018 presidential election; Sierra Leone's NEC denied Agora conducted the official election. Agora performed a parallel vote-counting observation, not the official tally *(source: multiple 2018 media corrections)* |
+| Follow My Vote | 2015 | Prototype only | Bitcoin-anchored | Open-source concept; not deployed in real elections |
+| Democracy Earth | 2015 | Liquid democracy experiments | Ethereum | Governance token model; experimental |
+| Horizon State | 2017 | Australian union elections | Ethereum | Token-based decision platform; limited adoption |
+
+**Note:** All entries above are time-anchored to their initial deployment year. The blockchain voting landscape changes rapidly; verify current status independently. No system listed above has been adopted for large-scale public elections without controversy.
 
 ### System Scope
 
@@ -6170,4 +6188,67 @@ Standards Bodies:
 
 ---
 
-*This chapter represents a comprehensive treatment of blockchain-based voting system design, covering the full spectrum from cryptographic primitives to operational deployment. The design prioritizes security and verifiability while acknowledging the fundamental limitations and trade-offs inherent in remote electronic voting. As with all election technology, the goal is not perfection but continuous improvement in service of democratic values.*
+## Mainstream Election-Security Consensus
+
+This section summarizes the position of leading election-security researchers and institutions. It is essential context for evaluating any blockchain voting design.
+
+### Key Findings
+
+| Source | Position |
+|--------|----------|
+| **NASEM (2018)** — *Securing the Vote* | "At the present time, the Internet (or any network connected to the Internet) should not be used for the return of marked ballots." |
+| **EAC / CISA** | Recommends voter-verified paper audit trails; discourages Internet return of ballots |
+| **Trail of Bits (2020)** — Voatz audit | Found critical vulnerabilities in the most-deployed blockchain voting app; recommended against use for public elections |
+| **MIT / Rivest et al. (2020)** | "Going from Bad to Worse: From Internet Voting to Blockchain Voting" — argues blockchain adds complexity without solving fundamental threats |
+| **Verified Voting** | Opposes all forms of Internet ballot return for public elections |
+
+### What Paper Ballots Provide That Blockchain Cannot
+
+| Property | Paper Ballot | Blockchain Vote |
+|----------|-------------|----------------|
+| **Software independence** | Voter marks paper; machines can be audited against physical record | No physical artifact; must trust the software stack end-to-end |
+| **Coercion resistance** | Secret ballot in controlled environment (polling place) | Voter at home; coercer can watch or direct |
+| **Recount capability** | Recount the paper; hand count if needed | Re-read the same digital data; no independent verification source |
+| **Denial-of-service resilience** | Physical polling places operate independently | Centralized Internet infrastructure; DDoS can disenfranchise |
+| **Accessibility + security balance** | Accommodation at polling places; provisional ballots | Accessibility improves, but at severe security cost |
+
+### Where Blockchain Voting MAY Be Appropriate
+
+Despite the limitations above, blockchain-based voting may be reasonable for:
+
+| Use Case | Why | Risk Level |
+|----------|-----|-----------|
+| **Corporate shareholder votes** | Lower stakes; participants have authenticated identities; coercion less relevant | Low-Medium |
+| **DAO governance** | Participants already on-chain; self-selecting community; outcomes are programmatic | Low |
+| **Student government / club elections** | Educational; low-stakes; acceptable risk for learning | Low |
+| **Internal organizational polls** | Non-binding; convenience valued over perfect security | Low |
+| **Party primaries (advisory)** | Non-binding; experimental; with informed consent | Medium |
+
+**NOT appropriate for:** National elections, state/provincial elections, binding referenda, or any context where coercion, disenfranchisement, or undetectable fraud would undermine democratic legitimacy.
+
+---
+
+## Authoritative References
+
+| Resource | Scope |
+|----------|-------|
+| **NASEM (2018)** — *Securing the Vote: Protecting American Democracy* | Comprehensive election security recommendations |
+| **MIT (2020)** — *Going from Bad to Worse: From Internet Voting to Blockchain Voting* | Technical analysis of blockchain voting limitations (Rivest, Park, Specter) |
+| **Trail of Bits (2020)** — Voatz security audit | Independent security assessment of production blockchain voting |
+| **Verified Voting** (verifiedvoting.org) | Ongoing election technology security advocacy and analysis |
+| **NIST Voting Standards** (VVSG 2.0) | US voting system test standards including software independence requirements |
+| **ACE Electoral Knowledge Network** | International comparative election technology guidance |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Blockchain fundamentals and limits | Ch 36: Blockchain & Distributed Systems |
+| Smart contract security | Ch 36 (Operational Risks); Ch 39 (DeFi Threat Model) |
+| Zero-knowledge proofs | Cryptographic foundations in this chapter |
+| Identity and authentication | Ch A8: Security & Authentication |
+| Consensus protocols | F4: Consensus & Coordination |
+
+---
+
+*This chapter is a system design exercise exploring the architectural challenges of blockchain-based voting. The design prioritizes security and verifiability while explicitly acknowledging the fundamental limitations documented above. Paper ballots with risk-limiting audits remain the recommended approach for public elections per mainstream election-security consensus.*

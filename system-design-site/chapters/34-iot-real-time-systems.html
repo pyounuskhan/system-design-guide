@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 - Real-World System Design Examples
-<strong>Position:</strong> Chapter 34 of 60
+<strong>Position:</strong> Chapter 34 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <h2 id="overview">Overview</h2>
 <p>IoT systems collect device telemetry, distribute commands, and operate over unreliable networks with constrained clients. Their architecture must handle device identity, bursts, ordering gaps, and long-lived fleet operations.</p>
@@ -5058,6 +5058,136 @@ ISA-18.2 defines a lifecycle for managing alarm quality:
 - Explain the ISA-18.2 alarm lifecycle and why alarm rationalization prevents operator fatigue.
 - Discuss the Purdue model (Level 0-4) and where the DMZ sits between OT and IT.
 - Address regulatory requirements: 7-year data retention, audit trails, change management.</p>
+<hr>
+<h2 id="device-threat-model">Device Threat Model</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Threat</th>
+<th>Vector</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Device spoofing</strong></td>
+<td>Attacker impersonates legitimate device</td>
+<td>Unique device certificates (X.509); mutual TLS to broker</td>
+</tr>
+<tr>
+<td><strong>Data tampering</strong></td>
+<td>Modified telemetry in transit</td>
+<td>TLS for all connections; message signing for critical data</td>
+</tr>
+<tr>
+<td><strong>Firmware tampering</strong></td>
+<td>Malicious firmware installed</td>
+<td>Signed firmware images (code signing); secure boot chain</td>
+</tr>
+<tr>
+<td><strong>Credential theft</strong></td>
+<td>Extracted device keys from physical access</td>
+<td>TPM/HSM for key storage; rotate credentials periodically</td>
+</tr>
+<tr>
+<td><strong>DDoS via botnet</strong></td>
+<td>Compromised devices flood the platform</td>
+<td>Rate limiting at ingestion; anomaly detection on device behavior</td>
+</tr>
+<tr>
+<td><strong>Stale/rogue devices</strong></td>
+<td>Decommissioned devices still sending data</td>
+<td>Device registry with active/revoked status; reject revoked certificates</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="ingestion-and-stream-processing-reference">Ingestion and Stream Processing Reference</h2>
+<pre><code>DEVICES (100K-10M) → MQTT/HTTPS → INGESTION GATEWAY
+  • Auth: device certificate (mTLS) or API key + device_id
+  • Rate limit: per-device (10 msg/sec default)
+  • Schema validation: reject malformed payloads → DLT
+        ↓
+KAFKA / KINESIS (partitioned by device_id)
+        ↓                    ↓
+STREAM PROCESSING            BATCH PROCESSING
+  Flink / Spark Streaming     Spark / dbt (hourly/daily)
+  • Real-time alerting         • Aggregate analytics
+  • Anomaly detection          • Fleet health reports
+  • Geofence triggers          • Training data for ML
+        ↓                    ↓
+TIME-SERIES DB              DATA WAREHOUSE
+  (InfluxDB/TimescaleDB)     (Snowflake/BigQuery)
+        ↓
+DASHBOARDS + ALERTS + DEVICE COMMANDS
+</code></pre>
+<h3 id="offline-buffering">Offline Buffering</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Client Behavior</th>
+<th>Server Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Device loses connectivity</td>
+<td>Buffer telemetry locally (circular buffer, 24h)</td>
+<td>Accept late-arriving data; process with event_time, not arrival_time</td>
+</tr>
+<tr>
+<td>Connectivity restored</td>
+<td>Send buffered data in order; resume real-time</td>
+<td>Detect gap by sequence number; backfill processing</td>
+</tr>
+<tr>
+<td>Buffer full (extended outage)</td>
+<td>Oldest data dropped (circular); log dropped count</td>
+<td>Reconciliation job detects missing sequences</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="fleet-update-and-rollout-strategy">Fleet Update and Rollout Strategy</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>How</th>
+<th>Risk</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Canary (1% → 10% → 100%)</strong></td>
+<td>Update subset of devices; monitor health metrics</td>
+<td>Low (contained blast radius)</td>
+<td>Production firmware; feature rollouts</td>
+</tr>
+<tr>
+<td><strong>Ring-based</strong></td>
+<td>Update by device group (test → internal → beta → GA)</td>
+<td>Low-medium</td>
+<td>Enterprise IoT with device tiers</td>
+</tr>
+<tr>
+<td><strong>Forced immediate</strong></td>
+<td>Push to all devices simultaneously</td>
+<td>High (no rollback window)</td>
+<td>Critical security patches only</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="ota-update-security">OTA Update Security</h3>
+<ul>
+<li>[ ] Firmware images signed (code signing certificate)</li>
+<li>[ ] Device validates signature before installing</li>
+<li>[ ] Rollback capability: keep previous firmware partition</li>
+<li>[ ] Update status reported to fleet management (success/failure/rollback)</li>
+<li>[ ] Supply-chain: build provenance tracked (SLSA level 2+)</li>
+</ul>
 <hr>
 <h2 id="navigation">Navigation</h2>
 <ul>

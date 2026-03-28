@@ -38,7 +38,7 @@ Every section is written to be useful for learners building mental models, engin
 
 ## Why This System Matters in Real Systems
 
-- **Caching** reduces database load by 90%+ and cuts p99 latency from 200ms to 2ms. Without it, most systems would collapse under read traffic.
+- **Caching** can, on hot read paths, dramatically reduce database load and cut tail latency by orders of magnitude *(actual improvement is workload-dependent — 90%+ DB load reduction and sub-5ms p99 are common for cache-friendly access patterns, but results vary by hit rate, key distribution, and invalidation strategy)*. Without it, most read-heavy systems would struggle under traffic.
 - **Message queues** decouple services, absorb traffic spikes, and enable event-driven architectures. Kafka processes **trillions of messages per day** at LinkedIn.
 - **Rate limiting** prevents abuse, protects backend resources, and ensures fair usage. Stripe rate-limits API calls to prevent cascade failures.
 - **Feature flags** enable safe deployments. Netflix deploys hundreds of times per day using feature flags to control rollout.
@@ -3522,6 +3522,74 @@ Steps:
 | SSE | Server-Sent Events — one-way server-to-client streaming over HTTP |
 | TSDB | Time-Series Database — database optimized for time-stamped metrics |
 | USE | Utilization, Saturation, Errors — monitoring method for resources |
+
+---
+
+## Infrastructure-as-Code as a Cross-Cutting System
+
+IaC is a peer cross-cutting system alongside caching, queues, and observability. It determines whether infrastructure is reproducible, auditable, and safe to change.
+
+### IaC Reference Implementation
+
+```
+REPOSITORY STRUCTURE:
+  infrastructure/
+  ├── modules/                    # Reusable Terraform modules
+  │   ├── vpc/                    # Network baseline
+  │   ├── rds/                    # Database module (PostgreSQL)
+  │   ├── redis/                  # Cache cluster
+  │   ├── kafka/                  # Event streaming
+  │   └── k8s-service/            # Standard service deployment
+  ├── environments/
+  │   ├── dev/                    # Dev variables + backend config
+  │   ├── staging/                # Staging
+  │   └── production/             # Production
+  ├── policies/                   # OPA/Sentinel policy checks
+  └── .github/workflows/
+      └── terraform.yml           # CI: plan on PR, apply on merge
+
+WORKFLOW:
+  Engineer creates PR → CI runs `terraform plan` + policy check
+  → Reviewer approves → Merge → CI runs `terraform apply`
+  → State stored in S3 + DynamoDB lock
+  → Drift detection: weekly plan-only run; alert if actual ≠ desired
+```
+
+### IaC Maturity
+
+| Level | What You Have | Risk |
+|-------|-------------|------|
+| L0: Manual | Console clicks; no record of changes | Unreproducible; no audit trail |
+| L1: Scripts | Bash/CLI scripts committed to Git | Partially reproducible; fragile |
+| L2: Declarative IaC | Terraform/Pulumi; PR-based changes; remote state | Reproducible; auditable |
+| L3: Policy-enforced | OPA/Sentinel validates every plan; no unapproved changes | Guardrails prevent misconfigurations |
+| L4: Self-service | Platform team provides modules; app teams self-serve | Fast + safe; golden path for infra |
+
+---
+
+## Incident Management as Cross-Cutting Infrastructure
+
+Incident response is infrastructure, not ad-hoc heroism.
+
+| Component | What It Provides | Tool |
+|-----------|-----------------|------|
+| **Alert routing** | Right person paged for right service | PagerDuty / OpsGenie |
+| **War room** | Coordinated response with IC, debuggers, communicators | Slack incident channel (auto-created) |
+| **Runbooks** | Step-by-step response per alert | Linked from alert → Confluence/wiki |
+| **Status page** | Customer-facing communication | Statuspage.io / Instatus |
+| **Postmortem** | Learning from every P0/P1 incident | Template in F10 §2.3.6 |
+| **Action item tracking** | Prevent repeat incidents | JIRA tickets with postmortem tag |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| IaC and GitOps deep dive | F11: Deployment & DevOps |
+| Policy-as-code (Kyverno, OPA) | Ch A7: Kubernetes & DevOps |
+| Observability pipeline | F10: Observability & Operations |
+| Incident lifecycle and postmortems | F10 §2.3, §2.5 |
+| Caching patterns (invalidation, stampede) | Ch 6: Caching Systems |
+| Rate limiting algorithms | Ch 15: API Gateway |
 
 ---
 

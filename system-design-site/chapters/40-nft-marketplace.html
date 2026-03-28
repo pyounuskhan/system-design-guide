@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1013,8 +1013,10 @@
 
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
-<p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 40 of 60</p>
+<p><strong>Part:</strong> Part 5 — Real-World System Design Examples<br>
+<strong>Position:</strong> Chapter 40 of 60<br>
+<strong>Last reviewed:</strong> March 2026. NFT ecosystem changes rapidly — verify against current sources.</p>
+<p><strong>⚠️ Disclaimer:</strong> This chapter is an <em>architectural reference for system design education</em>. It does NOT constitute financial or legal advice. NFT marketplaces handle real digital assets. Production implementations require security audits and legal review for IP/securities compliance.</p>
 <hr>
 <h2 id="table-of-contents">Table of Contents</h2>
 <ol>
@@ -5264,6 +5266,64 @@ Blur Protocol: https://docs.blur.foundation
 Chainabuse: https://www.chainabuse.com
 Flashbots: https://docs.flashbots.net
 </code></pre>
+<h2 id="metadata-integrity">Metadata Integrity</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Integrity</th><th>Availability</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td><strong>IPFS + pinning</strong></td><td>High (content-addressed)</td><td>Depends on pinning</td><td>Low-Medium</td></tr>
+<tr><td><strong>Arweave</strong></td><td>High (immutable, permanent)</td><td>High</td><td>Medium (one-time)</td></tr>
+<tr><td><strong>Centralized server</strong></td><td>None (URL content can change)</td><td>Depends on operator</td><td>Lowest</td></tr>
+<tr><td><strong>On-chain</strong></td><td>Highest</td><td>Blockchain availability</td><td>Very high (gas)</td></tr>
+</tbody>
+</table></div>
+<p><strong>Checklist:</strong> Token URI → content-addressed (IPFS/Arweave); image hash in metadata; 2+ pinning providers; metadata freeze after mint; provenance chain tracked on-chain.</p>
+<hr>
+<h2 id="marketplace-abuse">Marketplace Abuse and Rate Limiting</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Abuse</th><th>Detection</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Wash trading</strong></td><td>Graph analysis on buyer-seller wallets</td><td>Flag + exclude from rankings</td></tr>
+<tr><td><strong>Counterfeit art</strong></td><td>Perceptual hash matching</td><td>DMCA process; image fingerprinting</td></tr>
+<tr><td><strong>Bid manipulation</strong></td><td>Bid cancel patterns</td><td>On-chain escrow; cancellation penalty</td></tr>
+<tr><td><strong>Spam minting</strong></td><td>Volume anomaly per wallet</td><td>Rate limit (50 mints/day); listing fee</td></tr>
+<tr><td><strong>Phishing listings</strong></td><td>Name/image similarity check</td><td>Verified badges; report mechanism</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="content-moderation-nft">Content Moderation and Takedowns</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Challenge</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Illegal content</td><td>Pre-mint ML scan; post-mint reports + human review</td></tr>
+<tr><td>Copyright</td><td>DMCA process; perceptual hash matching</td></tr>
+<tr><td>On-chain removal</td><td>Cannot delete on-chain; CAN delist from UI + unpin metadata</td></tr>
+<tr><td>Appeals</td><td>Creator dispute; human review within 5 business days</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="nft-slos">Marketplace Observability SLOs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>SLO</th><th>Alert</th></tr></thead>
+<tbody>
+<tr><td>Listing page load</td><td>&lt; 1s (p99)</td><td>&gt; 3s</td></tr>
+<tr><td>Mint confirmation</td><td>&lt; 30s (finality)</td><td>&gt; 2 min</td></tr>
+<tr><td>Indexer freshness</td><td>&lt; 30s chain → display</td><td>&gt; 2 min</td></tr>
+<tr><td>Image/media load</td><td>&lt; 2s</td><td>&gt; 5s</td></tr>
+<tr><td>Search zero-result rate</td><td>&lt; 5%</td><td>&gt; 10%</td></tr>
+<tr><td>Wash trading detection</td><td>&lt; 24 hours</td><td>&gt; 72 hours</td></tr>
+</tbody>
+</table></div>
+<h3 id="nft-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Blockchain fundamentals</td><td><a href="36-blockchain-distributed-systems.html">Ch 36</a></td></tr>
+<tr><td>Smart contract security</td><td><a href="39-defi-lending-platform.html">Ch 39</a></td></tr>
+<tr><td>Content moderation</td><td><a href="20-social-media-content-platforms.html">Ch 20</a></td></tr>
+<tr><td>Object storage / CDN</td><td><a href="09-storage-systems.html">Ch 9</a></td></tr>
+<tr><td>Rate limiting</td><td><a href="15-api-gateway-pattern.html">Ch 15</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <p><strong>End of Chapter 40: NFT Marketplace</strong></p>
 <p><em>Next Chapter: 41 — [Next topic in Part 5]</em>

@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 19 of 60
+<strong>Position:</strong> Chapter 19 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -1069,7 +1069,7 @@
 <p>Key business constraints:
 - <strong>Every cent must be accounted for</strong>: The ledger must balance to zero at all times. Any discrepancy is a potential audit failure.
 - <strong>Uptime = revenue</strong>: Every minute of payment gateway downtime means lost merchant revenue and broken checkout flows.
-- <strong>Fraud eats margin</strong>: Card fraud, account takeover, and synthetic identity fraud can consume 1-5% of transaction volume.
+- <strong>Fraud eats margin</strong>: Card fraud, account takeover, and synthetic identity fraud can consume 1-5% of transaction volume <em>(illustrative range; varies by vertical, geography, and controls — see Nilson Report for card fraud benchmarks)</em>.
 - <strong>Regulation is non-negotiable</strong>: PCI-DSS, PSD2, SOX, AML directives, and local regulations impose hard architectural constraints.
 - <strong>Latency matters for conversion</strong>: Payment authorization p99 above 3 seconds causes cart abandonment.</p>
 <h3 id="system-boundaries">System Boundaries</h3>
@@ -7628,6 +7628,113 @@ EXEC
 <hr>
 <h2 id="evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 → V2 → V3)</h2>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/19-fintech-payments-diagram-38.svg" alt="Diagram 38 for Fintech &amp; Payments" loading="lazy"></figure>
+<h2 id="payment-rails">Payment Rails — Card vs Bank vs Wallet</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Dimension</th><th>Card Payments</th><th>Bank (ACH/SEPA)</th><th>Real-Time (UPI/RTP)</th><th>Wallet</th></tr></thead>
+<tbody>
+<tr><td><strong>Auth latency</strong></td><td>1-3 seconds</td><td>N/A (batch)</td><td>1-5 seconds</td><td>&lt; 100ms</td></tr>
+<tr><td><strong>Settlement</strong></td><td>T+1 to T+3</td><td>1-3 business days</td><td>Instant (seconds)</td><td>Instant (ledger)</td></tr>
+<tr><td><strong>Idempotency</strong></td><td>PSP idempotency key</td><td>Unique transfer ref</td><td>UPI RRN / RTP txn ID</td><td>Internal key</td></tr>
+<tr><td><strong>Failure mode</strong></td><td>Timeout → unknown</td><td>Batch rejection (next day)</td><td>Timeout → callback</td><td>Internal → always known</td></tr>
+<tr><td><strong>Fraud surface</strong></td><td>CNP, stolen cards</td><td>Account takeover</td><td>SIM swap, social eng</td><td>ATO, credential theft</td></tr>
+<tr><td><strong>Regulation</strong></td><td>PCI-DSS</td><td>ACH/SEPA rules</td><td>NPCI/TCH/BCB</td><td>E-money directive</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="fraud-risk-pipeline">Fraud and Risk Pipeline Blueprint</h2>
+<pre><code>LAYER 1: RULE ENGINE (&lt; 10ms)
+  Velocity checks, amount thresholds, blocklists, geo-mismatch
+  → PASS / BLOCK / ESCALATE
+
+LAYER 2: ML SCORING (&lt; 50ms)
+  Features: history, device fingerprint, behavioral, merchant risk
+  Score 0-1: &lt; 0.3 → APPROVE | 0.3-0.7 → REVIEW | &gt; 0.7 → DECLINE
+
+LAYER 3: STEP-UP (3D Secure, OTP, manual review queue)
+
+LAYER 4: POST-TRANSACTION (batch)
+  Pattern analysis, chargeback correlation, model retraining, SAR generation</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>Target</th></tr></thead>
+<tbody>
+<tr><td>Detection rate (recall)</td><td>&gt; 95%</td></tr>
+<tr><td>False positive rate</td><td>&lt; 3%</td></tr>
+<tr><td>Rule engine latency</td><td>&lt; 10ms</td></tr>
+<tr><td>ML scoring latency</td><td>&lt; 50ms</td></tr>
+<tr><td>Chargeback rate</td><td>&lt; 0.5%</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="fintech-observability">Observability &amp; Audit Requirements</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Signal</th><th>Monitor</th><th>Alert Threshold</th></tr></thead>
+<tbody>
+<tr><td>Transaction success rate</td><td>% authorized successfully</td><td>&lt; 95%</td></tr>
+<tr><td>Auth latency (p99)</td><td>PSP response time</td><td>&gt; 3 seconds</td></tr>
+<tr><td>Ledger balance drift</td><td>SUM(debits) - SUM(credits)</td><td>Any non-zero → P0</td></tr>
+<tr><td>Settlement match rate</td><td>% matched in reconciliation</td><td>&lt; 99.5%</td></tr>
+<tr><td>Fraud score distribution</td><td>Shift in risk scores</td><td>Sudden spike</td></tr>
+</tbody>
+</table></div>
+<h3 id="audit-trail">Audit Trail Requirements</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Requirement</th><th>Implementation</th><th>Driver</th></tr></thead>
+<tbody>
+<tr><td>Full transaction logging</td><td>Append-only log with hash chain</td><td>SOX, PCI-DSS</td></tr>
+<tr><td>Tamper-evident</td><td>Each entry includes hash of previous</td><td>SOX §302/404</td></tr>
+<tr><td>PII access logged</td><td>Data access logging on sensitive columns</td><td>GDPR, CCPA</td></tr>
+<tr><td>7-year retention</td><td>Hot 90d → cold 7 years</td><td>SOX, AML</td></tr>
+<tr><td>Regulatory export</td><td>On-demand SAR/CTR format export</td><td>BSA/AML, FinCEN</td></tr>
+</tbody>
+</table></div>
+<h3 id="privacy-by-design">Privacy-by-Design Checklist</h3>
+<ul>
+<li>PAN never stored — tokenized via PSP</li>
+<li>CVV never stored or logged (PCI-DSS)</li>
+<li>PII encrypted at rest with per-tenant KMS keys</li>
+<li>PII redacted from application logs</li>
+<li>Deletion within 30 days of account closure (GDPR)</li>
+</ul>
+<hr>
+<h2 id="compliance-reference">Compliance Reference Guide</h2>
+<p><em>Architectural reference, not legal advice. Consult qualified counsel for your context.</em></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Regulation</th><th>Scope</th><th>Architecture Impact</th><th>Reference</th></tr></thead>
+<tbody>
+<tr><td><strong>PCI-DSS</strong></td><td>Card data</td><td>Tokenize; network segmentation; no CVV storage</td><td>pcisecuritystandards.org</td></tr>
+<tr><td><strong>PSD2/SCA</strong></td><td>EU payments</td><td>Strong Customer Auth (3DS); open banking APIs</td><td>European Banking Authority</td></tr>
+<tr><td><strong>SOX</strong></td><td>Financial reporting (US)</td><td>Tamper-evident audit; segregation of duties</td><td>SEC/PCAOB</td></tr>
+<tr><td><strong>BSA/AML</strong></td><td>Anti-money laundering (US)</td><td>Transaction monitoring; SAR filing; KYC</td><td>fincen.gov</td></tr>
+<tr><td><strong>GDPR</strong></td><td>EU personal data</td><td>Minimization; erasure; consent; 72h breach notify</td><td>European Commission</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="replay-safety">Replay Safety and Idempotency Architecture</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Rail</th><th>Idempotency Key</th><th>Scope</th><th>TTL</th></tr></thead>
+<tbody>
+<tr><td>Card payment</td><td>Client UUID in <code>Idempotency-Key</code> header</td><td>Per merchant+amount+currency</td><td>24h</td></tr>
+<tr><td>Wallet transfer</td><td><code>transfer:{from}:{to}:{amount}:{ref}</code></td><td>Per transfer</td><td>24h</td></tr>
+<tr><td>UPI</td><td>UPI RRN</td><td>Global (NPCI)</td><td>48h</td></tr>
+<tr><td>ACH/SEPA</td><td>Instruction ID per batch</td><td>Per originator</td><td>7 days</td></tr>
+<tr><td>Refund</td><td><code>refund:{payment_id}:{amount}</code></td><td>Per payment</td><td>30 days</td></tr>
+</tbody>
+</table></div>
+<pre><code>Idempotency flow:
+  Request + key → Check store:
+    FOUND+completed → return cached (200)
+    FOUND+in_progress → 409 Conflict
+    NOT FOUND → SET NX lock, process, store result, release
+  Race prevention: Redis SET NX or PostgreSQL advisory locks</code></pre>
+<h3 id="fintech-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>E-commerce checkout saga</td><td><a href="18-ecommerce-marketplaces.html">Ch 18</a></td></tr>
+<tr><td>General idempotency patterns</td><td><a href="08-message-queues-event-systems.html">Ch 8</a>, <a href="13-distributed-transactions.html">Ch 13</a></td></tr>
+<tr><td>SLO/error budget framework</td><td><a href="F10-observability-operations.html">F10: Observability</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Fintech &amp; Payments is the domain where <strong>correctness is not negotiable</strong>. Every other system design domain tolerates some eventual consistency, some stale reads, some approximate answers. Financial systems do not. A dropped transaction is lost money. An unbalanced ledger is an audit failure. A missed fraud signal is a direct financial loss.</p>
@@ -7909,6 +8016,11 @@ EXEC
 </ul>
 </li>
 <li><a href="#evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 → V2 → V3)</a></li>
+<li><a href="#payment-rails">Payment Rails — Card vs Bank vs Wallet</a></li>
+<li><a href="#fraud-risk-pipeline">Fraud &amp; Risk Pipeline Blueprint</a></li>
+<li><a href="#fintech-observability">Observability &amp; Audit Requirements</a></li>
+<li><a href="#compliance-reference">Compliance Reference Guide</a></li>
+<li><a href="#replay-safety">Replay Safety &amp; Idempotency Architecture</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
 </ul>

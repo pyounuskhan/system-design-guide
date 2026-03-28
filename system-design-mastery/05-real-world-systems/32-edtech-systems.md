@@ -4422,6 +4422,110 @@ Implementation:
 
 
 
+## Peak-Capacity Scenario: Synchronized Exam Start
+
+EdTech systems face the most extreme traffic spikes in all of SaaS: thousands of students start an exam at the exact same second.
+
+### Traffic Profile
+
+```
+Normal: 10K concurrent users, 500 req/sec
+Exam start (10:00 AM): 50K students click "Start Exam" within 30 seconds
+  → 50,000 requests in 30s = 1,667 req/sec (3.3x normal)
+  → Each request: auth check + load exam + create attempt record + start timer
+  → Fan-out: 50K WebSocket connections for live timer + proctoring
+
+Peak concern: NOT total volume (modest), but SYNCHRONIZED burst — all at once
+```
+
+### Capacity Plan
+
+| Component | Normal | Exam Peak | Strategy |
+|-----------|--------|-----------|----------|
+| API servers | 4 instances | 12 instances (pre-scaled 30 min before) | Scheduled HPA; no reliance on reactive autoscaling |
+| Database writes | 50 writes/sec | 1,700 writes/sec (attempt records) | Batch insert with queue buffer; async confirmation |
+| WebSocket servers | 2 instances | 10 instances (pre-scaled) | Sticky connections; graceful handoff |
+| CDN | Warm | Pre-warmed with exam assets | Push exam content to CDN 1 hour before |
+| Auth service | Normal | 3x capacity | Cache session tokens; avoid per-request IdP calls |
+
+### Backpressure Pattern for Exam Start
+
+```
+50K "Start Exam" requests arrive in 30 seconds →
+  API Gateway: rate limit to 2,000 req/sec (queue overflow returns 429 + Retry-After: 2)
+  Queue: buffer exam-start events in Kafka
+  Workers: process at sustainable DB write rate (1,000/sec)
+  Client: show "Preparing your exam..." with progress indicator
+  Result: all 50K exams started within 60 seconds (acceptable)
+
+  WITHOUT backpressure: DB connection pool exhausted at T+5s → cascade → exam start fails
+```
+
+---
+
+## Assessment Integrity Model
+
+### Threat Matrix for Online Exams
+
+| Threat | How | Detection | Mitigation |
+|--------|-----|-----------|-----------|
+| **Answer sharing** | Students communicate during exam | IP proximity detection; answer similarity analysis | Randomized question order + question pools |
+| **Tab switching** | Student opens browser tabs for answers | Visibility API monitoring (client-side) | Log tab-switch events; flag if > 3 switches |
+| **Screen sharing** | Student shares screen with helper | Proctoring video analysis | AI proctoring; human review for flagged sessions |
+| **Impersonation** | Someone else takes the exam | Photo verification at start; periodic face checks | Identity verification; behavioral biometrics |
+| **Time manipulation** | Student modifies client-side timer | Server-side authoritative timer | All time checks server-side; client timer is display-only |
+| **Network disconnect abuse** | Student disconnects to get extra time | Server tracks elapsed time regardless of connection | Timer runs server-side; reconnect resumes from server time |
+
+### Assessment Data Integrity
+
+| Requirement | Implementation |
+|------------|---------------|
+| **Answer durability** | Every answer auto-saved to server every 30 seconds + on each answer change |
+| **Submission atomicity** | Final submission is a single atomic write; partial submissions preserved as draft |
+| **Audit trail** | Every answer change logged: (student, question, old_answer, new_answer, timestamp) |
+| **Grading integrity** | Grading locked after publish; grade changes require audit entry + approver |
+| **Time fairness** | Server-side timer is authoritative; accommodations (extra time) applied server-side |
+| **Anti-tampering** | Exam content served via signed URLs; question bank encrypted at rest |
+
+---
+
+## Live Session Observability
+
+### SLOs for Live Classes and Exams
+
+| Metric | SLO | Alert | Impact If Violated |
+|--------|-----|-------|-------------------|
+| **Live video latency** | < 3 seconds glass-to-glass | > 5 seconds | Students can't follow instructor in real-time |
+| **Chat message delivery** | < 2 seconds | > 5 seconds | Q&A feels broken |
+| **Exam page load** | < 2 seconds (p99) | > 5 seconds | Exam start fails; student panic |
+| **Answer save latency** | < 1 second | > 3 seconds | Student loses confidence in auto-save |
+| **WebSocket connection stability** | < 1% disconnect rate per session | > 3% | Proctoring gaps; timer issues |
+| **Video recording availability** (for review) | 99.9% | Any recording gap | Student can't review; accreditation risk |
+| **Exam submission success** | 99.99% | Any failure | Student loses exam; support escalation |
+
+### Proctoring Privacy Considerations
+
+| Concern | Implementation |
+|---------|---------------|
+| **Data minimization** | Capture only what's needed (webcam during exam, not before/after) |
+| **Consent** | Explicit consent before proctoring session; opt-out = in-person exam alternative |
+| **Retention** | Delete proctoring video after grade finalization + appeal period (typically 90 days) |
+| **Access control** | Only authorized proctors can view recordings; logged access |
+| **Bias in AI proctoring** | Audit AI flagging rates across demographics; human review for all AI-flagged incidents |
+| **Regional compliance** | FERPA (US), GDPR (EU) for student data; data residency for proctoring recordings |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Video streaming infrastructure | Ch 21: Video & Streaming |
+| WebSocket connection management | Ch 4: Networking; Ch 22: Communication |
+| Backpressure and load shedding | Ch 12: Fault Tolerance |
+| Privacy and consent | Ch 2: Requirements; Ch 28: Security |
+| Identity and authentication | Ch A8: Security & Authentication |
+
+---
+
 ## Navigation
 - Previous: [Healthcare Systems](31-healthcare-systems.md)
 - Next: [Enterprise Systems](33-enterprise-systems.md)

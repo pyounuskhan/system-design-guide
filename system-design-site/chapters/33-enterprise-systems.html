@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 - Real-World System Design Examples
-<strong>Position:</strong> Chapter 33 of 60
+<strong>Position:</strong> Chapter 33 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -6497,6 +6497,137 @@ Option 1 (URL path versioning) combined with Option 4 (additive-only as default 
 <li>Read about the Workday single-codebase SaaS architecture to understand how forced upgrades simplify multi-tenant operations.</li>
 <li>Explore ServiceNow's workflow automation patterns to see how low-code platforms handle enterprise process orchestration.</li>
 </ul>
+<hr>
+<h2 id="multi-tenant-data-model-templates">Multi-Tenant Data Model Templates</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Schema</th>
+<th>Isolation</th>
+<th>Cost</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Shared DB, shared schema</strong></td>
+<td><code>tenant_id</code> column on every table</td>
+<td>Application-enforced (ORM middleware)</td>
+<td>Lowest</td>
+<td>Early SaaS, &lt; 100 tenants</td>
+</tr>
+<tr>
+<td><strong>Shared DB, separate schemas</strong></td>
+<td>One schema per tenant in same DB instance</td>
+<td>Schema-level (stronger)</td>
+<td>Moderate</td>
+<td>Mid-tier; moderate compliance</td>
+</tr>
+<tr>
+<td><strong>Separate databases</strong></td>
+<td>One DB instance per tenant</td>
+<td>Full infrastructure isolation</td>
+<td>Highest</td>
+<td>Enterprise; regulated (HIPAA, SOX)</td>
+</tr>
+<tr>
+<td><strong>Hybrid</strong></td>
+<td>Shared for most; dedicated for top-tier</td>
+<td>Variable</td>
+<td>Variable</td>
+<td>Mixed customer tiers</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="tenant-isolation-checklist">Tenant Isolation Checklist</h3>
+<ul>
+<li>[ ] Every query includes <code>tenant_id</code> — enforce via ORM middleware, not developer discipline</li>
+<li>[ ] Row-Level Security (RLS) enabled as defense-in-depth</li>
+<li>[ ] Cross-tenant access negative-tested in CI</li>
+<li>[ ] Per-tenant encryption keys (KMS)</li>
+<li>[ ] Noisy-neighbor protection (per-tenant connection pool limits, rate limits)</li>
+<li>[ ] Tenant-scoped backups (can restore one tenant without affecting others)</li>
+</ul>
+<hr>
+<h2 id="identity-federation-blueprint">Identity Federation Blueprint</h2>
+<pre><code>External Users → Enterprise IdP (Okta/Azure AD/SAML) → SSO
+  → Platform issues scoped access token (JWT) with: user_id, tenant_id, roles, permissions
+  → API Gateway validates token on every request
+  → Services extract tenant context from token; enforce authZ via policy engine (OPA/Cedar)
+
+Service-to-Service: workload identity (mTLS or cloud IAM roles)
+  → No shared static secrets between services
+</code></pre>
+<h3 id="federation-patterns-by-customer-tier">Federation Patterns by Customer Tier</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Auth Method</th>
+<th>Provisioning</th>
+<th>Session</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Free/self-serve</td>
+<td>Email + password; social login</td>
+<td>Self-service signup</td>
+<td>Short-lived JWT</td>
+</tr>
+<tr>
+<td>Professional</td>
+<td>SSO via SAML/OIDC</td>
+<td>SCIM auto-provisioning</td>
+<td>SSO session</td>
+</tr>
+<tr>
+<td>Enterprise</td>
+<td>Dedicated IdP federation; custom RBAC</td>
+<td>SCIM + manual role mapping</td>
+<td>SSO + MFA enforced</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="configuration-and-change-management">Configuration and Change Management</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Implementation</th>
+<th>Cross-Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Feature flags per tenant</td>
+<td>LaunchDarkly / Flipt with tenant targeting</td>
+<td>F11: Deployment §2.4</td>
+</tr>
+<tr>
+<td>Config drift detection</td>
+<td>GitOps (Argo CD) with self-heal; alert on manual changes</td>
+<td>F11 §3.6 (GitOps)</td>
+</tr>
+<tr>
+<td>Policy-as-code</td>
+<td>OPA/Kyverno enforce guardrails (resource limits, registry restrictions)</td>
+<td>Ch A7: Kubernetes &amp; DevOps</td>
+</tr>
+<tr>
+<td>Internal developer platform</td>
+<td>Service catalog (Backstage); paved-road templates</td>
+<td>Ch 14: Monolith vs Microservices</td>
+</tr>
+<tr>
+<td>Change approval workflow</td>
+<td>PR-based config changes; production requires 2 approvers</td>
+<td>F11: Release Safety</td>
+</tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="navigation">Navigation</h2>
 <ul>

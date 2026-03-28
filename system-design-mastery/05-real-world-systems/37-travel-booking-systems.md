@@ -3535,6 +3535,112 @@ When designing a travel booking system in an interview, structure your answer ar
 14. Currency exchange rates move 3% between when a user searches and when they click "book." What happens?
 15. A hotel reports that a room you confirmed is actually unavailable due to channel manager sync delay. What is the recovery path?
 
+## Reservation Saga — Failure and Compensation
+
+### Booking Saga Flow
+
+```
+1. SEARCH → Price + availability snapshot (TTL: 15 min)
+2. HOLD → Temporary reservation (idempotency_key = session:booking_id)
+   → Inventory decremented with soft lock (expires in 15 min)
+3. PAYMENT → Authorize card (PSP idempotency key)
+   → If fails: release hold → notify user "payment declined"
+4. CONFIRM → Convert hold to confirmed booking
+   → Emit BookingConfirmed event → email, calendar, partner notification
+5. TICKET → Issue e-ticket / voucher (idempotent per booking_id)
+
+Compensation on failure at step N:
+  Step 3 fails → compensate step 2 (release hold)
+  Step 4 fails → compensate step 3 (void auth) + step 2 (release hold)
+  Step 5 fails → retry (ticketing is idempotent); don't compensate payment
+```
+
+### Idempotency Keys by Step
+
+| Step | Idempotency Key | TTL | Purpose |
+|------|----------------|-----|---------|
+| Hold | `hold:{session}:{flight_or_room}:{date}` | 15 min | Prevent double-hold |
+| Payment | `pay:{booking_id}` | 24 hours | Prevent double-charge |
+| Confirm | `confirm:{booking_id}` | 24 hours | Prevent duplicate booking record |
+| Ticket | `ticket:{booking_id}` | 7 days | Prevent duplicate e-ticket |
+| Cancel | `cancel:{booking_id}` | 30 days | Prevent double-refund |
+
+---
+
+## Oversell Prevention and Fairness
+
+### Inventory Contention Patterns
+
+| Pattern | How | Trade-off | Best For |
+|---------|-----|-----------|----------|
+| **Pessimistic lock** | `SELECT FOR UPDATE` on inventory row | Blocks concurrent readers; safe but slow | Low concurrency (boutique hotels) |
+| **Optimistic lock** | Version check on update; retry on conflict | No blocking; retry overhead under contention | Medium concurrency (most bookings) |
+| **Reservation counter** | Redis `DECR`; reject if < 0 | Fastest; eventual consistency with DB | High concurrency (flash sales, last-minute) |
+| **Queue serialization** | Enqueue all booking requests; process serially per resource | Perfect fairness; higher latency | Extremely hot inventory (concert tickets) |
+
+### Fairness During High Demand
+
+```
+Problem: 10,000 users try to book 50 seats in 1 second
+
+Without fairness: first TCP connections win (network advantage, not user fairness)
+
+With virtual queue:
+  1. User enters queue → receives queue position + estimated wait
+  2. Queue releases users in FIFO batches (50 at a time)
+  3. Released users have 5-minute hold window to complete payment
+  4. Expired holds release back to pool → next batch released
+
+  Result: fair ordering; no server overload; clear UX ("You are #347 in queue")
+```
+
+---
+
+## Load Shedding for Search and Booking
+
+| Path | Priority | Shed Policy |
+|------|----------|------------|
+| **Active payment** | P0 (never shed) | Always process; dedicated thread pool |
+| **Booking confirmation** | P0 | Always process |
+| **Reservation hold** | P1 | Shed if system > 90% capacity |
+| **Search results** | P2 | Return cached results if fresh < 5 min; shed complex filters |
+| **Price refresh** | P2 | Serve cached price; re-validate at checkout |
+| **Recommendations** | P3 | Hide panel entirely under load |
+| **Analytics tracking** | P3 | Drop silently |
+
+---
+
+## Booking SLOs
+
+| Metric | SLO | Alert | Why |
+|--------|-----|-------|-----|
+| Search latency (p99) | < 2 seconds | > 5 seconds | Users abandon slow search |
+| Booking confirmation | < 10 seconds end-to-end | > 30 seconds | User anxiety; double-click risk |
+| Hold success rate | > 95% of attempts | < 85% | Inventory contention or system overload |
+| Payment success rate | > 99% first attempt | < 97% | PSP health or card issues |
+| Oversell rate | < 0.01% of bookings | Any oversell | Trust destruction; compensation cost |
+| Cancellation processing | < 5 seconds | > 30 seconds | Refund delays frustrate users |
+
+### Conflict Resolution Playbook
+
+| Conflict | Detection | Resolution |
+|----------|-----------|-----------|
+| **Double-booking** (same room/seat sold twice) | Unique constraint violation on (resource, date) | Second booker gets apology + upgrade/alternative + compensation |
+| **Hold expired but user paid** | Payment webhook arrives after hold TTL | Re-check availability; if still open → confirm; if sold → refund + apologize |
+| **Price changed between search and payment** | Price at checkout ≠ price at search | Honor search price if within TTL; otherwise show updated price + re-confirm |
+| **Partner inventory mismatch** | Channel manager reports different availability | Reconciliation job every 5 min; if discrepancy → freeze inventory + alert ops |
+| **Concurrent cancellation and modification** | Race between cancel and modify requests | Use optimistic locking (version field); first writer wins; second gets conflict error |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Saga and distributed transactions | Ch 13: Distributed Transactions |
+| Idempotency patterns | Ch 8: Message Queues; Ch 19: Fintech |
+| Inventory concurrency (e-commerce) | Ch 18: E-Commerce |
+| Load shedding and resilience | Ch 12: Fault Tolerance |
+| Multi-region booking pitfalls | Ch 7: Load Balancing; Ch 11: Consistency |
+
 ---
 
 ## Navigation

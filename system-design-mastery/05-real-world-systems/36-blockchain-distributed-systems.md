@@ -3495,6 +3495,94 @@ Reconciliation Worker [scheduled every 5 minutes]
 | Ethereum event log indexed topics | Maximum 3 | EVM specification |
 | Block reward (Ethereum PoS) | ~0.02-0.05 ETH per block | Variable based on participation |
 
+## What Blockchain Does NOT Solve
+
+Blockchain is a powerful tool for specific problems, but it is frequently proposed where simpler architectures suffice. This section provides an honest assessment of limitations.
+
+### Common Overclaims
+
+| Claim | Reality | When It's Actually True |
+|-------|---------|------------------------|
+| "Blockchain is immutable" | Immutable *given* honest majority; 51% attacks can rewrite history | True for Bitcoin/Ethereum with sufficient confirmation depth; NOT true for small private chains |
+| "Blockchain eliminates trust" | Shifts trust from institutions to code + cryptography + economic incentives | True for trustless settlement between adversaries; NOT true when you already trust the counterparty |
+| "Smart contracts are secure" | Smart contracts are code; they have bugs. $billions lost to exploits | True that execution is deterministic; NOT true that logic is automatically correct |
+| "Decentralized = censorship resistant" | Only if validator set is sufficiently decentralized and geographically distributed | True for Bitcoin; less true for chains with < 20 validators or geographic concentration |
+| "On-chain data is private" | Public blockchains are fully transparent; everyone can read every transaction | True for privacy chains (Zcash, encrypted L2s); NOT true for Ethereum/Bitcoin by default |
+
+### When NOT to Use Blockchain
+
+| Scenario | Why Blockchain Is Wrong | Better Alternative |
+|----------|------------------------|-------------------|
+| **Internal enterprise database** | You already trust all participants; blockchain adds latency and complexity | PostgreSQL with audit logging |
+| **High-throughput transactions** | Most chains: 10-1000 TPS; centralized DB: 100K+ TPS | Traditional database with replication |
+| **Data that needs to be deleted** | Blockchain is append-only by design; GDPR right to erasure is incompatible | Standard database with deletion capability |
+| **Low-latency requirements** | Block confirmation: seconds to minutes; finality: minutes to hours | In-memory cache + relational DB |
+| **Single-organization record keeping** | No trust problem between parties; blockchain overhead is pure waste | Append-only audit log with hash chain (tamper-evident without blockchain) |
+
+### When Blockchain IS the Right Tool
+
+| Scenario | Why | Example |
+|----------|-----|---------|
+| **Settlement between adversaries** | No trusted intermediary; cryptographic proof of agreement | Cross-border payments; DvP securities |
+| **Publicly verifiable records** | Transparency is the requirement, not a side effect | Public goods funding; credential verification |
+| **Programmable money** | Composable financial primitives without intermediary permission | DeFi lending/exchange; stablecoins |
+| **Digital scarcity** | Provably unique digital assets | NFTs (art/collectibles); tokenized real-world assets |
+| **Censorship-resistant coordination** | Participants cannot trust any single entity to run the system | DAO governance; prediction markets |
+
+---
+
+## Operational Risks
+
+### Key Management
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| **Lost private key** | Permanent loss of funds/assets (no recovery) | Multi-sig wallets (2-of-3 or 3-of-5); HSM for institutional keys; social recovery |
+| **Stolen private key** | Attacker controls all assets | Hardware wallets; cold storage for large holdings; rate-limited hot wallets |
+| **Key rotation impossible** | Blockchain addresses are derived from keys; can't "change password" | Transfer assets to new address; smart contract proxy pattern for upgradeable identity |
+
+### Smart Contract Risks
+
+| Risk | Example | Mitigation |
+|------|---------|-----------|
+| **Reentrancy attack** | DAO hack (2016): $60M stolen | Checks-effects-interactions pattern; reentrancy guards |
+| **Integer overflow** | Unchecked arithmetic creates tokens from nothing | SafeMath libraries; Solidity 0.8+ built-in overflow checks |
+| **Logic bugs** | Incorrect access control allows unauthorized withdrawals | Formal verification; multiple audits; bug bounty programs |
+| **Upgrade risks** | Proxy pattern introduces admin key that can change contract logic | Timelock on upgrades; multi-sig governance; immutable core contracts |
+
+### Smart Contract Security Checklist
+
+- [ ] At least 2 independent security audits before mainnet deployment
+- [ ] Formal verification for critical financial logic
+- [ ] Bug bounty program (Immunefi or similar)
+- [ ] Timelock on all admin functions (24-48h delay)
+- [ ] Multi-sig for treasury and upgrade authority (3-of-5 minimum)
+- [ ] Monitoring for unusual transaction patterns (Forta, Tenderly)
+- [ ] Incident response plan for exploit scenario (pause mechanism + communication)
+
+---
+
+## Authoritative References
+
+| Resource | Scope |
+|----------|-------|
+| **NIST IR 8202** — Blockchain Technology Overview | Consensus mechanisms, security, scalability, use case evaluation |
+| **NIST IR 8403** — Blockchain for Access Control | Identity and access management on blockchain |
+| **Ethereum Yellow Paper** (Gavin Wood) | Formal EVM specification |
+| **Bitcoin Whitepaper** (Satoshi Nakamoto, 2008) | Original peer-to-peer electronic cash design |
+| **Trail of Bits — Building Secure Smart Contracts** | Practical smart contract security guide |
+| **Consensys Diligence** | Smart contract audit methodology |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Consensus protocols (Raft, Paxos — traditional) | F4: Consensus & Coordination |
+| Distributed transactions and finality | Ch 13: Distributed Transactions |
+| Key management and secrets | Ch A8: Security; Ch 28: Security Systems |
+| Financial ledger design | Ch 19: Fintech & Payments |
+| Consistency models | Ch 11: Consistency & CAP |
+
 ---
 
 ## Navigation

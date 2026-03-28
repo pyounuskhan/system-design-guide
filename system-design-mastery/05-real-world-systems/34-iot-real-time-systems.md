@@ -3507,6 +3507,77 @@ ISA-18.2 defines a lifecycle for managing alarm quality:
 - Discuss the Purdue model (Level 0-4) and where the DMZ sits between OT and IT.
 - Address regulatory requirements: 7-year data retention, audit trails, change management.
 
+## Device Threat Model
+
+| Threat | Vector | Mitigation |
+|--------|--------|-----------|
+| **Device spoofing** | Attacker impersonates legitimate device | Unique device certificates (X.509); mutual TLS to broker |
+| **Data tampering** | Modified telemetry in transit | TLS for all connections; message signing for critical data |
+| **Firmware tampering** | Malicious firmware installed | Signed firmware images (code signing); secure boot chain |
+| **Credential theft** | Extracted device keys from physical access | TPM/HSM for key storage; rotate credentials periodically |
+| **DDoS via botnet** | Compromised devices flood the platform | Rate limiting at ingestion; anomaly detection on device behavior |
+| **Stale/rogue devices** | Decommissioned devices still sending data | Device registry with active/revoked status; reject revoked certificates |
+
+---
+
+## Ingestion and Stream Processing Reference
+
+```
+DEVICES (100K-10M) → MQTT/HTTPS → INGESTION GATEWAY
+  • Auth: device certificate (mTLS) or API key + device_id
+  • Rate limit: per-device (10 msg/sec default)
+  • Schema validation: reject malformed payloads → DLT
+        ↓
+KAFKA / KINESIS (partitioned by device_id)
+        ↓                    ↓
+STREAM PROCESSING            BATCH PROCESSING
+  Flink / Spark Streaming     Spark / dbt (hourly/daily)
+  • Real-time alerting         • Aggregate analytics
+  • Anomaly detection          • Fleet health reports
+  • Geofence triggers          • Training data for ML
+        ↓                    ↓
+TIME-SERIES DB              DATA WAREHOUSE
+  (InfluxDB/TimescaleDB)     (Snowflake/BigQuery)
+        ↓
+DASHBOARDS + ALERTS + DEVICE COMMANDS
+```
+
+### Offline Buffering
+
+| Scenario | Client Behavior | Server Behavior |
+|----------|----------------|----------------|
+| Device loses connectivity | Buffer telemetry locally (circular buffer, 24h) | Accept late-arriving data; process with event_time, not arrival_time |
+| Connectivity restored | Send buffered data in order; resume real-time | Detect gap by sequence number; backfill processing |
+| Buffer full (extended outage) | Oldest data dropped (circular); log dropped count | Reconciliation job detects missing sequences |
+
+---
+
+## Fleet Update and Rollout Strategy
+
+| Strategy | How | Risk | Best For |
+|----------|-----|------|----------|
+| **Canary (1% → 10% → 100%)** | Update subset of devices; monitor health metrics | Low (contained blast radius) | Production firmware; feature rollouts |
+| **Ring-based** | Update by device group (test → internal → beta → GA) | Low-medium | Enterprise IoT with device tiers |
+| **Forced immediate** | Push to all devices simultaneously | High (no rollback window) | Critical security patches only |
+
+### OTA Update Security
+
+- [ ] Firmware images signed (code signing certificate)
+- [ ] Device validates signature before installing
+- [ ] Rollback capability: keep previous firmware partition
+- [ ] Update status reported to fleet management (success/failure/rollback)
+- [ ] Supply-chain: build provenance tracked (SLSA level 2+)
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| MQTT and streaming protocols | Ch 4: Networking; Ch 8: Message Queues |
+| Time-series data and storage tiers | Ch 9: Storage Systems |
+| Edge compute | Ch 26: Cloud Infrastructure |
+| Supply-chain security | F11 §1.5 |
+| Device identity (mTLS, certificates) | Ch A8: Security |
+
 ---
 
 ## Navigation

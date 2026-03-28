@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -3483,6 +3483,37 @@ Week 4: Dave (primary), Alice (secondary)
 1. Fix the underlying issue (so the alert stops firing).
 2. Tune the alert (change thresholds, add conditions).
 3. Delete the alert (it is not useful).</p>
+<p><strong>Alert fatigue maturity model:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Level</th><th>Characteristic</th><th>Signal-to-Noise Ratio</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>L0 — Chaos</td><td>Hundreds of alerts/week, most ignored</td><td>&lt; 20% actionable</td><td>Triage: delete or silence all non-P0 alerts, start from zero</td></tr>
+<tr><td>L1 — Reactive</td><td>Alerts exist but many are noisy</td><td>20-50% actionable</td><td>Apply three-strikes rule weekly, merge duplicates</td></tr>
+<tr><td>L2 — Managed</td><td>Regular alert reviews, most are useful</td><td>50-80% actionable</td><td>Migrate from threshold alerts to SLO burn-rate alerts</td></tr>
+<tr><td>L3 — Proactive</td><td>SLO-based alerting, alert-per-on-call-shift tracked</td><td>&gt; 80% actionable</td><td>Automate remediation for common alerts, reduce pages</td></tr>
+<tr><td>L4 — Optimized</td><td>Every alert has a runbook, median 2-3 pages per shift</td><td>&gt; 95% actionable</td><td>Continuous tuning, anomaly detection supplements rules</td></tr>
+</tbody>
+</table></div>
+<p><strong>Measuring alert health — key metrics to track:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>How to Measure</th><th>Target</th></tr></thead>
+<tbody>
+<tr><td>Pages per on-call shift</td><td>PagerDuty analytics</td><td>&lt; 5 per shift</td></tr>
+<tr><td>Alert acknowledgment time</td><td>Median time from fire → ack</td><td>&lt; 5 minutes for P0/P1</td></tr>
+<tr><td>Alerts with no human action</td><td>Alerts acked then resolved without any remediation steps</td><td>&lt; 10% (if higher, alert is noise)</td></tr>
+<tr><td>Alert-to-incident ratio</td><td>Alerts fired / incidents declared</td><td>&lt; 10:1 (high ratio = noise)</td></tr>
+<tr><td>Time in alert storm</td><td>Minutes where &gt; 5 alerts fire simultaneously</td><td>Trending to zero</td></tr>
+<tr><td>On-call satisfaction score</td><td>Quarterly survey (1-5 scale)</td><td>&gt; 3.5</td></tr>
+</tbody>
+</table></div>
+<p><strong>Alert storm prevention patterns:</strong></p>
+<p>Alert storms — cascading alerts where a single root cause triggers dozens of notifications — are the primary driver of fatigue during incidents. Prevent them with:</p>
+<ol>
+<li><strong>Dependency-aware inhibition</strong>: When a parent service alerts, suppress child alerts. Configure in Alertmanager <code>inhibit_rules</code>.</li>
+<li><strong>Alert aggregation windows</strong>: Group alerts firing within a 2-minute window into a single notification with a summary count.</li>
+<li><strong>Severity-based flood protection</strong>: During a P0, auto-silence all P3/P4 alerts for the affected service tree.</li>
+<li><strong>Circuit-breaker on notifications</strong>: If &gt; 20 alerts fire in 5 minutes, send a single "alert storm detected" page instead of 20 individual pages.</li>
+</ol>
 <h3 id="216-alert-deduplication">2.1.6 Alert Deduplication</h3>
 <p>During an outage, a single root cause can trigger hundreds of alerts across dependent services. Without deduplication, the on-call engineer is overwhelmed by a wall of notifications instead of seeing the one that matters.</p>
 <p><strong>Deduplication mechanisms:</strong></p>
@@ -3858,6 +3889,131 @@ requires raising the weakest components (Checkout, Payment) to 99.95%+.
 <p>Error budgets can gate deployments. If a service has exhausted its error budget, new feature deployments are blocked until reliability is restored. This creates a direct incentive for engineering teams to prioritize reliability.</p>
 <p><strong>Release gating flow:</strong></p>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/F10-observability-operations-diagram-14.svg" alt="Diagram 14 for Observability &amp; Operations" loading="lazy"></figure>
+<h3 id="227-canonical-slo-templates">2.2.7 Canonical SLO Templates</h3>
+<p>Defining SLOs from scratch is error-prone. The following templates provide ready-to-adopt SLO definitions for the four most common service archetypes. Each template specifies the SLI measurement, a recommended starting SLO target, the error budget policy, and the burn-rate alert thresholds.</p>
+<p><strong>Template 1: Synchronous API Service</strong> (e.g., checkout, search, user-profile)</p>
+<pre><code class="language-yaml"># slo-template-api-service.yaml
+service_type: synchronous_api
+slo_window: 30d rolling
+
+slis:
+  availability:
+    description: Proportion of non-5xx responses
+    good_event: &quot;http_status &lt; 500&quot;
+    total_event: &quot;all requests (excluding health checks)&quot;
+    measurement: |
+      sum(rate(http_requests_total{status!~&quot;5..&quot;}[5m]))
+      / sum(rate(http_requests_total[5m]))
+
+  latency:
+    description: Proportion of requests faster than threshold
+    good_event: &quot;response_time &lt; 300ms (p50), &lt; 1s (p99)&quot;
+    measurement: |
+      histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+      &lt; 1.0
+
+slo_targets:
+  availability: 99.9%    # Start here; tighten after 2 quarters of data
+  latency_p99: 99.0%     # 99% of requests under 1 second
+
+error_budget:
+  budget_30d: 43.2 minutes downtime OR 0.1% failed requests
+  policy:
+    green:  &quot;&gt; 50% remaining → normal velocity&quot;
+    yellow: &quot;25-50% remaining → reliability review on deploys&quot;
+    orange: &quot;0-25% remaining → freeze non-critical deploys&quot;
+    red:    &quot;exhausted → full freeze, all-hands reliability&quot;
+
+burn_rate_alerts:
+  - severity: P0
+    burn_rate: 14.4x
+    short_window: 5m
+    long_window: 1h
+    action: page on-call immediately
+  - severity: P1
+    burn_rate: 6x
+    short_window: 30m
+    long_window: 6h
+    action: page on-call
+  - severity: P2
+    burn_rate: 3x
+    short_window: 2h
+    long_window: 1d
+    action: create ticket
+  - severity: P3
+    burn_rate: 1x
+    short_window: 6h
+    long_window: 3d
+    action: weekly review</code></pre>
+<p><strong>Template 2: Data Pipeline</strong> (e.g., ETL, event processing, CDC)</p>
+<pre><code class="language-yaml"># slo-template-data-pipeline.yaml
+service_type: data_pipeline
+slo_window: 30d rolling
+
+slis:
+  freshness:
+    description: Proportion of time that output data is within freshness SLA
+    good_event: &quot;output_timestamp - input_timestamp &lt; freshness_threshold&quot;
+
+  completeness:
+    description: Proportion of expected records successfully processed
+    good_event: &quot;records_output &gt;= records_input * (1 - allowed_drop_rate)&quot;
+
+  correctness:
+    description: Proportion of records passing validation
+    good_event: &quot;record passes schema + business rule checks&quot;
+
+slo_targets:
+  freshness: 99.5%        # Data available within SLA 99.5% of the time
+  completeness: 99.9%     # Less than 0.1% record loss
+  correctness: 99.99%     # Extremely low tolerance for bad data</code></pre>
+<p><strong>Template 3: Batch / Cron Job</strong> (e.g., nightly report, billing reconciliation)</p>
+<pre><code class="language-yaml"># slo-template-batch-job.yaml
+service_type: batch_job
+slo_window: 30d rolling
+
+slis:
+  success_rate:
+    description: Proportion of job executions that complete successfully
+    good_event: &quot;job exits with status 0 and output passes validation&quot;
+
+  timeliness:
+    description: Proportion of jobs completing within schedule window
+    good_event: &quot;job completes before deadline (e.g., 06:00 UTC)&quot;
+
+slo_targets:
+  success_rate: 99.0%     # At most 1 failure per ~3 months for daily jobs
+  timeliness: 99.5%       # Deadline met 99.5% of runs</code></pre>
+<p><strong>Template 4: Streaming / Real-Time Service</strong> (e.g., Kafka consumer, websocket push)</p>
+<pre><code class="language-yaml"># slo-template-streaming-service.yaml
+service_type: streaming_realtime
+slo_window: 30d rolling
+
+slis:
+  processing_lag:
+    description: Proportion of time consumer lag stays within threshold
+    good_event: &quot;consumer_lag &lt; max_acceptable_lag (e.g., 30 seconds)&quot;
+
+  delivery_rate:
+    description: Proportion of messages successfully delivered to downstream
+    good_event: &quot;message acknowledged by consumer without error&quot;
+
+slo_targets:
+  processing_lag: 99.0%   # Lag under threshold 99% of the time
+  delivery_rate: 99.95%   # At most 0.05% message loss</code></pre>
+<p><strong>SLO adoption checklist:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Step</th><th>Action</th><th>Owner</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Choose the template closest to your service archetype</td><td>Service team</td></tr>
+<tr><td>2</td><td>Customize thresholds based on 2+ weeks of baseline data</td><td>Service team + SRE</td></tr>
+<tr><td>3</td><td>Implement SLI metrics using OpenTelemetry or Prometheus</td><td>Service team</td></tr>
+<tr><td>4</td><td>Configure burn-rate alerts in Alertmanager</td><td>SRE</td></tr>
+<tr><td>5</td><td>Publish SLO dashboard in Grafana (team + executive views)</td><td>SRE</td></tr>
+<tr><td>6</td><td>Document error budget policy and get PM/EM sign-off</td><td>Service team + PM</td></tr>
+<tr><td>7</td><td>Review and tighten targets quarterly</td><td>Service team + SRE</td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="23-incident-management">2.3 Incident Management</h2>
 <p>When things go wrong — and they will — the difference between a 10-minute recovery and a 4-hour outage is often not technical skill but process discipline.</p>
@@ -4067,7 +4223,101 @@ confidence.
 <li><strong>Track completion</strong>: Action items from postmortems must be tracked and completed. An unactioned action item is a future incident.</li>
 <li><strong>Review periodically</strong>: Quarterly review of all postmortem action items to ensure they were completed and effective.</li>
 </ol>
-<h3 id="236-runbooks">2.3.6 Runbooks</h3>
+<h3 id="236-postmortem-template">2.3.6 Postmortem Template — Reusable Form</h3>
+<p>The following is a ready-to-copy template that teams can adopt as their standard incident review document. It enforces structured thinking, captures the data needed for trending analysis, and ensures every postmortem drives concrete improvements.</p>
+<pre><code class="language-markdown"># Incident Postmortem — [INCIDENT-ID]
+
+## Metadata
+| Field | Value |
+|-------|-------|
+| Incident ID | INC-XXXX |
+| Date | YYYY-MM-DD |
+| Duration | HH:MM (detect → resolve) |
+| Severity | SEV0 / SEV1 / SEV2 / SEV3 |
+| Incident Commander | Name |
+| Author | Name |
+| Status | Draft / Reviewed / Final |
+| Postmortem due date | YYYY-MM-DD (48h for SEV0, 5d for SEV1) |
+
+## Executive Summary
+&lt;!-- 2-3 sentences. What broke, who was impacted, how long, how it was resolved. --&gt;
+
+## Impact
+| Metric | Value |
+|--------|-------|
+| Users affected | N |
+| Revenue impact | $X (or N/A) |
+| Error budget consumed | X% of 30-day budget |
+| Support tickets generated | N |
+| SLA breach | Yes / No |
+
+## Detection
+| Question | Answer |
+|----------|--------|
+| How was the incident detected? | Alert / Customer report / Internal report |
+| Which alert fired first? | alert_name (link to alert rule) |
+| Time from start to detection | X minutes |
+| Was detection fast enough? | Yes / No — if No, what would improve it? |
+
+## Timeline
+| Time (UTC) | Event |
+|------------|-------|
+| HH:MM | First error observed in metrics |
+| HH:MM | Alert fires, on-call paged |
+| HH:MM | IC declares SEV-X |
+| HH:MM | Root cause identified |
+| HH:MM | Mitigation applied (rollback / config change / ...) |
+| HH:MM | Service recovery confirmed |
+| HH:MM | Incident resolved |
+
+## Root Cause
+1. Why did the service fail? → ...
+2. Why did that happen? → ...
+3. Why did that happen? → ...
+4. Why did that happen? → ...
+5. Why did that happen? → ... (systemic root cause)
+
+## Contributing Factors
+- [ ] Missing monitoring / alerting gap
+- [ ] Runbook missing or outdated
+- [ ] Insufficient testing (unit / integration / load)
+- [ ] Configuration drift
+- [ ] Human error (describe the systemic reason, not blame)
+- [ ] Dependency failure not handled
+
+## What Went Well
+1. ...
+2. ...
+
+## What Went Wrong
+1. ...
+2. ...
+
+## Action Items
+| # | Action | Owner | Priority | Due Date | Ticket |
+|---|--------|-------|----------|----------|--------|
+| 1 | | | P0/P1/P2 | YYYY-MM-DD | JIRA-XXX |
+| 2 | | | P0/P1/P2 | YYYY-MM-DD | JIRA-XXX |
+
+## Recurrence Check
+| Question | Answer |
+|----------|--------|
+| Has a similar incident occurred before? | Yes (INC-YYYY) / No |
+| Were previous action items completed? | Yes / Partially / No |
+| What systemic change prevents recurrence? | ... |
+</code></pre>
+<p><strong>Postmortem health metrics</strong> — track these quarterly to measure postmortem program effectiveness:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>Target</th><th>Why It Matters</th></tr></thead>
+<tbody>
+<tr><td>Postmortem completion rate</td><td>100% for SEV0/SEV1</td><td>No learning without documentation</td></tr>
+<tr><td>Median days to postmortem</td><td>&lt; 5 business days</td><td>Freshness improves accuracy</td></tr>
+<tr><td>Action item completion rate</td><td>&gt; 85% within 30 days</td><td>Unactioned items become future incidents</td></tr>
+<tr><td>Repeat incident rate</td><td>&lt; 10%</td><td>Measures whether action items actually prevent recurrence</td></tr>
+<tr><td>Action items per postmortem</td><td>3-7</td><td>Too few = shallow analysis; too many = unfocused</td></tr>
+</tbody>
+</table></div>
+<h3 id="237-runbooks">2.3.7 Runbooks</h3>
 <p>A runbook is a step-by-step guide for responding to a specific alert or condition. It transforms "I have no idea what this alert means" into "step 1: check X, step 2: if Y then Z."</p>
 <p><strong>Runbook template:</strong></p>
 <pre><code class="language-markdown">## Runbook: checkout_error_rate_high
@@ -5765,6 +6015,212 @@ causing brief service disruption until Kubernetes restarts the pod.
 - File ticket to investigate memory leak with profiling.
 </code></pre>
 <hr>
+<h2 id="instrumentation-blueprint">Instrumentation Blueprint — Observing a New Service from Day One</h2>
+<p>When a team launches a new microservice, observability should not be an afterthought. This blueprint defines the minimum instrumentation every service must ship with on day one, organized by pillar. It is designed around OpenTelemetry as the universal instrumentation layer.</p>
+<h3 id="logging-baseline">Logging Baseline</h3>
+<p>Every service must emit structured JSON logs with the following minimum fields:</p>
+<pre><code class="language-json">{
+  "timestamp": "ISO-8601 with timezone",
+  "level": "INFO | WARN | ERROR | FATAL",
+  "service": "service-name",
+  "version": "v1.2.3 (or git SHA)",
+  "trace_id": "W3C trace ID from OTel context",
+  "span_id": "current span ID",
+  "correlation_id": "business correlation ID (e.g., order_id)",
+  "event": "descriptive_event_name",
+  "message": "human-readable description",
+  "error": "error type + message (if applicable)",
+  "duration_ms": "operation duration (if applicable)"
+}</code></pre>
+<p><strong>Logging rules for new services:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>Use INFO as the default production level</td><td>DEBUG in prod is a cost bug</td></tr>
+<tr><td>Log all errors with stack traces</td><td>Stack traces are essential for diagnosis</td></tr>
+<tr><td>Log all external calls with duration</td><td>Dependency latency is the #1 source of issues</td></tr>
+<tr><td>Include trace_id in every log line</td><td>Enables log → trace correlation</td></tr>
+<tr><td>Redact PII before logging</td><td>Legal and compliance requirement</td></tr>
+<tr><td>Use event-based names, not free-text messages</td><td>Enables log-based alerting and dashboards</td></tr>
+</tbody>
+</table></div>
+<h3 id="metrics-baseline">Metrics Baseline</h3>
+<p>Every service must expose these minimum metrics via OpenTelemetry SDK or Prometheus client:</p>
+<pre><code class="language-yaml"># Mandatory metrics for every service
+metrics:
+  # --- RED metrics (request-driven) ---
+  http_requests_total:
+    type: counter
+    labels: [method, path, status_code]
+    description: "Total HTTP requests handled"
+
+  http_request_duration_seconds:
+    type: histogram
+    labels: [method, path]
+    buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+    description: "Request latency distribution"
+
+  http_requests_in_flight:
+    type: gauge
+    labels: [method]
+    description: "Currently processing requests"
+
+  # --- Dependency metrics ---
+  external_call_duration_seconds:
+    type: histogram
+    labels: [dependency, method, status]
+    description: "Latency of calls to external dependencies"
+
+  external_call_errors_total:
+    type: counter
+    labels: [dependency, error_type]
+    description: "Errors from external dependencies"
+
+  # --- Resource metrics (USE method) ---
+  db_connection_pool_size:
+    type: gauge
+    labels: [pool_name]
+    description: "Current DB connection pool size"
+
+  db_connection_pool_in_use:
+    type: gauge
+    labels: [pool_name]
+    description: "Active DB connections"
+
+  # --- Business metrics ---
+  business_operation_total:
+    type: counter
+    labels: [operation, outcome]
+    description: "Business operations (e.g., orders_placed, payments_processed)"</code></pre>
+<p><strong>Cardinality guard rails:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Label</th><th>Max Cardinality</th><th>Enforcement</th></tr></thead>
+<tbody>
+<tr><td>method</td><td>~5 (GET, POST, PUT, DELETE, PATCH)</td><td>Static set</td></tr>
+<tr><td>path</td><td>Parameterize routes (<code>/users/{id}</code> not <code>/users/12345</code>)</td><td>Route normalization middleware</td></tr>
+<tr><td>status_code</td><td>~20 (HTTP status codes)</td><td>Static set</td></tr>
+<tr><td>dependency</td><td>~10-20 downstream services</td><td>Static configuration</td></tr>
+<tr><td>error_type</td><td>~10-15 classified error types</td><td>Enum, not free-text</td></tr>
+</tbody>
+</table></div>
+<h3 id="tracing-baseline">Tracing Baseline</h3>
+<p>Every service must participate in distributed tracing using OpenTelemetry:</p>
+<pre><code class="language-yaml"># Minimum tracing configuration for every service
+tracing:
+  sdk: OpenTelemetry (language-appropriate SDK)
+  propagation: W3C TraceContext (traceparent header)
+  auto_instrumentation:
+    - HTTP server/client (inbound + outbound requests)
+    - gRPC server/client
+    - Database clients (SQL, Redis, MongoDB)
+    - Message queue producers/consumers (Kafka, SQS, RabbitMQ)
+
+  manual_instrumentation:
+    - Business-critical operations (payment processing, order fulfillment)
+    - Long-running background tasks
+    - Fan-out operations (parallel calls to multiple services)
+
+  span_attributes:
+    required:
+      - service.name
+      - service.version
+      - deployment.environment
+      - user.id (if applicable, hashed for PII)
+    recommended:
+      - http.method, http.route, http.status_code
+      - db.system, db.statement (parameterized)
+      - messaging.system, messaging.destination
+
+  sampling:
+    development: 100% (all traces)
+    staging: 100% (all traces)
+    production: tail-based via OTel Collector
+      always_sample: errors, slow requests (&gt; p99)
+      head_sample: 1-5% of successful fast requests</code></pre>
+<h3 id="day-one-observability-checklist">Day-One Observability Checklist</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>Item</th><th>Pillar</th><th>Priority</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Structured JSON logging with trace_id</td><td>Logs</td><td>P0</td></tr>
+<tr><td>2</td><td>RED metrics (rate, errors, duration) for all endpoints</td><td>Metrics</td><td>P0</td></tr>
+<tr><td>3</td><td>OTel auto-instrumentation enabled</td><td>Traces</td><td>P0</td></tr>
+<tr><td>4</td><td>Health check endpoint (<code>/healthz</code>, <code>/readyz</code>)</td><td>Metrics</td><td>P0</td></tr>
+<tr><td>5</td><td>Service registered in Grafana dashboards</td><td>Dashboard</td><td>P0</td></tr>
+<tr><td>6</td><td>SLO defined (availability + latency at minimum)</td><td>SLO</td><td>P1</td></tr>
+<tr><td>7</td><td>Burn-rate alerts configured in Alertmanager</td><td>Alerting</td><td>P1</td></tr>
+<tr><td>8</td><td>Runbook for top 3 expected failure modes</td><td>Incident</td><td>P1</td></tr>
+<tr><td>9</td><td>Dependency metrics for all external calls</td><td>Metrics</td><td>P1</td></tr>
+<tr><td>10</td><td>Business metrics for key operations</td><td>Metrics</td><td>P2</td></tr>
+<tr><td>11</td><td>PII redaction verified in log output</td><td>Logs</td><td>P1</td></tr>
+<tr><td>12</td><td>On-call rotation configured for the service</td><td>Operations</td><td>P2</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="observability-cost-as-budget">Observability Cost as a Budget</h2>
+<p>Observability data is essential but not free. At scale, unmanaged telemetry costs can exceed 20-30% of total infrastructure spend. Treating observability cost as a managed engineering budget — not an unbounded byproduct — is a critical operational discipline.</p>
+<h3 id="cost-as-budget-framework">The Cost-as-Budget Framework</h3>
+<p>The core principle: <strong>every team owns an observability budget</strong>, measured in dollars-per-month or GB-per-month, just as they own a compute budget. Overruns require the same justification as requesting more compute.</p>
+<pre><code>Observability Budget = Ingestion Cost + Storage Cost + Query Cost + Licensing
+
+Per-team budget allocation:
+  Team budget = (total observability budget) × (team's share of traffic/services)
+  Buffer: Reserve 15% for incident-driven debugging surges</code></pre>
+<p><strong>Budget categories and typical cost drivers:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Category</th><th>Primary Cost Driver</th><th>Typical Share</th><th>Optimization Lever</th></tr></thead>
+<tbody>
+<tr><td>Log ingestion</td><td>Volume (GB/day)</td><td>40-50%</td><td>Sampling, log levels, dropping verbose fields</td></tr>
+<tr><td>Metric storage</td><td>Cardinality (active time series)</td><td>15-25%</td><td>Label discipline, recording rules, aggregation</td></tr>
+<tr><td>Trace storage</td><td>Span volume (spans/sec)</td><td>10-20%</td><td>Tail-based sampling, shorter retention</td></tr>
+<tr><td>Licensing</td><td>Per-host, per-GB, per-user fees</td><td>15-30%</td><td>Vendor negotiation, open-source alternatives</td></tr>
+<tr><td>Query compute</td><td>Dashboard load, ad-hoc queries</td><td>5-10%</td><td>Recording rules, query caching, dashboard pruning</td></tr>
+</tbody>
+</table></div>
+<h3 id="implementing-cost-governance">Implementing Cost Governance</h3>
+<p><strong>Step 1: Make costs visible</strong> — publish per-team observability costs on a shared Grafana dashboard:</p>
+<pre><code class="language-promql"># Per-team log ingestion rate (bytes/sec)
+sum by (team) (rate(log_bytes_ingested_total[1h]))
+
+# Per-team active metric series count
+count by (team) (group({team=~".+"}) by (__name__, team))
+
+# Per-team trace span rate
+sum by (team) (rate(traces_spans_ingested_total[1h]))</code></pre>
+<p><strong>Step 2: Set per-team budgets</strong> based on baseline measurement + growth projection:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Team</th><th>Services</th><th>Monthly Budget</th><th>Current Spend</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Checkout</td><td>8</td><td>$12,000</td><td>$10,400</td><td>Green</td></tr>
+<tr><td>Search</td><td>5</td><td>$18,000</td><td>$22,100</td><td>Red — over budget</td></tr>
+<tr><td>Payments</td><td>6</td><td>$9,000</td><td>$8,200</td><td>Green</td></tr>
+<tr><td>Platform</td><td>12</td><td>$25,000</td><td>$24,800</td><td>Yellow — approaching</td></tr>
+</tbody>
+</table></div>
+<p><strong>Step 3: Review and adjust quarterly</strong> — observability budgets are living constraints, not fixed ceilings:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Trigger</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>Team consistently under budget</td><td>Reduce allocation, reallocate to teams that need it</td></tr>
+<tr><td>Team over budget</td><td>Require optimization plan within 2 weeks</td></tr>
+<tr><td>New service launch</td><td>Allocate incremental budget based on estimated traffic</td></tr>
+<tr><td>Major incident required debug data</td><td>Temporary budget surge approved, reviewed post-incident</td></tr>
+<tr><td>Vendor price increase</td><td>Re-evaluate build vs. buy; consider open-source migration</td></tr>
+</tbody>
+</table></div>
+<h3 id="cost-efficiency-metrics">Cost-Efficiency Metrics</h3>
+<p>Track these metrics to ensure observability spend delivers proportional value:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>Formula</th><th>Target</th></tr></thead>
+<tbody>
+<tr><td>Cost per incident resolved</td><td>Monthly observability cost / incidents resolved</td><td>Decreasing quarter-over-quarter</td></tr>
+<tr><td>Cost per million requests</td><td>Monthly observability cost / (requests/month in millions)</td><td>Stable or decreasing</td></tr>
+<tr><td>MTTR trend vs. cost trend</td><td>Correlation of MTTR improvement with cost changes</td><td>MTTR should improve faster than cost grows</td></tr>
+<tr><td>Unused dashboard ratio</td><td>Dashboards with 0 views in 90 days / total dashboards</td><td>&lt; 10%</td></tr>
+<tr><td>Alert signal-to-noise ratio</td><td>Actionable alerts / total alerts fired</td><td>&gt; 80%</td></tr>
+</tbody>
+</table></div>
+<p><strong>The golden rule</strong>: If observability costs are growing faster than the value they deliver (measured by MTTR reduction, incident prevention, and developer productivity), something is wrong. Either the data is not being used effectively, or the collection is not targeted enough.</p>
+<hr>
 <h2 id="architectural-decision-records-adrs">Architectural Decision Records (ADRs)</h2>
 <h3 id="adr-1-structured-logging-format">ADR-1: Structured Logging Format</h3>
 <p><strong>Status:</strong> Accepted</p>
@@ -5968,9 +6424,9 @@ You (after core design):
 </ul>
 <h3 id="section-2-alerting-and-incident-response">Section 2 — Alerting and Incident Response</h3>
 <ul>
-<li><strong>Alerts</strong>: Design for action, not noise. Multi-window burn rate alerts on SLOs are the gold standard.</li>
-<li><strong>SLOs</strong>: Transform reliability from a vague goal to a measurable budget. Error budgets drive deployment decisions.</li>
-<li><strong>Incidents</strong>: Process discipline (IC, communication channels, postmortems) matters as much as technical skill.</li>
+<li><strong>Alerts</strong>: Design for action, not noise. Multi-window burn rate alerts on SLOs are the gold standard. Track alert health metrics to combat fatigue.</li>
+<li><strong>SLOs</strong>: Transform reliability from a vague goal to a measurable budget. Use canonical SLO templates per service archetype (API, pipeline, batch, streaming). Error budgets drive deployment decisions.</li>
+<li><strong>Incidents</strong>: Process discipline (IC, communication channels, postmortems) matters as much as technical skill. Use structured postmortem templates to ensure consistent learning.</li>
 <li><strong>Chaos</strong>: Prove resilience through experimentation, not hope. Game days build confidence and reveal gaps.</li>
 </ul>
 <h3 id="section-3-operational-excellence_2">Section 3 — Operational Excellence</h3>
@@ -5979,6 +6435,11 @@ You (after core design):
 <li><strong>Capacity planning</strong>: Forecast, test, benchmark, and model costs before traffic arrives.</li>
 <li><strong>Toil reduction</strong>: Automate everything that can be automated. Self-healing systems reduce human intervention.</li>
 <li><strong>On-call</strong>: Treat it as a first-class engineering practice. Measure health, compensate fairly, and continuously reduce burden.</li>
+</ul>
+<h3 id="cross-cutting-enhancements">Cross-Cutting Enhancements</h3>
+<ul>
+<li><strong>Instrumentation blueprint</strong>: Every new service should ship with day-one observability — structured logs, RED metrics, and OTel-based tracing. Use the instrumentation checklist.</li>
+<li><strong>Observability cost as budget</strong>: Treat telemetry spend as a managed per-team budget. Track cost-efficiency metrics (cost per incident, cost per million requests) and optimize quarterly.</li>
 </ul>
 <p>The observability maturity of an engineering organization is one of the strongest predictors of its ability to ship reliable software at speed. Investing in these foundations pays dividends across every system described in subsequent chapters.</p>
 <hr>
@@ -6111,6 +6572,7 @@ You (after core design):
 <li><a href="#224-burn-rate-alerts">2.2.4 Burn Rate Alerts</a></li>
 <li><a href="#225-error-budget-calculation-worked-examples">2.2.5 Error Budget Calculation — Worked Examples</a></li>
 <li><a href="#226-slo-based-release-gating">2.2.6 SLO-Based Release Gating</a></li>
+<li><a href="#227-canonical-slo-templates">2.2.7 Canonical SLO Templates</a></li>
 </ul>
 </li>
 <li><a href="#23-incident-management">2.3 Incident Management</a><ul>
@@ -6119,7 +6581,8 @@ You (after core design):
 <li><a href="#233-incident-timeline">2.3.3 Incident Timeline</a></li>
 <li><a href="#234-status-pages">2.3.4 Status Pages</a></li>
 <li><a href="#235-blameless-postmortems">2.3.5 Blameless Postmortems</a></li>
-<li><a href="#236-runbooks">2.3.6 Runbooks</a></li>
+<li><a href="#236-postmortem-template">2.3.6 Postmortem Template — Reusable Form</a></li>
+<li><a href="#237-runbooks">2.3.7 Runbooks</a></li>
 </ul>
 </li>
 <li><a href="#24-chaos-engineering">2.4 Chaos Engineering</a><ul>
@@ -6164,6 +6627,19 @@ You (after core design):
 <li><a href="#345-reducing-on-call-burden">3.4.5 Reducing On-Call Burden</a></li>
 <li><a href="#346-on-call-maturity-model">3.4.6 On-Call Maturity Model</a></li>
 <li><a href="#347-runbook-template-library">3.4.7 Runbook Template Library</a></li>
+</ul>
+</li>
+<li><a href="#instrumentation-blueprint">Instrumentation Blueprint — Observing a New Service from Day One</a><ul>
+<li><a href="#logging-baseline">Logging Baseline</a></li>
+<li><a href="#metrics-baseline">Metrics Baseline</a></li>
+<li><a href="#tracing-baseline">Tracing Baseline</a></li>
+<li><a href="#day-one-observability-checklist">Day-One Observability Checklist</a></li>
+</ul>
+</li>
+<li><a href="#observability-cost-as-budget">Observability Cost as a Budget</a><ul>
+<li><a href="#cost-as-budget-framework">The Cost-as-Budget Framework</a></li>
+<li><a href="#implementing-cost-governance">Implementing Cost Governance</a></li>
+<li><a href="#cost-efficiency-metrics">Cost-Efficiency Metrics</a></li>
 </ul>
 </li>
 <li><a href="#architectural-decision-records-adrs">Architectural Decision Records (ADRs)</a><ul>

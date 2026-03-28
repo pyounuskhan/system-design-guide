@@ -3474,6 +3474,97 @@ flowchart LR
 7. **10% of searches return zero results. How do you diagnose and fix this?** Cover query analysis, synonym expansion, and monitoring.
 8. **Design personalized search that avoids filter bubbles.** Cover user signals, blending, and exploration injection.
 
-## Final Recap
+## Indexing Pipeline — Reference Architecture
+
+```
+SOURCES [Product DB CDC] [Content CMS] [User-Generated] [Logs]
+        ↓ Change events (Kafka / CDC)
+INDEXING PIPELINE
+  1. Schema validation  2. Content extraction  3. Enrichment
+  4. Embedding generation  5. Write keyword index  6. Write vector index
+  Modes: Real-time (CDC, < 60s) | Batch (nightly) | Backfill (on-demand)
+        ↓
+SEARCH INDEX
+  [Keyword: Elasticsearch/BM25] + [Vector: HNSW/pgvector]
+  Hybrid retrieval: BM25 + vector → Reciprocal Rank Fusion
+```
+
+---
+
+## Freshness vs Relevance Trade-off Rubric
+
+| Scenario | Freshness | Relevance | Strategy |
+|----------|----------|-----------|----------|
+| E-commerce product | High | High | Real-time CDC (< 60s); ML re-ranking |
+| News/content | Very high | Medium | Near-real-time (< 30s); recency boost |
+| Enterprise knowledge | Low | Very high | Batch (hourly); semantic matching |
+| Autocomplete | Medium | Very high | Pre-computed; update hourly from logs |
+| Log search | Critical | Low | Append-only real-time; no ranking |
+
+### Index Freshness SLOs
+
+| Index | Target | Alert |
+|-------|--------|-------|
+| Product catalog | < 60s | > 3 min |
+| Content | < 5 min | > 15 min |
+| Autocomplete | < 1 hour | > 3 hours |
+| Vector embeddings | < 24 hours | > 48 hours |
+
+---
+
+## Vector Search and Hybrid Retrieval
+
+```
+Query → Keyword (BM25, top 100) + Vector (ANN, top 100)
+  → RRF fusion: RRF_score = Σ 1/(k + rank) per list → top 20
+    → ML re-ranker (cross-encoder, < 50ms) → top 10 displayed
+```
+
+**Add vector search when:** zero-result rate > 10%, CTR on #1 < 20%, users search concepts not exact terms.
+
+---
+
+## Ranking Update — Staged Rollout
+
+| Stage | Traffic | Duration | Success | Rollback |
+|-------|---------|----------|---------|----------|
+| Shadow | 0% (log only) | 1 week | NDCG improves | NDCG drops > 5% |
+| Canary | 1% | 3 days | CTR stable | CTR drops > 3% |
+| Ramp | 10→25→50% | 1 week/step | Metrics stable | Any > 2% decline |
+| Full | 100% | Ongoing | Monitor weekly | Sustained decline |
+
+### Search Quality Metrics
+
+| Metric | Target |
+|--------|--------|
+| NDCG@10 | Improving vs baseline |
+| Click-through rate | > 30% |
+| Zero-result rate | < 5% |
+| Query latency (p99) | < 200ms |
+| Refinement rate | Decreasing |
+
+### Query Latency Budget (p99 < 150ms)
+
+| Component | Budget |
+|-----------|--------|
+| Query understanding | < 10ms |
+| BM25 retrieval | < 30ms |
+| Vector ANN | < 20ms |
+| Fusion + re-rank | < 50ms |
+| Personalization | < 20ms |
+| Serialization | < 20ms |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Vector search for RAG | F12 §7.7 |
+| Caching for search | Ch 6 |
+| CDC for indexing | Ch 5, Ch 8 |
+| A/B testing for ranking | Ch 24 |
+
+---
+
+## Final Recap — Search & Discovery
 
 Search & Discovery combines **information retrieval fundamentals** (inverted indices, BM25, TF-IDF) with **modern ML ranking** (learning-to-rank, embeddings, neural re-rankers) and **specialized search modes** (geo, faceted, semantic). The key insight is that search is not one problem but a **pipeline**: query understanding → retrieval → ranking → personalization → presentation. Each stage has different latency budgets and model complexity.

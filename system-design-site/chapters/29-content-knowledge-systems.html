@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 - Real-World System Design Examples<br>
-<strong>Position:</strong> Chapter 29 of 60
+<strong>Position:</strong> Chapter 29 of 42<br>
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <h2 id="overview">Overview</h2>
 <p>Knowledge systems mix content modeling, collaboration, publishing workflows, search, and access control. Their architecture often shifts from simple CMS patterns to versioned collaborative editing and permissions-heavy serving.</p>
@@ -5406,6 +5406,65 @@ Scenario 4: CDN Complete Outage
 <p><strong>Alternatives Considered:</strong>
 - Full SaaS stack (Contentful + Algolia + Auth0 + Vercel): fastest time to market but highest ongoing cost and vendor dependency.
 - Full self-hosted including CDN and email: maximum control but excessive operational burden for capabilities that are true commodities.</p>
+<h2 id="crdt-local-first">CRDT and Local-First Collaboration</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>CRDT</th><th>Use Case</th><th>How</th></tr></thead>
+<tbody>
+<tr><td><strong>RGA</strong></td><td>Text editing (character-level)</td><td>Unique position IDs; concurrent inserts merge</td></tr>
+<tr><td><strong>Yjs / Automerge</strong></td><td>Rich-text + structured docs</td><td>CRDT lib for text, lists, maps, nested</td></tr>
+<tr><td><strong>OR-Set</strong></td><td>Tags, collaborator lists</td><td>Add/remove with unique op IDs</td></tr>
+<tr><td><strong>LWW-Register</strong></td><td>Title, metadata fields</td><td>Last-writer-wins by timestamp</td></tr>
+</tbody>
+</table></div>
+<pre><code>Local-first: User A (offline) edits → User B edits → Sync server merges CRDTs → No conflicts
+Server-authoritative: better for structured data (forms, records)
+CRDT/local-first: better for unstructured editing (docs, notes, whiteboards)</code></pre>
+<hr>
+<h2 id="permission-patterns">Permission Model Patterns</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th>How</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>ACL</strong></td><td>Per-document (principal, permission) pairs</td><td>File sharing (Google Drive)</td></tr>
+<tr><td><strong>RBAC</strong></td><td>Role → permissions; users assigned roles</td><td>Enterprise CMS (admin/editor/viewer)</td></tr>
+<tr><td><strong>ABAC</strong></td><td>User + resource + context attributes</td><td>Complex policies</td></tr>
+<tr><td><strong>Hierarchical</strong></td><td>Inherit from parent folder/space</td><td>Nested content (Confluence-style)</td></tr>
+</tbody>
+</table></div>
+<pre><code>Evaluation: doc ACL → parent folder → workspace default → deny-overrides-allow → log</code></pre>
+<h3 id="sharing-levels">Sharing Levels</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Level</th><th>Who</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Private</td><td>Owner only</td><td>Draft</td></tr>
+<tr><td>Specific people</td><td>Named users/groups</td><td>Shared with team</td></tr>
+<tr><td>Anyone with link</td><td>URL holders (no auth)</td><td>Public wiki</td></tr>
+<tr><td>Organization</td><td>All authenticated members</td><td>Internal KB</td></tr>
+<tr><td>Public</td><td>Internet</td><td>Published blog</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="sync-slos">Sync Freshness and Collaboration SLOs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>SLO</th><th>Alert</th></tr></thead>
+<tbody>
+<tr><td>Collaborative edit latency</td><td>&lt; 200ms keystroke-to-screen</td><td>&gt; 500ms</td></tr>
+<tr><td>Offline sync time</td><td>&lt; 5s after reconnect</td><td>&gt; 30s</td></tr>
+<tr><td>Permission propagation</td><td>&lt; 5s (revoke must be fast)</td><td>&gt; 30s (security risk)</td></tr>
+<tr><td>Search index freshness</td><td>&lt; 60s from publish/edit</td><td>&gt; 5 min</td></tr>
+<tr><td>Document save</td><td>&lt; 1 second</td><td>&gt; 3 seconds</td></tr>
+</tbody>
+</table></div>
+<h3 id="content-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>CRDTs in messaging</td><td><a href="22-communication-systems.html">Ch 22</a></td></tr>
+<tr><td>Consistency models</td><td><a href="11-consistency-cap-theorem.html">Ch 11</a></td></tr>
+<tr><td>Search indexing</td><td><a href="25-search-discovery.html">Ch 25</a></td></tr>
+<tr><td>Access control</td><td><a href="40-security-authentication.html">A8</a></td></tr>
+<tr><td>Audit logging</td><td><a href="28-security-systems.html">Ch 28</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="navigation">Navigation</h2>
 <ul>

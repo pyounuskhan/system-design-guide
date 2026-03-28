@@ -1039,7 +1039,7 @@
 <h3 id="section-5-cost-awareness">Section 5 — Cost Awareness</h3>
 <p>Cloud cost models, optimization techniques, and total cost of ownership analysis that distinguishes senior candidates from junior ones.</p>
 <h3 id="section-6-mock-interview-walkthroughs">Section 6 — Mock Interview Walkthroughs</h3>
-<p>Complete walkthroughs of three classic design problems, an interviewer scoring rubric, and 20+ practice questions.</p>
+<p>Complete walkthroughs of five design problems (including AI-era and platform-level questions), an interviewer scoring rubric, and 24 practice questions.</p>
 <p>Every section includes Mermaid diagrams, estimation cheat sheets, Architecture Decision Records (ADRs), and the "Numbers Every Engineer Should Know" reference table.</p>
 <hr>
 <h2 id="why-this-chapter-matters">Why This Chapter Matters</h2>
@@ -1064,6 +1064,120 @@
 </ol>
 <p>The time allocations assume a 45-minute interview. For 60-minute interviews, expand the deep dive.</p>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/F12-system-design-interview-thinking-diagram-01.svg" alt="Diagram 1 for System Design Interview Thinking" loading="lazy"></figure>
+<h3 id="timebox-to-deliverable-map">Timebox-to-Deliverable Map</h3>
+<p>Every minute in a system design interview must produce a concrete deliverable. The table below maps each step to its expected output artifact for both 45-minute and 60-minute interview formats.</p>
+<p><strong>45-Minute Interview:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Time</th>
+<th>Deliverable</th>
+<th>What the Interviewer Sees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Requirements</td>
+<td>0:00–0:06</td>
+<td>Bulleted list of 4-6 FRs + 3-4 NFRs, explicit out-of-scope items</td>
+<td>Candidate drives scope, asks smart questions</td>
+</tr>
+<tr>
+<td>2. Estimation</td>
+<td>0:06–0:10</td>
+<td>QPS, storage, bandwidth numbers on the board</td>
+<td>Candidate connects numbers to design decisions</td>
+</tr>
+<tr>
+<td>3. High-Level Design</td>
+<td>0:10–0:22</td>
+<td>Block diagram + API signatures + core data model</td>
+<td>Candidate draws readable diagram, names components</td>
+</tr>
+<tr>
+<td>4. Deep Dive</td>
+<td>0:22–0:38</td>
+<td>1-2 components with algorithm detail, data structure choices, failure handling</td>
+<td>Candidate shows production depth, handles pivots</td>
+</tr>
+<tr>
+<td>5. Trade-offs</td>
+<td>0:38–0:45</td>
+<td>3+ trade-offs articulated, 2+ bottlenecks with mitigations</td>
+<td>Candidate evaluates own design critically</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>60-Minute Interview:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Time</th>
+<th>Additional vs. 45-min</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Requirements</td>
+<td>0:00–0:08</td>
+<td>More time for edge cases and compliance constraints</td>
+</tr>
+<tr>
+<td>2. Estimation</td>
+<td>0:08–0:12</td>
+<td>Add cost estimation (monthly cloud spend)</td>
+</tr>
+<tr>
+<td>3. High-Level Design</td>
+<td>0:12–0:27</td>
+<td>Add detailed API contracts (request/response schemas)</td>
+</tr>
+<tr>
+<td>4. Deep Dive</td>
+<td>0:27–0:50</td>
+<td>Deep dive 2-3 components; expect interviewer pivots to new areas</td>
+</tr>
+<tr>
+<td>5. Trade-offs</td>
+<td>0:50–0:60</td>
+<td>Add operational concerns: SLOs, monitoring, deployment strategy, on-call</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Senior-level (L6+) deliverable expectations:</strong></p>
+<p>At staff level and above, interviewers expect these additional signals in every step:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Additional Senior Expectation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Requirements</td>
+<td>Frame in business context ("this affects revenue because..."); identify hidden requirements (compliance, data residency, abuse)</td>
+</tr>
+<tr>
+<td>Estimation</td>
+<td>Include cost estimate; reason about cost-per-user and infrastructure budget</td>
+</tr>
+<tr>
+<td>High-Level Design</td>
+<td>Discuss SLO targets for the system; identify which components need 99.99% vs 99.9% vs 99% availability</td>
+</tr>
+<tr>
+<td>Deep Dive</td>
+<td>Discuss on-call implications; deployment strategy (canary vs blue-green); explain how to debug this in production</td>
+</tr>
+<tr>
+<td>Trade-offs</td>
+<td>Frame trade-offs in terms of error budget impact; discuss "what happens in 2 years when traffic 10x's"</td>
+</tr>
+</tbody>
+</table></div>
 <h3 id="why-this-order-matters">Why This Order Matters</h3>
 <p>The order is not arbitrary. Each step produces outputs that the next step consumes:</p>
 <div class="table-wrap"><table>
@@ -4156,7 +4270,307 @@ Base62 encoding:
 - Mitigation: large range buffers (100K per instance), etcd cluster for HA</p>
 <p><strong>This design is intentionally simple.</strong> A URL shortener at the described scale (40 writes/sec, 4K reads/sec) could run on a single PostgreSQL instance with a Redis cache. The value of this interview question is testing whether candidates can identify the appropriate level of complexity rather than over-engineering.</p>
 <hr>
-<h2 id="64-interviewer-scoring-rubric">6.4 Interviewer Scoring Rubric</h2>
+<h2 id="64-mock-interview-4-design-a-rag-based-knowledge-assistant">6.4 Mock Interview 4: Design a RAG-Based Knowledge Assistant</h2>
+<p>This walkthrough demonstrates handling an AI-era interview question using the same five-step framework.</p>
+<h3 id="problem-statement_3">Problem Statement</h3>
+<p>Design a knowledge assistant for a company's internal documentation. Employees ask natural-language questions and get accurate answers with citations from company wikis, Confluence pages, and Slack threads.</p>
+<h3 id="step-1-requirements-6-minutes">Step 1: Requirements (6 minutes)</h3>
+<p><strong>Functional Requirements:</strong></p>
+<ul>
+<li>Users ask questions in natural language via web UI or Slack bot</li>
+<li>System retrieves relevant internal documents and generates an answer</li>
+<li>Answers include citations (links to source documents)</li>
+<li>Users can give thumbs up/down feedback on answer quality</li>
+<li>Support for 50,000 internal documents (wiki pages, PDFs, Slack threads)</li>
+</ul>
+<p><strong>Non-Functional Requirements:</strong></p>
+<ul>
+<li>Latency: answer within 3-5 seconds (acceptable for knowledge Q&amp;A)</li>
+<li>Accuracy: &gt; 90% of answers should be factually grounded in source documents</li>
+<li>Freshness: new/updated documents indexed within 15 minutes</li>
+<li>Cost: &lt; $0.05 per query at scale</li>
+<li>Scale: 10,000 employees, ~2,000 queries/day</li>
+</ul>
+<p><strong>Out of scope:</strong> multi-turn conversation (v2), image/diagram understanding, external web search.</p>
+<h3 id="step-2-estimation-3-minutes_3">Step 2: Estimation (3 minutes)</h3>
+<pre><code>Query volume:
+  2,000 queries/day → ~0.02 QPS average → 0.1 QPS peak
+  (Low QPS — this is a latency and accuracy problem, not a throughput problem)
+
+Document corpus:
+  50,000 documents × avg 2,000 tokens = 100M tokens total
+  Chunked at 512 tokens → ~200,000 chunks
+  Each chunk embedding (1536 dims, float32) = 6 KB
+  Total vector storage = 200,000 × 6 KB = ~1.2 GB (fits in memory easily)
+
+LLM cost per query:
+  Retrieval: ~10 chunks × 512 tokens = 5,120 context tokens
+  System prompt + query: ~500 tokens
+  Response: ~300 tokens
+  Total: ~6,000 tokens/query
+  At $3/M tokens (GPT-4o class): $0.018/query → within budget
+
+Monthly cost:
+  2,000 queries/day × 30 days × $0.018 = ~$1,080/month (LLM only)
+  Vector DB (managed): ~$70/month for 200K vectors
+  Compute (embedding + API): ~$200/month
+  Total: ~$1,350/month
+</code></pre>
+<h3 id="step-3-high-level-design-12-minutes">Step 3: High-Level Design (12 minutes)</h3>
+<pre><code>                    ┌───────────────┐
+                    │  Web UI /     │
+                    │  Slack Bot    │
+                    └───────┬───────┘
+                            │
+                    ┌───────▼───────┐
+                    │  API Gateway  │
+                    └───────┬───────┘
+                            │
+              ┌─────────────▼─────────────┐
+              │  Query Orchestrator        │
+              │  (FastAPI service)         │
+              │  1. Embed query            │
+              │  2. Retrieve top-k chunks  │
+              │  3. Re-rank               │
+              │  4. Build prompt           │
+              │  5. Call LLM              │
+              │  6. Return answer + cites  │
+              └──┬──────┬──────┬──────────┘
+                 │      │      │
+        ┌────────▼┐ ┌───▼────┐ ┌▼─────────┐
+        │ Embedding│ │ Vector │ │ LLM API  │
+        │ Service  │ │ DB     │ │ (OpenAI  │
+        │ (text-   │ │(pgvec- │ │  / self- │
+        │ embedding│ │ tor)   │ │  hosted) │
+        │ -3-small)│ └────────┘ └──────────┘
+        └─────────┘
+
+              ┌─────────────────────────────┐
+              │  Ingestion Pipeline          │
+              │  (runs on document change)   │
+              │  1. Fetch from source        │
+              │  2. Extract text (PDF/HTML)  │
+              │  3. Chunk (512 tokens)       │
+              │  4. Embed                    │
+              │  5. Upsert to vector DB      │
+              └─────────────────────────────┘
+              Sources: [Confluence] [Wiki] [Slack] [PDFs]
+</code></pre>
+<p><strong>Core API:</strong></p>
+<pre><code>POST /api/v1/ask
+  Request: { "question": "How do I request PTO?", "user_id": "u123" }
+  Response: {
+    "answer": "To request PTO, submit a request in Workday...",
+    "citations": [
+      { "title": "PTO Policy", "url": "https://wiki/pto", "snippet": "..." }
+    ],
+    "confidence": 0.92,
+    "query_id": "q456"
+  }
+
+POST /api/v1/feedback
+  Request: { "query_id": "q456", "rating": "thumbs_up" }
+</code></pre>
+<h3 id="step-4-deep-dive-retrieval-quality-15-minutes">Step 4: Deep Dive — Retrieval Quality (15 minutes)</h3>
+<p><strong>Chunking strategy:</strong></p>
+<ul>
+<li>Use 512-token chunks with 64-token overlap</li>
+<li>Preserve document structure (don't split mid-paragraph)</li>
+<li>Add metadata to each chunk: document title, section header, last_updated, source_type</li>
+<li>Reasoning: 512 tokens is large enough for context but small enough for precise retrieval</li>
+</ul>
+<p><strong>Hybrid retrieval (semantic + keyword):</strong></p>
+<pre><code>Retrieval pipeline:
+  1. Embed query → semantic search → top 20 candidates
+  2. BM25 keyword search → top 20 candidates
+  3. Reciprocal Rank Fusion (RRF) to merge results
+  4. Cross-encoder re-ranker → top 5 final chunks
+</code></pre>
+<ul>
+<li>Why hybrid: pure semantic misses exact acronyms/product names; pure keyword misses paraphrased questions</li>
+<li>RRF is simple and effective — no ML model needed for fusion</li>
+</ul>
+<p><strong>Prompt engineering:</strong></p>
+<pre><code>System: You are a knowledge assistant for {company_name}. Answer questions
+using ONLY the provided context. If the context doesn't contain the answer,
+say "I don't have enough information to answer this."
+
+Context:
+[chunk 1: {title} — {text}]
+[chunk 2: {title} — {text}]
+...
+
+Always cite your sources using [Source: {title}] format.
+
+User: {question}
+</code></pre>
+<p><strong>Freshness pipeline:</strong></p>
+<ul>
+<li>Confluence/Wiki: webhook on page update → re-chunk + re-embed → upsert</li>
+<li>Slack: scheduled poll every 15 minutes for new messages in indexed channels</li>
+<li>PDFs: watch S3 bucket for new uploads → extract text → chunk → embed</li>
+<li>Incremental: only re-process changed documents, not entire corpus</li>
+</ul>
+<h3 id="step-5-trade-offs-and-bottlenecks-5-minutes_3">Step 5: Trade-offs and Bottlenecks (5 minutes)</h3>
+<p><strong>Trade-offs:</strong></p>
+<ol>
+<li><strong>Managed LLM API vs self-hosted model</strong>: API is simpler and higher quality but creates vendor dependency and sends internal data externally. Self-hosted (Llama 3) keeps data internal but requires GPU infrastructure. <em>Decision: start with managed API + data processing agreement; evaluate self-hosting at $5K+/month spend.</em></li>
+<li><strong>Single vector DB vs separate per-source</strong>: Single is simpler; separate allows source-specific relevance tuning. <em>Decision: single DB with source_type metadata filter.</em></li>
+<li><strong>Real-time indexing vs batch</strong>: Real-time ensures freshness but adds complexity. <em>Decision: webhook-triggered for Confluence/Wiki (critical); 15-minute batch for Slack (acceptable).</em></li>
+</ol>
+<p><strong>Bottlenecks:</strong></p>
+<ul>
+<li>LLM latency (2-4 seconds) dominates end-to-end time → mitigate with streaming responses</li>
+<li>Embedding throughput during bulk re-indexing → mitigate with batch embedding API</li>
+<li>Answer quality degrades with stale documents → mitigate with document freshness signal in re-ranking</li>
+</ul>
+<hr>
+<h2 id="65-mock-interview-5-design-a-notification-platform">6.5 Mock Interview 5: Design a Notification Platform</h2>
+<p>This walkthrough demonstrates a platform-level design question that tests scalability, multi-channel delivery, and operational concerns.</p>
+<h3 id="problem-statement_4">Problem Statement</h3>
+<p>Design a notification platform that sends push notifications, emails, SMS, and in-app messages to users. It must support 500M users and handle event-driven triggers from dozens of upstream services.</p>
+<h3 id="step-1-requirements-6-minutes_1">Step 1: Requirements (6 minutes)</h3>
+<p><strong>Functional Requirements:</strong></p>
+<ul>
+<li>Accept notification requests from upstream services via API</li>
+<li>Deliver via 4 channels: push (iOS/Android), email, SMS, in-app</li>
+<li>User preference management (opt-in/out per channel per notification type)</li>
+<li>Template system with variable substitution</li>
+<li>Rate limiting per user (no notification fatigue)</li>
+<li>Delivery tracking (sent, delivered, opened, failed)</li>
+</ul>
+<p><strong>Non-Functional Requirements:</strong></p>
+<ul>
+<li>Scale: 500M users, 2B notifications/day</li>
+<li>Latency: &lt; 30 seconds for time-sensitive (e.g., OTP); &lt; 5 minutes for batch</li>
+<li>Reliability: at-least-once delivery, no silent message loss</li>
+<li>Priority support: high-priority (OTP, security alerts) must preempt low-priority (marketing)</li>
+</ul>
+<p><strong>Out of scope:</strong> notification content creation, A/B testing of notification copy.</p>
+<h3 id="step-2-estimation-3-minutes_4">Step 2: Estimation (3 minutes)</h3>
+<pre><code>Volume:
+  2B notifications/day = 23,000 notifications/sec average
+  Peak (3x): 70,000 notifications/sec
+  With channel fan-out (avg 1.5 channels per notification): 105,000 deliveries/sec peak
+
+Storage:
+  Notification log: 2B/day × 500 bytes = 1 TB/day
+  Retention: 90 days → 90 TB
+  User preferences: 500M users × 1 KB = 500 GB
+
+External provider throughput:
+  Push (APNS/FCM): effectively unlimited (batched)
+  Email (SES): 10,000/sec per account (can request increase)
+  SMS (Twilio): 1,000/sec per account (rate-limited, expensive)
+</code></pre>
+<h3 id="step-3-high-level-design-12-minutes_1">Step 3: High-Level Design (12 minutes)</h3>
+<pre><code>┌───────────────────┐
+│ Upstream Services  │
+│ (Orders, Auth,     │
+│  Marketing, etc.)  │
+└────────┬──────────┘
+         │ POST /notify
+┌────────▼──────────┐
+│ Notification API   │
+│ (validates, dedupes│
+│  enriches, routes) │
+└────────┬──────────┘
+         │
+┌────────▼──────────┐
+│ Priority Router    │
+│ High → fast queue  │
+│ Low  → batch queue │
+└──┬─────────────┬──┘
+   │             │
+┌──▼────────┐ ┌──▼────────┐
+│ Kafka      │ │ Kafka      │
+│ (high-pri) │ │ (low-pri)  │
+└──┬────────┘ └──┬────────┘
+   │             │
+┌──▼─────────────▼──┐
+│ Channel Workers     │
+│ ┌─────┐ ┌───────┐  │
+│ │Push │ │Email  │  │
+│ │Worker│ │Worker │  │
+│ └─────┘ └───────┘  │
+│ ┌─────┐ ┌───────┐  │
+│ │SMS  │ │In-App │  │
+│ │Worker│ │Worker │  │
+│ └─────┘ └───────┘  │
+└─────────┬──────────┘
+          │
+┌─────────▼──────────┐
+│ Delivery Tracker    │
+│ (sent/delivered/    │
+│  opened/failed)     │
+│ → Cassandra         │
+└────────────────────┘
+
+┌────────────────────┐
+│ User Preference DB  │
+│ (Redis + PostgreSQL)│
+└────────────────────┘
+</code></pre>
+<p><strong>Core API:</strong></p>
+<pre><code>POST /api/v1/notify
+  Request: {
+    "user_id": "u123",
+    "notification_type": "order_shipped",
+    "template_id": "tmpl_456",
+    "variables": { "order_id": "ORD-789", "tracking_url": "..." },
+    "channels": ["push", "email"],     // optional override
+    "priority": "high",                // high | normal | low
+    "idempotency_key": "order-789-shipped"
+  }
+  Response: { "notification_id": "n789", "status": "queued" }
+</code></pre>
+<h3 id="step-4-deep-dive-rate-limiting-and-priority-15-minutes">Step 4: Deep Dive — Rate Limiting and Priority (15 minutes)</h3>
+<p><strong>Per-user rate limiting:</strong></p>
+<pre><code>Rate limit rules (configurable per notification type):
+  - OTP / Security alert: no limit
+  - Transactional (order updates): max 20/hour
+  - Marketing: max 3/day, not between 10 PM - 8 AM user local time
+  - Digest: max 1/day (batch into digest)
+
+Implementation:
+  - Redis sorted set per user: ZADD user:{id}:notifications {timestamp} {notif_id}
+  - Check count in window: ZCOUNT user:{id}:notifications {window_start} {now}
+  - If over limit: drop (marketing) or buffer for digest (transactional)
+</code></pre>
+<p><strong>Priority queue design:</strong></p>
+<ul>
+<li>Two Kafka topics: <code>notifications-high</code> and <code>notifications-low</code></li>
+<li>High-priority consumers: auto-scaled, always provisioned, no batching delay</li>
+<li>Low-priority consumers: batch processing, can be throttled during peak</li>
+<li>SMS channel: separate rate limiter matching Twilio's API limits (token bucket at 1000/sec)</li>
+</ul>
+<p><strong>Delivery guarantees:</strong></p>
+<ul>
+<li>At-least-once via Kafka consumer offset management</li>
+<li>Idempotency key in the API prevents duplicate notifications from upstream retries</li>
+<li>Deduplication window: 24 hours (store idempotency keys in Redis with TTL)</li>
+<li>Dead letter queue for persistently failing deliveries → alert + manual retry</li>
+</ul>
+<p><strong>Template engine:</strong></p>
+<pre><code>Template: "Hi {{user.first_name}}, your order {{order_id}} has shipped!"
+Variables resolved at send time from the request payload
+Templates stored in PostgreSQL, cached in Redis (invalidated on template update)
+</code></pre>
+<h3 id="step-5-trade-offs-and-bottlenecks-5-minutes_4">Step 5: Trade-offs and Bottlenecks (5 minutes)</h3>
+<p><strong>Trade-offs:</strong></p>
+<ol>
+<li><strong>Single Kafka cluster vs per-channel queues</strong>: Per-channel allows independent scaling and backpressure but increases operational complexity. <em>Decision: two priority levels (high/low), fan-out to per-channel consumer groups within each topic.</em></li>
+<li><strong>Push vs pull for delivery status</strong>: Push (webhooks from providers) gives real-time status but requires handling webhook reliability. <em>Decision: push with fallback polling for providers that support it (APNS/FCM → push; SMS → poll).</em></li>
+<li><strong>Cassandra vs PostgreSQL for delivery log</strong>: Cassandra handles 2B writes/day better; PostgreSQL is simpler. <em>Decision: Cassandra for delivery tracking (write-heavy, time-series); PostgreSQL for user preferences and templates (read-heavy, relational).</em></li>
+</ol>
+<p><strong>Bottlenecks:</strong></p>
+<ul>
+<li>SMS provider rate limits (1000/sec) → mitigate with multi-provider failover (Twilio + Vonage)</li>
+<li>Thundering herd on marketing blast (100M users) → mitigate with staged rollout over 30 minutes</li>
+<li>SLO: 99.9% delivery within 30 seconds for high-priority → requires monitoring per-channel latency p99</li>
+</ul>
+<hr>
+<h2 id="66-interviewer-scoring-rubric">6.6 Interviewer Scoring Rubric</h2>
 <h3 id="level-expectations">Level Expectations</h3>
 <p>Understanding what is expected at each level helps you calibrate your preparation.</p>
 <h4 id="l4-mid-level-sde-ii">L4 (Mid-Level / SDE II)</h4>
@@ -4236,8 +4650,192 @@ Base62 encoding:
 </tbody>
 </table></div>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/F12-system-design-interview-thinking-diagram-19.svg" alt="Diagram 19 for System Design Interview Thinking" loading="lazy"></figure>
+<h3 id="detailed-per-dimension-scoring">Detailed Per-Dimension Scoring (1-5 Scale)</h3>
+<p>Use this rubric to evaluate or self-assess interview performance. Each dimension uses concrete behavioral signals.</p>
+<p><strong>Problem Exploration (15%)</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Jumps straight to drawing; asks no clarifying questions</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Asks 1-2 generic questions ("how many users?"); misses non-functional requirements</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Identifies core FRs and NFRs; defines scope; clarifies ambiguity</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Distinguishes user types; identifies edge cases; frames business context</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Discovers hidden requirements (abuse, compliance, data residency); structures scope as "in scope / out of scope / future"</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>High-Level Design (25%)</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Cannot draw a coherent diagram; components are vague or wrong</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Standard diagram but components are not justified; no API or data model</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Clear diagram with logical data flow; basic API contracts; reasonable data model</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Components sized by estimation numbers; APIs include request/response schemas; data model supports all requirements</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Design reflects production reality (CDN, queues, caching layers); discusses consistency boundaries; identifies read vs write paths explicitly</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Technical Depth (25%)</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Cannot explain how any component works internally</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Surface-level explanation ("we use Redis for caching"); no algorithm detail</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Explains one component with concrete data structures and algorithms; handles basic failure cases</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Deep expertise in 2+ areas; discusses specific optimizations (e.g., B-tree vs LSM, fan-out strategies); handles interviewer pivots</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Production-level reasoning: explains race conditions, discusses specific failure modes, proposes monitoring signals; knowledge clearly comes from real experience</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Trade-off Analysis (20%)</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>No trade-offs mentioned; design is presented as the only option</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Acknowledges trade-offs exist but cannot articulate them</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Identifies 2-3 trade-offs; compares options with clear reasoning ("I chose X over Y because Z")</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Quantifies trade-offs where possible (cost, latency, availability); discusses trade-off evolution over time</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Frames trade-offs in SLO/error budget terms; discusses how the design degrades under failure; proposes adaptive strategies</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Communication (15%)</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Score</th>
+<th>Signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Incoherent; no structure; long silences</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Answers questions but does not drive the conversation; poor whiteboard hygiene</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Clear structure; narrates thought process; labels diagrams cleanly</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Collaborative; checks in with interviewer at transitions; adapts when challenged</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Drives conversation naturally; teaches while designing; makes the interviewer forget they are interviewing</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Overall scoring guide:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Total Score (out of 25)</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>20-25</td>
+<td>Strong Hire</td>
+</tr>
+<tr>
+<td>15-19</td>
+<td>Hire</td>
+</tr>
+<tr>
+<td>10-14</td>
+<td>Lean Hire / Lean No Hire (level-dependent)</td>
+</tr>
+<tr>
+<td>5-9</td>
+<td>No Hire</td>
+</tr>
+</tbody>
+</table></div>
 <hr>
-<h2 id="65-practice-questions">6.5 Practice Questions</h2>
+<h2 id="67-practice-questions">6.7 Practice Questions</h2>
 <h3 id="tier-1-foundational-l4-target">Tier 1: Foundational (L4 Target)</h3>
 <p>These problems test core skills — data modeling, API design, caching, and basic scaling.</p>
 <ol>
@@ -4311,7 +4909,7 @@ Base62 encoding:
 <li>Redo the same problem 1 week later — your second attempt should be significantly better</li>
 </ol>
 <hr>
-<h2 id="66-anti-patterns-to-avoid">6.6 Anti-Patterns to Avoid</h2>
+<h2 id="68-anti-patterns-to-avoid">6.8 Anti-Patterns to Avoid</h2>
 <h3 id="in-the-interview">In the Interview</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -4417,7 +5015,7 @@ Base62 encoding:
 </tbody>
 </table></div>
 <hr>
-<h2 id="67-interview-communication-framework">6.7 Interview Communication Framework</h2>
+<h2 id="69-interview-communication-framework">6.9 Interview Communication Framework</h2>
 <h3 id="the-star-d-method-for-system-design">The STAR-D Method for System Design</h3>
 <p>Adapt the STAR method for system design responses:</p>
 <ul>
@@ -4756,7 +5354,261 @@ Alternatives Considered:
   [What other options were evaluated? Why were they rejected?]
 </code></pre>
 <hr>
-<h2 id="76-final-checklist-before-your-interview">7.6 Final Checklist: Before Your Interview</h2>
+<h2 id="76-interview-output-templates">7.6 Interview Output Templates</h2>
+<p>Use these templates during practice to ensure your interview deliverables are complete and well-structured.</p>
+<h3 id="diagram-template">Diagram Template</h3>
+<p>Every system design diagram should have these layers. Draw top-to-bottom or left-to-right, and label every arrow.</p>
+<pre><code>┌─────────────────────────────────────────────────────┐
+│  CLIENT LAYER                                        │
+│  [Web App]  [Mobile App]  [Third-Party API Consumer] │
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTPS / WebSocket
+┌──────────────────────▼──────────────────────────────┐
+│  EDGE / GATEWAY LAYER                                │
+│  [CDN]  [API Gateway / Load Balancer]  [Rate Limiter]│
+└──────────────────────┬──────────────────────────────┘
+                       │ HTTP / gRPC
+┌──────────────────────▼──────────────────────────────┐
+│  APPLICATION LAYER                                   │
+│  [Service A]  [Service B]  [Service C]               │
+│  (stateless, horizontally scalable)                  │
+└─────────┬────────────┬───────────────┬──────────────┘
+          │            │               │
+┌─────────▼──┐  ┌──────▼─────┐  ┌─────▼──────────────┐
+│ DATA LAYER  │  │ CACHE LAYER│  │ ASYNC LAYER         │
+│ [Primary DB]│  │ [Redis]    │  │ [Kafka / SQS]       │
+│ [Replicas]  │  │ [Memcached]│  │ [Workers / Consumers]│
+│ [Object     │  └────────────┘  └─────────────────────┘
+│  Storage]   │
+└─────────────┘
+</code></pre>
+<p><strong>Diagram checklist</strong> — verify before moving on:</p>
+<ul>
+<li>[ ] Every box is labeled with its role (not just a technology name)</li>
+<li>[ ] Every arrow is labeled with the protocol/data type</li>
+<li>[ ] Read path and write path are distinguishable (or drawn separately)</li>
+<li>[ ] Client types are shown (web, mobile, API)</li>
+<li>[ ] Data stores are labeled with consistency model (strong/eventual)</li>
+</ul>
+<h3 id="api-template">API Template</h3>
+<p>For each core feature, define at least one API endpoint:</p>
+<pre><code>POST /api/v1/{resource}
+  Description: [What does this endpoint do?]
+  Auth: [Bearer token / API key / session cookie]
+  Request:
+    {
+      "field_1": "string (required) — [description]",
+      "field_2": 123 (optional) — [description]
+    }
+  Response (200):
+    {
+      "id": "uuid",
+      "field_1": "string",
+      "created_at": "ISO-8601",
+      "metadata": {}
+    }
+  Response (400): { "error": "validation_error", "message": "..." }
+  Response (429): { "error": "rate_limited", "retry_after": 60 }
+
+  Rate limit: 100 req/min per user
+  Idempotency: [Yes — idempotency key in header / No]
+  Pagination: [cursor-based / offset-based] (for list endpoints)
+</code></pre>
+<p><strong>API checklist:</strong></p>
+<ul>
+<li>[ ] Versioned endpoint (v1)</li>
+<li>[ ] Error responses defined</li>
+<li>[ ] Rate limiting specified</li>
+<li>[ ] Pagination strategy for list endpoints</li>
+<li>[ ] Idempotency for write endpoints</li>
+</ul>
+<h3 id="data-model-template">Data Model Template</h3>
+<pre><code>Table: {entity_name}
+┌──────────────────┬──────────────┬──────────────────────────────┐
+│ Column           │ Type         │ Notes                        │
+├──────────────────┼──────────────┼──────────────────────────────┤
+│ id               │ UUID / BIGINT│ Primary key                  │
+│ {foreign_key}_id │ UUID         │ FK → {related_table}         │
+│ {field_1}        │ VARCHAR(255) │ Indexed for search           │
+│ {field_2}        │ JSONB        │ Flexible metadata            │
+│ status           │ ENUM         │ [active, deleted, archived]  │
+│ created_at       │ TIMESTAMP    │ Indexed for time-range queries│
+│ updated_at       │ TIMESTAMP    │ Used for optimistic locking  │
+└──────────────────┴──────────────┴──────────────────────────────┘
+
+Indexes:
+  - PRIMARY KEY (id)
+  - INDEX idx_{field}_created (field_1, created_at DESC)
+  - UNIQUE INDEX idx_{unique_field} (unique_field)
+
+Access patterns:
+  - Read by ID: O(1) via primary key → hot path, cache with TTL
+  - List by user: idx_user_created → pagination with cursor
+  - Search by field: Full-text index or external search (Elasticsearch)
+
+Sharding strategy: [hash(user_id) / range(created_at) / none]
+Estimated row count: [X million / year]
+Estimated row size: [~Y bytes]
+</code></pre>
+<hr>
+<h2 id="77-ai-era-system-design-topics">7.7 AI-Era System Design Topics</h2>
+<p>AI/ML systems are now standard interview topics at senior levels. Expect questions about LLM serving, RAG pipelines, vector search, and ML inference infrastructure.</p>
+<h3 id="common-ai-system-design-questions">Common AI System Design Questions</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Core Challenge</th>
+<th>Key Components</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Design a RAG system</td>
+<td>Retrieval quality + latency + cost</td>
+<td>Vector DB, embedding pipeline, LLM API, prompt orchestration</td>
+</tr>
+<tr>
+<td>Design an LLM serving platform</td>
+<td>Latency, throughput, cost at scale</td>
+<td>Model serving (vLLM/TGI), GPU scheduling, batching, KV cache</td>
+</tr>
+<tr>
+<td>Design a recommendation engine</td>
+<td>Personalization + freshness + cold start</td>
+<td>Feature store, candidate generation, ranking model, A/B testing</td>
+</tr>
+<tr>
+<td>Design a real-time content moderation system</td>
+<td>Latency + accuracy + appeal workflow</td>
+<td>ML classifier, human review queue, feedback loop</td>
+</tr>
+<tr>
+<td>Design a vector search engine</td>
+<td>Similarity search at scale</td>
+<td>ANN index (HNSW/IVF), embedding pipeline, hybrid search</td>
+</tr>
+<tr>
+<td>Design an AI chatbot platform</td>
+<td>Multi-turn context, tool use, safety</td>
+<td>LLM orchestrator, memory/context store, tool routing, guardrails</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="rag-system-design-quick-reference">RAG System Design — Quick Reference</h3>
+<pre><code>┌─────────────┐     ┌───────────────┐     ┌──────────────┐
+│ Documents   │────→│ Chunking +    │────→│ Vector DB    │
+│ (corpus)    │     │ Embedding     │     │ (Pinecone/   │
+└─────────────┘     │ (text-        │     │  Weaviate/   │
+                    │  embedding-3) │     │  pgvector)   │
+                    └───────────────┘     └──────┬───────┘
+                                                 │ top-k
+┌─────────────┐     ┌───────────────┐     ┌──────▼───────┐
+│ User Query  │────→│ Query         │────→│ Retriever    │
+└─────────────┘     │ Embedding     │     │ (semantic +  │
+                    └───────────────┘     │  keyword     │
+                                          │  hybrid)     │
+                                          └──────┬───────┘
+                                                 │ context
+                                          ┌──────▼───────┐
+                                          │ LLM          │
+                                          │ (prompt =    │
+                                          │  system +    │
+                                          │  context +   │
+                                          │  query)      │
+                                          └──────┬───────┘
+                                                 │
+                                          ┌──────▼───────┐
+                                          │ Response +   │
+                                          │ Citations    │
+                                          └──────────────┘
+</code></pre>
+<p><strong>Key trade-offs in RAG design:</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Trade-off</th>
+<th>Option A</th>
+<th>Option B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chunk size</td>
+<td>Small (256 tokens): precise retrieval</td>
+<td>Large (1024 tokens): more context per chunk</td>
+</tr>
+<tr>
+<td>Retrieval method</td>
+<td>Semantic only: great for natural queries</td>
+<td>Hybrid (semantic + BM25): better for keyword-heavy queries</td>
+</tr>
+<tr>
+<td>Embedding model</td>
+<td>Proprietary (OpenAI): highest quality</td>
+<td>Open-source (e5, BGE): lower cost, self-hosted</td>
+</tr>
+<tr>
+<td>Vector DB</td>
+<td>Managed (Pinecone): zero-ops</td>
+<td>Self-hosted (pgvector, Milvus): cost control, data sovereignty</td>
+</tr>
+<tr>
+<td>Re-ranking</td>
+<td>No re-ranker: lower latency</td>
+<td>Cross-encoder re-ranker: higher relevance, +50ms latency</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="llm-serving-key-numbers">LLM Serving — Key Numbers</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Typical Value</th>
+<th>Interview Relevance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Time to first token (TTFT)</td>
+<td>200-500ms</td>
+<td>Drives perceived latency</td>
+</tr>
+<tr>
+<td>Token generation rate</td>
+<td>30-80 tokens/sec per request</td>
+<td>Determines throughput</td>
+</tr>
+<tr>
+<td>GPU memory per 7B model</td>
+<td>~14 GB (FP16)</td>
+<td>Drives hardware cost</td>
+</tr>
+<tr>
+<td>GPU memory per 70B model</td>
+<td>~140 GB (FP16)</td>
+<td>Requires multi-GPU</td>
+</tr>
+<tr>
+<td>KV cache per request</td>
+<td>0.5-4 GB (depending on context length)</td>
+<td>Main memory bottleneck</td>
+</tr>
+<tr>
+<td>Cost per 1M tokens (API)</td>
+<td>$0.15-$15 (varies by model/provider)</td>
+<td>Drives build vs buy</td>
+</tr>
+<tr>
+<td>Batch size sweet spot</td>
+<td>8-32 concurrent requests</td>
+<td>Maximizes GPU utilization</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="78-final-checklist-before-your-interview">7.8 Final Checklist: Before Your Interview</h2>
 <h3 id="knowledge-checklist">Knowledge Checklist</h3>
 <ul>
 <li>[ ] Can you convert DAU to QPS without hesitation?</li>
@@ -4790,7 +5642,7 @@ Alternatives Considered:
 <li>[ ] Have you practiced problems from all three tiers?</li>
 </ul>
 <hr>
-<h2 id="77-the-meta-skill-learning-to-think">7.7 The Meta-Skill: Learning to Think</h2>
+<h2 id="79-the-meta-skill-learning-to-think">7.9 The Meta-Skill: Learning to Think</h2>
 <p>This chapter has provided frameworks, checklists, and walkthroughs. But the ultimate skill is not following a framework — it is <strong>thinking clearly about complex systems under uncertainty</strong>.</p>
 <p>The framework is training wheels. After enough practice, the framework becomes internalized and you think through the steps naturally. At that point, the interview feels like a conversation between two engineers discussing a real problem — which is exactly what it should feel like.</p>
 <h3 id="the-three-levels-of-system-design-mastery">The Three Levels of System Design Mastery</h3>
@@ -4819,7 +5671,13 @@ Alternatives Considered:
 <p><strong>Cost Awareness</strong> — Cloud cost models, optimization strategies, and build vs buy analysis.</p>
 </li>
 <li>
-<p><strong>Mock Walkthroughs</strong> — Complete design walkthroughs for Twitter, Uber, and a URL shortener, with scoring rubrics and 24 practice questions.</p>
+<p><strong>Mock Walkthroughs</strong> — Complete design walkthroughs for Twitter, Uber, a URL shortener, a RAG-based knowledge assistant, and a notification platform, with scoring rubrics and 24 practice questions.</p>
+</li>
+<li>
+<p><strong>Interview Output Templates</strong> — Reusable templates for diagrams, API contracts, and data models that ensure deliverables are complete and well-structured during the interview.</p>
+</li>
+<li>
+<p><strong>AI-Era Topics</strong> — RAG systems, LLM serving, vector search, and recommendation engines are now standard interview questions. Key numbers and trade-offs provided for quick reference.</p>
 </li>
 </ol>
 <p>The core message: system design interviews reward <strong>clear thinking, structured communication, and defensible trade-off decisions</strong> — not memorized architectures or buzzword-driven answers.</p>
@@ -4941,6 +5799,7 @@ Alternatives Considered:
 </li>
 <li><a href="#why-this-chapter-matters">Why This Chapter Matters</a></li>
 <li><a href="#11-the-five-step-method">1.1 The Five-Step Method</a><ul>
+<li><a href="#timebox-to-deliverable-map">Timebox-to-Deliverable Map</a></li>
 <li><a href="#why-this-order-matters">Why This Order Matters</a></li>
 </ul>
 </li>
@@ -5149,24 +6008,43 @@ Alternatives Considered:
 <li><a href="#step-5-trade-offs-and-bottlenecks-5-minutes_2">Step 5: Trade-offs and Bottlenecks (5 minutes)</a></li>
 </ul>
 </li>
-<li><a href="#64-interviewer-scoring-rubric">6.4 Interviewer Scoring Rubric</a><ul>
-<li><a href="#level-expectations">Level Expectations</a></li>
-<li><a href="#scoring-dimensions">Scoring Dimensions</a></li>
+<li><a href="#64-mock-interview-4-design-a-rag-based-knowledge-assistant">6.4 Mock Interview 4: Design a RAG-Based Knowledge Assistant</a><ul>
+<li><a href="#problem-statement_3">Problem Statement</a></li>
+<li><a href="#step-1-requirements-6-minutes">Step 1: Requirements (6 minutes)</a></li>
+<li><a href="#step-2-estimation-3-minutes_3">Step 2: Estimation (3 minutes)</a></li>
+<li><a href="#step-3-high-level-design-12-minutes">Step 3: High-Level Design (12 minutes)</a></li>
+<li><a href="#step-4-deep-dive-retrieval-quality-15-minutes">Step 4: Deep Dive — Retrieval Quality (15 minutes)</a></li>
+<li><a href="#step-5-trade-offs-and-bottlenecks-5-minutes_3">Step 5: Trade-offs and Bottlenecks (5 minutes)</a></li>
 </ul>
 </li>
-<li><a href="#65-practice-questions">6.5 Practice Questions</a><ul>
+<li><a href="#65-mock-interview-5-design-a-notification-platform">6.5 Mock Interview 5: Design a Notification Platform</a><ul>
+<li><a href="#problem-statement_4">Problem Statement</a></li>
+<li><a href="#step-1-requirements-6-minutes_1">Step 1: Requirements (6 minutes)</a></li>
+<li><a href="#step-2-estimation-3-minutes_4">Step 2: Estimation (3 minutes)</a></li>
+<li><a href="#step-3-high-level-design-12-minutes_1">Step 3: High-Level Design (12 minutes)</a></li>
+<li><a href="#step-4-deep-dive-rate-limiting-and-priority-15-minutes">Step 4: Deep Dive — Rate Limiting and Priority (15 minutes)</a></li>
+<li><a href="#step-5-trade-offs-and-bottlenecks-5-minutes_4">Step 5: Trade-offs and Bottlenecks (5 minutes)</a></li>
+</ul>
+</li>
+<li><a href="#66-interviewer-scoring-rubric">6.6 Interviewer Scoring Rubric</a><ul>
+<li><a href="#level-expectations">Level Expectations</a></li>
+<li><a href="#scoring-dimensions">Scoring Dimensions</a></li>
+<li><a href="#detailed-per-dimension-scoring">Detailed Per-Dimension Scoring (1-5 Scale)</a></li>
+</ul>
+</li>
+<li><a href="#67-practice-questions">6.7 Practice Questions</a><ul>
 <li><a href="#tier-1-foundational-l4-target">Tier 1: Foundational (L4 Target)</a></li>
 <li><a href="#tier-2-intermediate-l5-target">Tier 2: Intermediate (L5 Target)</a></li>
 <li><a href="#tier-3-advanced-l6-target">Tier 3: Advanced (L6 Target)</a></li>
 <li><a href="#how-to-practice">How to Practice</a></li>
 </ul>
 </li>
-<li><a href="#66-anti-patterns-to-avoid">6.6 Anti-Patterns to Avoid</a><ul>
+<li><a href="#68-anti-patterns-to-avoid">6.8 Anti-Patterns to Avoid</a><ul>
 <li><a href="#in-the-interview">In the Interview</a></li>
 <li><a href="#in-the-design">In the Design</a></li>
 </ul>
 </li>
-<li><a href="#67-interview-communication-framework">6.7 Interview Communication Framework</a><ul>
+<li><a href="#69-interview-communication-framework">6.9 Interview Communication Framework</a><ul>
 <li><a href="#the-star-d-method-for-system-design">The STAR-D Method for System Design</a></li>
 </ul>
 </li>
@@ -5180,13 +6058,25 @@ Alternatives Considered:
 </ul>
 </li>
 <li><a href="#75-architecture-decision-record-template">7.5 Architecture Decision Record Template</a></li>
-<li><a href="#76-final-checklist-before-your-interview">7.6 Final Checklist: Before Your Interview</a><ul>
+<li><a href="#76-interview-output-templates">7.6 Interview Output Templates</a><ul>
+<li><a href="#diagram-template">Diagram Template</a></li>
+<li><a href="#api-template">API Template</a></li>
+<li><a href="#data-model-template">Data Model Template</a></li>
+</ul>
+</li>
+<li><a href="#77-ai-era-system-design-topics">7.7 AI-Era System Design Topics</a><ul>
+<li><a href="#common-ai-system-design-questions">Common AI System Design Questions</a></li>
+<li><a href="#rag-system-design-quick-reference">RAG System Design — Quick Reference</a></li>
+<li><a href="#llm-serving-key-numbers">LLM Serving — Key Numbers</a></li>
+</ul>
+</li>
+<li><a href="#78-final-checklist-before-your-interview">7.8 Final Checklist: Before Your Interview</a><ul>
 <li><a href="#knowledge-checklist">Knowledge Checklist</a></li>
 <li><a href="#process-checklist">Process Checklist</a></li>
 <li><a href="#practice-checklist">Practice Checklist</a></li>
 </ul>
 </li>
-<li><a href="#77-the-meta-skill-learning-to-think">7.7 The Meta-Skill: Learning to Think</a><ul>
+<li><a href="#79-the-meta-skill-learning-to-think">7.9 The Meta-Skill: Learning to Think</a><ul>
 <li><a href="#the-three-levels-of-system-design-mastery">The Three Levels of System Design Mastery</a></li>
 </ul>
 </li>

@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 20 of 60
+<strong>Position:</strong> Chapter 20 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -5227,6 +5227,101 @@ Savings: ~66%
 <hr>
 <h2 id="evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 → V2 → V3)</h2>
 <figure class="mermaid-static-diagram"><img src="../assets/diagrams/20-social-media-content-platforms-diagram-38.svg" alt="Diagram 38 for Social Media &amp; Content Platforms" loading="lazy"></figure>
+<h2 id="fanout-decision-matrix">Fanout Strategy Decision Matrix</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How It Works</th><th>Write Cost</th><th>Read Cost</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>Push (fanout-on-write)</strong></td><td>Write to every follower's cache on post</td><td>O(followers)</td><td>O(1)</td><td>&lt; 10K followers</td></tr>
+<tr><td><strong>Pull (fanout-on-read)</strong></td><td>Query followed accounts on feed load</td><td>O(1)</td><td>O(following)</td><td>Mega-creators &gt; 100K</td></tr>
+<tr><td><strong>Hybrid</strong></td><td>Push for regular; pull for mega-creators; merge at read</td><td>Bounded</td><td>Mostly cached</td><td>Production at scale</td></tr>
+</tbody>
+</table></div>
+<pre><code>Hybrid: 500M DAU, 300 follows avg, 2 posts/day
+  Pure push: 300B feed writes/day → unsustainable
+  Hybrid (99% push, 1% pull): ~3B writes/day → 100x reduction</code></pre>
+<hr>
+<h2 id="per-feature-consistency">Consistency Model — Per-Feature Guide</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Feature</th><th>Consistency</th><th>Implementation</th><th>Acceptable Lag</th></tr></thead>
+<tbody>
+<tr><td><strong>Own post visibility</strong></td><td>Read-your-writes</td><td>Read from write DB for posting user</td><td>0 (immediate)</td></tr>
+<tr><td><strong>Feed content</strong></td><td>Eventual</td><td>Redis fanout cache + async merge</td><td>&lt; 10 seconds</td></tr>
+<tr><td><strong>Like count (display)</strong></td><td>Approximate</td><td>Redis INCR → async DB sync</td><td>&lt; 30 seconds</td></tr>
+<tr><td><strong>Comment list</strong></td><td>Eventually consistent</td><td>Write DB → CDC → cache invalidation</td><td>&lt; 5 seconds</td></tr>
+<tr><td><strong>Follow/unfollow</strong></td><td>Eventual</td><td>Graph DB → async feed cache update</td><td>&lt; 30 seconds</td></tr>
+<tr><td><strong>Message delivery</strong></td><td>At-least-once</td><td>Persistent queue + delivery ack</td><td>&lt; 2 seconds</td></tr>
+<tr><td><strong>Post deletion</strong></td><td>Strong (soft delete)</td><td>Immediate DB flag → async cache cleanup</td><td>&lt; 10 seconds</td></tr>
+<tr><td><strong>Block/mute</strong></td><td>Strong for blocker</td><td>Immediate filter on blocked user's requests</td><td>&lt; 5 seconds</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="moderation-blueprint">Content Moderation and Safety Blueprint</h2>
+<pre><code>LAYER 1: PRE-PUB ML (&lt; 200ms)
+  Image: nudity/violence CNN | Text: hate/spam/self-harm | Link: URL reputation
+  → PASS / BLOCK / REDUCE_DISTRIBUTION
+
+LAYER 2: POST-PUB ASYNC (minutes-hours)
+  Deep video analysis | Behavioral signals | Graph analysis | User reports
+  → ESCALATE / REDUCE_REACH / REMOVE
+
+LAYER 3: HUMAN REVIEW (hours-days)
+  Policy specialists | Appeals | Regulatory (CSAM → NCMEC, terrorism → law enforcement)
+  → CONFIRM_REMOVAL / REINSTATE / RESTRICT</code></pre>
+<h3 id="moderation-slos">Moderation SLOs</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Content</th><th>Pre-Pub</th><th>Post-Pub Scan</th><th>Human Review</th><th>Regulatory</th></tr></thead>
+<tbody>
+<tr><td>Text</td><td>&lt; 100ms</td><td>&lt; 10 min</td><td>&lt; 24h</td><td>N/A</td></tr>
+<tr><td>Image</td><td>&lt; 200ms</td><td>&lt; 30 min</td><td>&lt; 24h</td><td>CSAM: &lt; 1h</td></tr>
+<tr><td>Video</td><td>&lt; 500ms (frames)</td><td>&lt; 2h (full)</td><td>&lt; 48h</td><td>Terrorism: &lt; 1h</td></tr>
+<tr><td>Live stream</td><td>Real-time</td><td>Continuous</td><td>On-call</td><td>Immediate</td></tr>
+</tbody>
+</table></div>
+<h3 id="privacy-controls">Privacy Controls</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Control</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Account privacy (public/private)</td><td>Follow requests require approval for private; content not indexed</td></tr>
+<tr><td>Post audience</td><td>Scope stored per post; enforced at read time</td></tr>
+<tr><td>Block</td><td>Bidirectional: blocked user cannot see or interact</td></tr>
+<tr><td>Mute</td><td>Unidirectional: hidden from feed; no notification to muted user</td></tr>
+<tr><td>Account deletion</td><td>Soft delete → 30d grace → hard delete; content → "Deleted User"</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="feed-slos">Feed Freshness and Latency SLOs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>SLO</th><th>Alert Threshold</th></tr></thead>
+<tbody>
+<tr><td>Feed load latency (p99)</td><td>&lt; 500ms</td><td>&gt; 800ms for 5+ min</td></tr>
+<tr><td>New post → follower feed</td><td>&lt; 10 seconds</td><td>&gt; 30 seconds sustained</td></tr>
+<tr><td>Push notification delivery</td><td>&lt; 5 seconds</td><td>&gt; 15 seconds</td></tr>
+<tr><td>Image upload → playable</td><td>&lt; 30 seconds</td><td>&gt; 2x target</td></tr>
+<tr><td>Video upload → playable</td><td>&lt; 5 minutes</td><td>&gt; 2x target</td></tr>
+<tr><td>Search index freshness</td><td>&lt; 60 seconds</td><td>&gt; 3 minutes</td></tr>
+<tr><td>Moderation pre-pub latency</td><td>&lt; 200ms</td><td>&gt; 500ms</td></tr>
+</tbody>
+</table></div>
+<h3 id="feed-quality-metrics">Feed Quality Metrics</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>Meaning</th><th>Target</th></tr></thead>
+<tbody>
+<tr><td>Feed engagement rate</td><td>% items with any interaction</td><td>&gt; 5%</td></tr>
+<tr><td>Empty feed rate</td><td>% loads with 0 items</td><td>&lt; 0.1%</td></tr>
+<tr><td>Stale feed rate</td><td>% loads where newest item &gt; 1h old</td><td>&lt; 2%</td></tr>
+<tr><td>Fanout lag (p99)</td><td>Time from post to all follower caches</td><td>&lt; 30 seconds</td></tr>
+</tbody>
+</table></div>
+<h3 id="social-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Caching strategies for feeds</td><td><a href="06-caching-systems.html">Ch 6</a></td></tr>
+<tr><td>Event-driven fanout</td><td><a href="16-event-driven-architecture.html">Ch 16</a></td></tr>
+<tr><td>CQRS for read/write separation</td><td><a href="17-cqrs-pattern.html">Ch 17</a></td></tr>
+<tr><td>Privacy/regulatory requirements</td><td><a href="02-types-of-requirements.html">Ch 2</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Social Media &amp; Content Platforms represent the most architecturally diverse domain in system design:</p>
@@ -5463,6 +5558,10 @@ Savings: ~66%
 </ul>
 </li>
 <li><a href="#evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 → V2 → V3)</a></li>
+<li><a href="#fanout-decision-matrix">Fanout Decision Matrix</a></li>
+<li><a href="#per-feature-consistency">Per-Feature Consistency Guide</a></li>
+<li><a href="#moderation-blueprint">Content Moderation &amp; Safety Blueprint</a></li>
+<li><a href="#feed-slos">Feed Freshness &amp; Latency SLOs</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
 </ul>

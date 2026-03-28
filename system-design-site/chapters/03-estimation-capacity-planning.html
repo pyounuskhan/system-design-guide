@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 1 - Foundations of System Design<br>
-<strong>Position:</strong> Chapter 3 of 60
+<strong>Position:</strong> Chapter 3 of 42<br>
 <strong>Why this part exists:</strong> This opening section gives the reader the language, framing, and mental models needed to reason about systems before choosing technologies.<br>
 <strong>This chapter builds toward:</strong> credible high-level design, bottleneck identification, and interview-ready back-of-the-envelope reasoning</p>
 <h2 id="overview">Overview</h2>
@@ -1143,6 +1143,144 @@
 <li>Revisit estimates as the product changes because old assumptions quietly become dangerous.</li>
 <li>Ask which number is most likely to break the system first, not just which number is easiest to compute.</li>
 </ul>
+<h2 id="estimation-cheat-sheet">Interview Estimation Cheat Sheet</h2>
+<p>Memorize these numbers to order-of-magnitude accuracy. They are reasoning anchors for interviews and design reviews.</p>
+<h3 id="latency-numbers">Latency Numbers Every Engineer Should Know</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Operation</th><th>Approximate Latency</th></tr></thead>
+<tbody>
+<tr><td>L1 cache reference</td><td>1 ns</td></tr>
+<tr><td>L2 cache reference</td><td>4 ns</td></tr>
+<tr><td>Main memory reference</td><td>100 ns</td></tr>
+<tr><td>SSD random read</td><td>16 μs</td></tr>
+<tr><td>HDD random read</td><td>4 ms</td></tr>
+<tr><td>Read 1 MB from SSD</td><td>50 μs</td></tr>
+<tr><td>Read 1 MB from HDD</td><td>2 ms</td></tr>
+<tr><td>Read 1 MB from network (1 Gbps)</td><td>10 ms</td></tr>
+<tr><td>Round trip same datacenter</td><td>0.5 ms</td></tr>
+<tr><td>Round trip cross-continent (US-EU)</td><td>70-150 ms</td></tr>
+<tr><td>TCP handshake (same region)</td><td>1-3 ms</td></tr>
+<tr><td>TLS handshake (same region)</td><td>5-15 ms</td></tr>
+</tbody>
+</table></div>
+<h3 id="quick-conversions">Quick Conversion Table</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Input</th><th>Formula</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>1M requests/day</td><td>÷ 86,400</td><td>~12 QPS</td></tr>
+<tr><td>100M requests/day</td><td>÷ 86,400</td><td>~1,200 QPS</td></tr>
+<tr><td>1B requests/day</td><td>÷ 86,400</td><td>~12,000 QPS</td></tr>
+<tr><td>Average QPS → Peak QPS</td><td>× 2-5 (default 3)</td><td>Peak QPS</td></tr>
+<tr><td>1 KB × 1 billion</td><td>=</td><td>1 TB</td></tr>
+<tr><td>1 MB × 1 million</td><td>=</td><td>1 TB</td></tr>
+</tbody>
+</table></div>
+<h3 id="server-capacity">Server Capacity Rules of Thumb</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Typical Limit</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Single PostgreSQL</td><td>5K-10K QPS (read), 1K-5K QPS (write)</td><td>Depends on query complexity</td></tr>
+<tr><td>Single Redis</td><td>100K+ QPS</td><td>In-memory, single-threaded per core</td></tr>
+<tr><td>Single Kafka broker</td><td>100K+ messages/sec</td><td>Depends on message size</td></tr>
+<tr><td>WebSocket connections/server</td><td>50K-100K</td><td>Depends on message frequency</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="cost-per-request">Cost-per-Request Modeling</h2>
+<p>Estimation is incomplete without cost awareness. Knowing that your system handles 10,000 QPS is useful. Knowing that each request costs $0.0003 and your monthly bill is $78K is actionable.</p>
+<h3 id="cost-formula">The Cost Estimation Formula</h3>
+<pre><code>Monthly cost = Compute + Storage + Bandwidth + Managed Services + Observability
+
+Cost per request = Monthly infrastructure cost / Monthly request count
+
+Example:
+  Monthly cost: $15,000
+  Monthly requests: 500 million
+  Cost per request: $0.00003 (0.003 cents)
+  At 10x growth: $150,000/month
+  At 100x growth: $1,500,000/month → optimization required</code></pre>
+<h3 id="cloud-cost-reference">Cloud Cost Quick Reference</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Approximate Cost</th><th>Unit</th></tr></thead>
+<tbody>
+<tr><td>EC2 m6i.xlarge (4 vCPU, 16 GB)</td><td>~$140/month on-demand</td><td>Per instance</td></tr>
+<tr><td>RDS PostgreSQL db.r6g.xlarge</td><td>~$350/month</td><td>Per instance</td></tr>
+<tr><td>ElastiCache Redis r6g.large</td><td>~$175/month</td><td>Per node</td></tr>
+<tr><td>S3 Standard</td><td>$0.023/GB/month</td><td>Per GB</td></tr>
+<tr><td>S3 Glacier</td><td>$0.004/GB/month</td><td>Per GB</td></tr>
+<tr><td>CloudFront egress</td><td>$0.085/GB</td><td>Per GB</td></tr>
+<tr><td>Lambda</td><td>$0.20 per 1M invocations</td><td>Per request</td></tr>
+<tr><td>API Gateway</td><td>$3.50 per 1M requests</td><td>Per request</td></tr>
+</tbody>
+</table></div>
+<h3 id="storage-lifecycle-tiers">Storage Lifecycle Tiers</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Tier</th><th>Access Pattern</th><th>Storage Class</th><th>Cost ($/GB/month)</th><th>Use Case</th></tr></thead>
+<tbody>
+<tr><td>Hot</td><td>Frequent (multiple/day)</td><td>SSD, S3 Standard</td><td>$0.02-0.10</td><td>Active user data, cache</td></tr>
+<tr><td>Warm</td><td>Occasional (weekly)</td><td>HDD, S3 IA</td><td>$0.01-0.03</td><td>Recent logs, 30-day analytics</td></tr>
+<tr><td>Cold</td><td>Rare (monthly)</td><td>S3 Glacier Instant</td><td>$0.004</td><td>90-day compliance data</td></tr>
+<tr><td>Archive</td><td>Regulatory only</td><td>S3 Glacier Deep Archive</td><td>$0.001</td><td>7-year audit logs</td></tr>
+</tbody>
+</table></div>
+<p><strong>Cost impact:</strong> 100 TB with lifecycle tiers costs ~$640/month vs $2,300/month all in S3 Standard (72% savings).</p>
+<hr>
+<h2 id="multi-region-estimation">Multi-Region Traffic Assumptions</h2>
+<p>For systems serving a global user base, estimation must account for geographic distribution.</p>
+<h3 id="multi-region-adjustments">Multi-Region Estimation Adjustments</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Factor</th><th>Single Region</th><th>Multi-Region</th><th>Impact</th></tr></thead>
+<tbody>
+<tr><td>Total QPS</td><td>Sum of all traffic</td><td>Split by region (e.g., 40% US, 30% EU, 20% APAC)</td><td>Each region sized for its peak</td></tr>
+<tr><td>Database</td><td>Single primary</td><td>Primary per region OR global primary + read replicas</td><td>Cross-region replication lag 100-300ms</td></tr>
+<tr><td>Latency budget</td><td>~50ms DB + ~20ms cache</td><td>Add 70-150ms cross-continent</td><td>Forces data locality strategy</td></tr>
+<tr><td>Storage</td><td>1x (plus replication)</td><td>N× regions × replication factor</td><td>Costs multiply</td></tr>
+<tr><td>Cost multiplier</td><td>1x</td><td>1.5-2.5x</td><td>Factor from the start</td></tr>
+</tbody>
+</table></div>
+<p><strong>Rule of thumb:</strong> Multi-region roughly doubles cost. Only deploy multi-region when the business requires it (latency SLO, data residency, DR).</p>
+<hr>
+<h2 id="scenario-exercises">Scenario Exercises with Latency Targets</h2>
+<p>These exercises combine estimation with latency budgeting (p95/p99 targets). Practice them to build interview fluency.</p>
+<h3 id="exercise-1-photo-sharing">Exercise 1: Photo-Sharing App</h3>
+<pre><code>Given: 500M MAU, 300M DAU, 20 photo views/day, 0.5 uploads/day, 2 MB original, 200 KB compressed
+
+Upload QPS: 300M × 0.5 / 86,400 = ~1,700 (peak 3x = 5,100)
+View QPS: 300M × 20 / 86,400 = ~69,000 (peak 3x = 207,000)
+Read:Write = 40:1 �� heavily read-optimized
+
+Daily storage: 300M × 0.5 × 2.2 MB = ~330 TB/day
+Annual: ~120 PB/year → lifecycle tiering essential
+
+Latency budget (photo view, p99 &lt; 200ms):
+  CDN hit: 0ms (90% of views)
+  CDN miss: DNS(5) + TLS(10) + API(5) + Auth(10) + S3(50) + Response(15) = 100ms ✓
+
+Architecture: CDN critical (90%+ hit rate), pre-compute thumbnails at upload</code></pre>
+<h3 id="exercise-2-ride-matching">Exercise 2: Real-Time Ride Matching</h3>
+<pre><code>Given: 50M MAU, 20M rides/month, 500K active drivers, location update every 4s
+
+Location QPS: 500K / 4 = 125,000 QPS
+Ride match QPS: ~8 avg (peak 80)
+Daily location data: 125K × 86,400 × 100 bytes = ~1 TB/day (hot, ephemeral)
+
+Latency budget (match, p95 &lt; 3s):
+  Geo query(50ms) + Filter(20ms) + ETA(100ms) + Push(200ms) = 370ms system
+  + driver response (human, ~2s) → total ~2.4s ✓
+
+Architecture: geospatial index (H3/S2), in-memory location store, ephemeral data</code></pre>
+<h3 id="exercise-3-notifications">Exercise 3: Notification Platform</h3>
+<pre><code>Given: 200M users, 3 notifications/user/day, marketing blast to all in 30 min
+
+Daily: 600M notifications → ~7,000 QPS average
+Blast peak: 200M in 30 min = 111K/sec
+With fan-out (1.3 channels): 144K deliveries/sec
+
+Cost: SMS ($0.0075) &gt;&gt; Email ($0.0001) &gt;&gt; Push (~free)
+  SMS: 200M × 10% × $0.0075 = $150K/month ← cost bottleneck
+
+Latency: transactional (OTP) &lt; 5s, marketing &lt; 30 min
+Architecture: priority queues, staged blast rollout, SMS budget governance</code></pre>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Planning with average QPS and ignoring peak concentration.</li>
@@ -1268,6 +1406,19 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#estimation-cheat-sheet">Interview Estimation Cheat Sheet</a><ul>
+<li><a href="#latency-numbers">Latency Numbers</a></li>
+<li><a href="#quick-conversions">Quick Conversions</a></li>
+<li><a href="#server-capacity">Server Capacity Rules of Thumb</a></li>
+</ul>
+</li>
+<li><a href="#cost-per-request">Cost-per-Request Modeling</a><ul>
+<li><a href="#cloud-cost-reference">Cloud Cost Quick Reference</a></li>
+<li><a href="#storage-lifecycle-tiers">Storage Lifecycle Tiers</a></li>
+</ul>
+</li>
+<li><a href="#multi-region-estimation">Multi-Region Traffic Assumptions</a></li>
+<li><a href="#scenario-exercises">Scenario Exercises with Latency Targets</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

@@ -4408,6 +4408,160 @@ Get aggregated rating for a driver.
 
 ---
 
+## Dispatch and Matching — Algorithm Trade-offs
+
+The matching algorithm is the most consequential system constraint in on-demand platforms. It determines wait time, driver utilization, and revenue.
+
+### Algorithm Comparison
+
+| Algorithm | How It Works | Latency | Quality | Best For |
+|-----------|-------------|---------|---------|----------|
+| **Nearest available** | Assign closest idle driver by Haversine distance | < 50ms | Low (ignores ETA, driver direction, demand patterns) | V1 MVP; low-volume markets |
+| **Nearest by ETA** | Route-based ETA instead of straight-line distance | 100-200ms (requires routing API) | Medium (accounts for road network) | Mid-scale; most common starting point |
+| **Batch matching** | Collect requests over 2-5s window; solve assignment as optimization problem | 2-5 seconds | High (global optimum over batch) | High-density markets (Manhattan, Delhi) |
+| **ML-scored matching** | Predict acceptance probability, trip quality, driver earnings; score all candidates | 50-100ms | Highest (personalized) | Mature platforms with training data |
+
+### Matching Constraints (System Requirements)
+
+| Constraint | Value | Why |
+|-----------|-------|-----|
+| Match latency (end-to-end) | < 5 seconds from request to driver offer | Rider expects near-instant match |
+| Driver offer timeout | 15-30 seconds | Driver must accept/decline before re-dispatch |
+| Maximum re-dispatch attempts | 3-5 before "no drivers available" | Balance rider patience vs driver supply |
+| Geospatial search radius | 3-10 km (dynamic by market density) | Too narrow → no matches; too wide → long ETA |
+| Candidate set size | 5-20 nearest eligible drivers | Balance quality vs computation time |
+
+---
+
+## Trip/Order Lifecycle State Machine
+
+```
+┌──────────┐
+│ REQUESTED │ ← Rider submits ride request
+└────┬─────┘
+     │ Match found
+┌────▼──────────┐
+│ DRIVER_OFFERED │ ← Offer sent to driver (15s timeout)
+└────┬────┬─────┘
+     │    │ Timeout/Decline → re-dispatch (up to 3x)
+     │    └──→ [REQUESTED] or [NO_DRIVERS]
+     │ Accept
+┌────▼──────────┐
+│ DRIVER_EN_ROUTE│ ← Driver heading to pickup
+└────┬──────────┘
+     │ Arrive
+┌────▼──────────┐
+│ DRIVER_ARRIVED │ ← Waiting for rider (5 min timeout)
+└────┬────┬─────┘
+     │    │ Rider no-show → CANCELLED (cancellation fee)
+     │ Start trip
+┌────▼──────────┐
+│ IN_PROGRESS   │ ← Actively en route to destination
+└────┬──────────┘
+     │ Arrive at destination
+┌────▼──────────┐
+│ COMPLETED     │ ← Trip finished; payment initiated
+└────┬──────────┘
+     │ Payment success
+┌────▼──────────┐
+│ SETTLED       │ ← Payment captured; driver payout queued
+└──────────────┘
+
+Edge states:
+  CANCELLED — by rider (before pickup) or driver (before start)
+  DISPUTED — rider contests fare or experience
+  PAYMENT_FAILED — retry → manual resolution → suspend rider
+```
+
+### State Transition Rules
+
+| From | To | Trigger | Side Effects |
+|------|-----|---------|-------------|
+| REQUESTED → DRIVER_OFFERED | Match algorithm selects driver | Push notification to driver; start 15s timer |
+| DRIVER_OFFERED → DRIVER_EN_ROUTE | Driver accepts | Update rider UI; begin ETA tracking |
+| DRIVER_OFFERED → REQUESTED | Driver declines/timeout | Re-dispatch to next candidate |
+| IN_PROGRESS → COMPLETED | Driver ends trip | Calculate fare; initiate payment auth |
+| COMPLETED → SETTLED | Payment captured | Queue driver payout for settlement batch |
+| Any → CANCELLED | Rider/driver cancels | Cancellation fee if applicable; free driver for next match |
+
+---
+
+## Observability Signals and SLO Thresholds
+
+### Platform SLOs
+
+| Metric | SLO Target | Alert Threshold | Architecture Implication |
+|--------|-----------|----------------|--------------------------|
+| **Match latency** (request → driver offered) | < 5 seconds (p95) | > 10 seconds | Geospatial index must be in-memory (Redis/H3) |
+| **ETA accuracy** | Within 20% of actual (p75) | > 30% deviation sustained | Route API must account for live traffic |
+| **Dispatch success rate** | > 85% of requests matched | < 75% in any market | Supply health; trigger surge pricing |
+| **Driver acceptance rate** | > 70% of offers accepted | < 50% for any driver cohort | Matching quality; offer incentives |
+| **Trip cancellation rate** | < 5% post-match | > 8% | UX/matching quality problem |
+| **Payment success rate** | > 99.5% first attempt | < 98% | Payment method health; retry logic |
+| **Location update freshness** | < 4 seconds | > 10 seconds sustained | Connection health; stale data → bad matches |
+| **App crash rate** | < 0.5% of sessions | > 1% | Client stability; release quality |
+
+### Real-Time Telemetry Signals
+
+| Signal | Source | Frequency | Use |
+|--------|--------|-----------|-----|
+| Driver location | GPS from driver app | Every 4 seconds | Matching, ETA, live tracking |
+| Driver availability | State change events | On change | Supply map; matching pool |
+| Surge multiplier | Demand/supply calculator | Every 30 seconds per H3 cell | Pricing; rider display |
+| Trip status | State machine transitions | On event | Rider/driver UI; ops dashboard |
+| Payment events | PSP webhooks + internal | On event | Revenue tracking; fraud detection |
+
+---
+
+## Geo-Distributed Data Placement and Privacy
+
+### Data Placement Strategy
+
+| Data | Storage Location | Why |
+|------|-----------------|-----|
+| **Driver location (real-time)** | Regional Redis (closest to driver) | Latency-critical; stale after 4s anyway |
+| **Trip data** | Regional primary DB (where trip occurs) | Data residency; latency for in-trip queries |
+| **User profiles** | Regional with cross-region replication | Login from any region; eventual consistency OK |
+| **Payment data** | Region-locked (PCI compliance) | Card data must not leave regulated jurisdiction |
+| **Analytics** | Centralized data warehouse (one region) | Cross-market analysis acceptable with lag |
+
+### Privacy Boundaries
+
+| Concern | Implementation |
+|---------|---------------|
+| **Driver location after trip** | Scrub precise GPS after trip settlement; retain only area-level for analytics |
+| **Rider location** | Never stored permanently; derived from trip data only |
+| **Trip history retention** | 3 years for regulatory; anonymize after 1 year for analytics |
+| **Real-time tracking** | Only sharing between rider ↔ assigned driver during active trip |
+| **Law enforcement requests** | Require valid legal process; log all data disclosures |
+| **Driver background data** | Stored in isolated compliance DB; accessed only by background-check service |
+
+---
+
+## Safety-Critical Reliability
+
+| Scenario | Impact | Mitigation |
+|----------|--------|-----------|
+| **Matching service down** | No new rides dispatched | Multi-AZ deployment; fallback to nearest-available algorithm (degraded quality, not zero service) |
+| **Location service down** | Stale driver positions → bad matches | Graceful degradation: use last-known + time-decay; alert ops |
+| **Payment service down** | Rides complete but unpaid | Allow ride completion; queue payment for retry; settle in next batch |
+| **Total regional outage** | All rides in region affected | Active-passive failover; DNS-based routing to backup region (minutes of downtime) |
+| **Surge calculator stuck** | Incorrect pricing | Circuit breaker: if no surge update in 60s, fall back to 1.0x (no surge) |
+| **Driver app crash during trip** | Trip state unclear | Server-side trip state is authoritative; rider can see driver location via server; driver app recovers state on restart |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Geospatial indexing (H3, S2) | F12 §6.2 (Uber mock interview) |
+| Real-time location streaming | Ch 4: Networking Fundamentals |
+| State machine design | Ch 13: Distributed Transactions |
+| Surge pricing as system constraint | Ch 3: Estimation (ride matching exercise) |
+| Payment resilience | Ch 19: Fintech & Payments |
+| Observability SLOs | F10: Observability & Operations |
+
+---
+
 ## Final Recap
 
 On-Demand Services combine **real-time geospatial systems, ML-driven matching and pricing, and physical-world logistics**. The defining challenge is that supply (drivers, couriers) and demand (riders, hungry customers) are both moving, both time-sensitive, and both geographically constrained. Every decision — which driver to match, what price to show, which route to take — must be made in seconds with incomplete information. The architecture must handle this uncertainty while maintaining a smooth user experience.

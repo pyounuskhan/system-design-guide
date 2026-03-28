@@ -2020,6 +2020,36 @@ If an alert fires three times in a week and no action was taken, one of these mu
 2. Tune the alert (change thresholds, add conditions).
 3. Delete the alert (it is not useful).
 
+**Alert fatigue maturity model:**
+
+| Level | Characteristic | Signal-to-Noise Ratio | Action |
+|-------|---------------|----------------------|--------|
+| L0 — Chaos | Hundreds of alerts/week, most ignored | < 20% actionable | Triage: delete or silence all non-P0 alerts, start from zero |
+| L1 — Reactive | Alerts exist but many are noisy | 20-50% actionable | Apply three-strikes rule weekly, merge duplicates |
+| L2 — Managed | Regular alert reviews, most are useful | 50-80% actionable | Migrate from threshold alerts to SLO burn-rate alerts |
+| L3 — Proactive | SLO-based alerting, alert-per-on-call-shift tracked | > 80% actionable | Automate remediation for common alerts, reduce pages |
+| L4 — Optimized | Every alert has a runbook, median 2-3 pages per shift | > 95% actionable | Continuous tuning, anomaly detection supplements rules |
+
+**Measuring alert health — key metrics to track:**
+
+| Metric | How to Measure | Target |
+|--------|---------------|--------|
+| Pages per on-call shift | PagerDuty analytics | < 5 per shift |
+| Alert acknowledgment time | Median time from fire → ack | < 5 minutes for P0/P1 |
+| Alerts with no human action | Alerts acked then resolved without any remediation steps | < 10% (if higher, alert is noise) |
+| Alert-to-incident ratio | Alerts fired / incidents declared | < 10:1 (high ratio = noise) |
+| Time in alert storm | Minutes where > 5 alerts fire simultaneously | Trending to zero |
+| On-call satisfaction score | Quarterly survey (1-5 scale) | > 3.5 |
+
+**Alert storm prevention patterns:**
+
+Alert storms — cascading alerts where a single root cause triggers dozens of notifications — are the primary driver of fatigue during incidents. Prevent them with:
+
+1. **Dependency-aware inhibition**: When a parent service alerts, suppress child alerts. Configure in Alertmanager `inhibit_rules`.
+2. **Alert aggregation windows**: Group alerts firing within a 2-minute window into a single notification with a summary count.
+3. **Severity-based flood protection**: During a P0, auto-silence all P3/P4 alerts for the affected service tree.
+4. **Circuit-breaker on notifications**: If > 20 alerts fire in 5 minutes, send a single "alert storm detected" page instead of 20 individual pages.
+
 ### 2.1.6 Alert Deduplication
 
 During an outage, a single root cause can trigger hundreds of alerts across dependent services. Without deduplication, the on-call engineer is overwhelmed by a wall of notifications instead of seeing the one that matters.
@@ -2322,6 +2352,173 @@ graph TB
     F --> C
 ```
 
+### 2.2.7 Canonical SLO Templates
+
+Defining SLOs from scratch is error-prone. The following templates provide ready-to-adopt SLO definitions for the four most common service archetypes. Each template specifies the SLI measurement, a recommended starting SLO target, the error budget policy, and the burn-rate alert thresholds.
+
+**Template 1: Synchronous API Service** (e.g., checkout, search, user-profile)
+
+```yaml
+# slo-template-api-service.yaml
+service_type: synchronous_api
+slo_window: 30d rolling
+
+slis:
+  availability:
+    description: Proportion of non-5xx responses
+    good_event: "http_status < 500"
+    total_event: "all requests (excluding health checks)"
+    measurement: |
+      sum(rate(http_requests_total{status!~"5.."}[5m]))
+      / sum(rate(http_requests_total[5m]))
+
+  latency:
+    description: Proportion of requests faster than threshold
+    good_event: "response_time < 300ms (p50), < 1s (p99)"
+    measurement: |
+      histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+      < 1.0
+
+slo_targets:
+  availability: 99.9%    # Start here; tighten after 2 quarters of data
+  latency_p99: 99.0%     # 99% of requests under 1 second
+
+error_budget:
+  budget_30d: 43.2 minutes downtime OR 0.1% failed requests
+  policy:
+    green:  "> 50% remaining → normal velocity"
+    yellow: "25-50% remaining → reliability review on deploys"
+    orange: "0-25% remaining → freeze non-critical deploys"
+    red:    "exhausted → full freeze, all-hands reliability"
+
+burn_rate_alerts:
+  - severity: P0
+    burn_rate: 14.4x
+    short_window: 5m
+    long_window: 1h
+    action: page on-call immediately
+  - severity: P1
+    burn_rate: 6x
+    short_window: 30m
+    long_window: 6h
+    action: page on-call
+  - severity: P2
+    burn_rate: 3x
+    short_window: 2h
+    long_window: 1d
+    action: create ticket
+  - severity: P3
+    burn_rate: 1x
+    short_window: 6h
+    long_window: 3d
+    action: weekly review
+```
+
+**Template 2: Data Pipeline** (e.g., ETL, event processing, CDC)
+
+```yaml
+# slo-template-data-pipeline.yaml
+service_type: data_pipeline
+slo_window: 30d rolling
+
+slis:
+  freshness:
+    description: Proportion of time that output data is within freshness SLA
+    good_event: "output_timestamp - input_timestamp < freshness_threshold"
+    measurement: |
+      1 - (sum(increase(pipeline_freshness_violation_total[1h]))
+      / sum(increase(pipeline_runs_total[1h])))
+
+  completeness:
+    description: Proportion of expected records successfully processed
+    good_event: "records_output >= records_input * (1 - allowed_drop_rate)"
+    measurement: |
+      sum(rate(pipeline_records_output_total[5m]))
+      / sum(rate(pipeline_records_input_total[5m]))
+
+  correctness:
+    description: Proportion of records passing validation
+    good_event: "record passes schema + business rule checks"
+    measurement: |
+      1 - (sum(rate(pipeline_validation_failures_total[5m]))
+      / sum(rate(pipeline_records_output_total[5m])))
+
+slo_targets:
+  freshness: 99.5%        # Data available within SLA 99.5% of the time
+  completeness: 99.9%     # Less than 0.1% record loss
+  correctness: 99.99%     # Extremely low tolerance for bad data
+
+error_budget:
+  freshness_budget_30d: 3.6 hours of stale data
+  completeness_budget_30d: 1 in 1000 records may be lost
+```
+
+**Template 3: Batch / Cron Job** (e.g., nightly report, billing reconciliation)
+
+```yaml
+# slo-template-batch-job.yaml
+service_type: batch_job
+slo_window: 30d rolling
+
+slis:
+  success_rate:
+    description: Proportion of job executions that complete successfully
+    good_event: "job exits with status 0 and output passes validation"
+    measurement: |
+      sum(increase(batch_job_success_total[24h]))
+      / sum(increase(batch_job_runs_total[24h]))
+
+  timeliness:
+    description: Proportion of jobs completing within schedule window
+    good_event: "job completes before deadline (e.g., 06:00 UTC)"
+    measurement: |
+      sum(increase(batch_job_on_time_total[24h]))
+      / sum(increase(batch_job_runs_total[24h]))
+
+slo_targets:
+  success_rate: 99.0%     # At most 1 failure per ~3 months for daily jobs
+  timeliness: 99.5%       # Deadline met 99.5% of runs
+```
+
+**Template 4: Streaming / Real-Time Service** (e.g., Kafka consumer, websocket push)
+
+```yaml
+# slo-template-streaming-service.yaml
+service_type: streaming_realtime
+slo_window: 30d rolling
+
+slis:
+  processing_lag:
+    description: Proportion of time consumer lag stays within threshold
+    good_event: "consumer_lag < max_acceptable_lag (e.g., 30 seconds)"
+    measurement: |
+      1 - (sum(increase(consumer_lag_exceeded_total[5m]))
+      / sum(increase(consumer_lag_checks_total[5m])))
+
+  delivery_rate:
+    description: Proportion of messages successfully delivered to downstream
+    good_event: "message acknowledged by consumer without error"
+    measurement: |
+      sum(rate(messages_delivered_total[5m]))
+      / sum(rate(messages_produced_total[5m]))
+
+slo_targets:
+  processing_lag: 99.0%   # Lag under threshold 99% of the time
+  delivery_rate: 99.95%   # At most 0.05% message loss
+```
+
+**SLO adoption checklist:**
+
+| Step | Action | Owner |
+|------|--------|-------|
+| 1 | Choose the template closest to your service archetype | Service team |
+| 2 | Customize thresholds based on 2+ weeks of baseline data | Service team + SRE |
+| 3 | Implement SLI metrics using OpenTelemetry or Prometheus | Service team |
+| 4 | Configure burn-rate alerts in Alertmanager | SRE |
+| 5 | Publish SLO dashboard in Grafana (team + executive views) | SRE |
+| 6 | Document error budget policy and get PM/EM sign-off | Service team + PM |
+| 7 | Review and tighten targets quarterly | Service team + SRE |
+
 ---
 
 ## 2.3 Incident Management
@@ -2491,7 +2688,117 @@ confidence.
 4. **Track completion**: Action items from postmortems must be tracked and completed. An unactioned action item is a future incident.
 5. **Review periodically**: Quarterly review of all postmortem action items to ensure they were completed and effective.
 
-### 2.3.6 Runbooks
+### 2.3.6 Postmortem Template — Reusable Form
+
+The following is a ready-to-copy template that teams can adopt as their standard incident review document. It enforces structured thinking, captures the data needed for trending analysis, and ensures every postmortem drives concrete improvements.
+
+```markdown
+# Incident Postmortem — [INCIDENT-ID]
+
+## Metadata
+| Field | Value |
+|-------|-------|
+| Incident ID | INC-XXXX |
+| Date | YYYY-MM-DD |
+| Duration | HH:MM (detect → resolve) |
+| Severity | SEV0 / SEV1 / SEV2 / SEV3 |
+| Incident Commander | Name |
+| Author | Name |
+| Status | Draft / Reviewed / Final |
+| Postmortem due date | YYYY-MM-DD (48h for SEV0, 5d for SEV1) |
+
+## Executive Summary
+<!-- 2-3 sentences. What broke, who was impacted, how long, how it was resolved. -->
+
+## Impact
+| Metric | Value |
+|--------|-------|
+| Users affected | N |
+| Revenue impact | $X (or N/A) |
+| Error budget consumed | X% of 30-day budget |
+| Support tickets generated | N |
+| SLA breach | Yes / No |
+
+## Detection
+| Question | Answer |
+|----------|--------|
+| How was the incident detected? | Alert / Customer report / Internal report |
+| Which alert fired first? | alert_name (link to alert rule) |
+| Time from start to detection | X minutes |
+| Was detection fast enough? | Yes / No — if No, what would improve it? |
+
+## Timeline
+<!-- Use UTC timestamps. Include: detection, escalation, key decisions, mitigation, resolution. -->
+| Time (UTC) | Event |
+|------------|-------|
+| HH:MM | First error observed in metrics |
+| HH:MM | Alert fires, on-call paged |
+| HH:MM | IC declares SEV-X |
+| HH:MM | Root cause identified |
+| HH:MM | Mitigation applied (rollback / config change / ...) |
+| HH:MM | Service recovery confirmed |
+| HH:MM | Incident resolved |
+
+## Root Cause
+<!-- Describe the technical root cause. Use "5 Whys" if helpful. -->
+1. Why did the service fail? → ...
+2. Why did that happen? → ...
+3. Why did that happen? → ...
+4. Why did that happen? → ...
+5. Why did that happen? → ... (systemic root cause)
+
+## Contributing Factors
+<!-- List factors that made the incident worse or delayed recovery. -->
+- [ ] Missing monitoring / alerting gap
+- [ ] Runbook missing or outdated
+- [ ] Insufficient testing (unit / integration / load)
+- [ ] Configuration drift
+- [ ] Human error (describe the systemic reason, not blame)
+- [ ] Dependency failure not handled
+- [ ] Other: ...
+
+## What Went Well
+<!-- Celebrate what worked. This reinforces good practices. -->
+1. ...
+2. ...
+
+## What Went Wrong
+<!-- Systemic issues only. No individual blame. -->
+1. ...
+2. ...
+
+## Action Items
+<!-- Every action item MUST have an owner, priority, and due date. -->
+| # | Action | Owner | Priority | Due Date | Ticket |
+|---|--------|-------|----------|----------|--------|
+| 1 | | | P0/P1/P2 | YYYY-MM-DD | JIRA-XXX |
+| 2 | | | P0/P1/P2 | YYYY-MM-DD | JIRA-XXX |
+
+## Recurrence Check
+| Question | Answer |
+|----------|--------|
+| Has a similar incident occurred before? | Yes (INC-YYYY) / No |
+| Were previous action items completed? | Yes / Partially / No |
+| What systemic change prevents recurrence? | ... |
+
+## Appendix
+- Link to incident Slack channel
+- Link to dashboards used during debugging
+- Link to relevant traces / logs
+- Link to deploy / change that triggered incident
+```
+
+**Postmortem health metrics** — track these quarterly to measure postmortem program effectiveness:
+
+| Metric | Target | Why It Matters |
+|--------|--------|----------------|
+| Postmortem completion rate | 100% for SEV0/SEV1 | No learning without documentation |
+| Median days to postmortem | < 5 business days | Freshness improves accuracy |
+| Action item completion rate | > 85% within 30 days | Unactioned items become future incidents |
+| Repeat incident rate | < 10% | Measures whether action items actually prevent recurrence |
+| Action items per postmortem | 3-7 | Too few = shallow analysis; too many = unfocused |
+
+### 2.3.7 Runbooks
 
 A runbook is a step-by-step guide for responding to a specific alert or condition. It transforms "I have no idea what this alert means" into "step 1: check X, step 2: if Y then Z."
 
@@ -3789,6 +4096,238 @@ causing brief service disruption until Kubernetes restarts the pod.
 
 ---
 
+## Instrumentation Blueprint — Observing a New Service from Day One
+
+When a team launches a new microservice, observability should not be an afterthought. This blueprint defines the minimum instrumentation every service must ship with on day one, organized by pillar. It is designed around OpenTelemetry as the universal instrumentation layer.
+
+### Logging Baseline
+
+Every service must emit structured JSON logs with the following minimum fields:
+
+```json
+{
+  "timestamp": "ISO-8601 with timezone",
+  "level": "INFO | WARN | ERROR | FATAL",
+  "service": "service-name",
+  "version": "v1.2.3 (or git SHA)",
+  "trace_id": "W3C trace ID from OTel context",
+  "span_id": "current span ID",
+  "correlation_id": "business correlation ID (e.g., order_id)",
+  "event": "descriptive_event_name",
+  "message": "human-readable description",
+  "error": "error type + message (if applicable)",
+  "duration_ms": "operation duration (if applicable)"
+}
+```
+
+**Logging rules for new services:**
+
+| Rule | Rationale |
+|------|-----------|
+| Use INFO as the default production level | DEBUG in prod is a cost bug |
+| Log all errors with stack traces | Stack traces are essential for diagnosis |
+| Log all external calls (HTTP, gRPC, DB, queue) with duration | Dependency latency is the #1 source of issues |
+| Include trace_id in every log line | Enables log → trace correlation |
+| Redact PII before logging | Legal and compliance requirement |
+| Use event-based names, not free-text messages | Enables log-based alerting and dashboards |
+
+### Metrics Baseline
+
+Every service must expose these minimum metrics via OpenTelemetry SDK or Prometheus client:
+
+```yaml
+# Mandatory metrics for every service
+metrics:
+  # --- RED metrics (request-driven) ---
+  http_requests_total:
+    type: counter
+    labels: [method, path, status_code]
+    description: "Total HTTP requests handled"
+
+  http_request_duration_seconds:
+    type: histogram
+    labels: [method, path]
+    buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+    description: "Request latency distribution"
+
+  http_requests_in_flight:
+    type: gauge
+    labels: [method]
+    description: "Currently processing requests"
+
+  # --- Dependency metrics ---
+  external_call_duration_seconds:
+    type: histogram
+    labels: [dependency, method, status]
+    description: "Latency of calls to external dependencies"
+
+  external_call_errors_total:
+    type: counter
+    labels: [dependency, error_type]
+    description: "Errors from external dependencies"
+
+  # --- Resource metrics (USE method) ---
+  db_connection_pool_size:
+    type: gauge
+    labels: [pool_name]
+    description: "Current DB connection pool size"
+
+  db_connection_pool_in_use:
+    type: gauge
+    labels: [pool_name]
+    description: "Active DB connections"
+
+  # --- Business metrics ---
+  business_operation_total:
+    type: counter
+    labels: [operation, outcome]
+    description: "Business operations (e.g., orders_placed, payments_processed)"
+```
+
+**Cardinality guard rails:**
+
+| Label | Max Cardinality | Enforcement |
+|-------|----------------|-------------|
+| method | ~5 (GET, POST, PUT, DELETE, PATCH) | Static set |
+| path | Parameterize routes (`/users/{id}` not `/users/12345`) | Route normalization middleware |
+| status_code | ~20 (HTTP status codes) | Static set |
+| dependency | ~10-20 downstream services | Static configuration |
+| error_type | ~10-15 classified error types | Enum, not free-text |
+
+### Tracing Baseline
+
+Every service must participate in distributed tracing using OpenTelemetry:
+
+```yaml
+# Minimum tracing configuration for every service
+tracing:
+  sdk: OpenTelemetry (language-appropriate SDK)
+  propagation: W3C TraceContext (traceparent header)
+  auto_instrumentation:
+    - HTTP server/client (inbound + outbound requests)
+    - gRPC server/client
+    - Database clients (SQL, Redis, MongoDB)
+    - Message queue producers/consumers (Kafka, SQS, RabbitMQ)
+
+  manual_instrumentation:
+    - Business-critical operations (payment processing, order fulfillment)
+    - Long-running background tasks
+    - Fan-out operations (parallel calls to multiple services)
+
+  span_attributes:
+    required:
+      - service.name
+      - service.version
+      - deployment.environment
+      - user.id (if applicable, hashed for PII)
+    recommended:
+      - http.method, http.route, http.status_code
+      - db.system, db.statement (parameterized)
+      - messaging.system, messaging.destination
+
+  sampling:
+    development: 100% (all traces)
+    staging: 100% (all traces)
+    production: tail-based via OTel Collector
+      always_sample: errors, slow requests (> p99)
+      head_sample: 1-5% of successful fast requests
+```
+
+### Day-One Observability Checklist
+
+| # | Item | Pillar | Priority |
+|---|------|--------|----------|
+| 1 | Structured JSON logging with trace_id | Logs | P0 |
+| 2 | RED metrics (rate, errors, duration) for all endpoints | Metrics | P0 |
+| 3 | OTel auto-instrumentation enabled | Traces | P0 |
+| 4 | Health check endpoint (`/healthz`, `/readyz`) | Metrics | P0 |
+| 5 | Service registered in Grafana dashboards | Dashboard | P0 |
+| 6 | SLO defined (availability + latency at minimum) | SLO | P1 |
+| 7 | Burn-rate alerts configured in Alertmanager | Alerting | P1 |
+| 8 | Runbook for top 3 expected failure modes | Incident | P1 |
+| 9 | Dependency metrics for all external calls | Metrics | P1 |
+| 10 | Business metrics for key operations | Metrics | P2 |
+| 11 | PII redaction verified in log output | Logs | P1 |
+| 12 | On-call rotation configured for the service | Operations | P2 |
+
+---
+
+## Observability Cost as a Budget
+
+Observability data is essential but not free. At scale, unmanaged telemetry costs can exceed 20-30% of total infrastructure spend. Treating observability cost as a managed engineering budget — not an unbounded byproduct — is a critical operational discipline.
+
+### The Cost-as-Budget Framework
+
+The core principle: **every team owns an observability budget**, measured in dollars-per-month or GB-per-month, just as they own a compute budget. Overruns require the same justification as requesting more compute.
+
+```
+Observability Budget = Ingestion Cost + Storage Cost + Query Cost + Licensing
+
+Per-team budget allocation:
+  Team budget = (total observability budget) × (team's share of traffic/services)
+  Buffer: Reserve 15% for incident-driven debugging surges
+```
+
+**Budget categories and typical cost drivers:**
+
+| Category | Primary Cost Driver | Typical Share | Optimization Lever |
+|----------|-------------------|---------------|-------------------|
+| Log ingestion | Volume (GB/day) | 40-50% | Sampling, log levels, dropping verbose fields |
+| Metric storage | Cardinality (active time series) | 15-25% | Label discipline, recording rules, aggregation |
+| Trace storage | Span volume (spans/sec) | 10-20% | Tail-based sampling, shorter retention |
+| Licensing | Per-host, per-GB, per-user fees | 15-30% | Vendor negotiation, open-source alternatives |
+| Query compute | Dashboard load, ad-hoc queries | 5-10% | Recording rules, query caching, dashboard pruning |
+
+### Implementing Cost Governance
+
+**Step 1: Make costs visible** — publish per-team observability costs on a shared Grafana dashboard:
+
+```promql
+# Per-team log ingestion rate (bytes/sec)
+sum by (team) (rate(log_bytes_ingested_total[1h]))
+
+# Per-team active metric series count
+count by (team) (group({team=~".+"}) by (__name__, team))
+
+# Per-team trace span rate
+sum by (team) (rate(traces_spans_ingested_total[1h]))
+```
+
+**Step 2: Set per-team budgets** based on baseline measurement + growth projection:
+
+| Team | Services | Monthly Budget | Current Spend | Status |
+|------|----------|---------------|---------------|--------|
+| Checkout | 8 | $12,000 | $10,400 | Green |
+| Search | 5 | $18,000 | $22,100 | Red — over budget |
+| Payments | 6 | $9,000 | $8,200 | Green |
+| Platform | 12 | $25,000 | $24,800 | Yellow — approaching |
+
+**Step 3: Review and adjust quarterly** — observability budgets are living constraints, not fixed ceilings:
+
+| Trigger | Action |
+|---------|--------|
+| Team consistently under budget | Reduce allocation, reallocate to teams that need it |
+| Team over budget | Require optimization plan within 2 weeks |
+| New service launch | Allocate incremental budget based on estimated traffic |
+| Major incident required debug data | Temporary budget surge approved, reviewed post-incident |
+| Vendor price increase | Re-evaluate build vs. buy; consider open-source migration |
+
+### Cost-Efficiency Metrics
+
+Track these metrics to ensure observability spend delivers proportional value:
+
+| Metric | Formula | Target |
+|--------|---------|--------|
+| Cost per incident resolved | Monthly observability cost / incidents resolved | Decreasing quarter-over-quarter |
+| Cost per million requests | Monthly observability cost / (requests/month in millions) | Stable or decreasing |
+| MTTR trend vs. cost trend | Correlation of MTTR improvement with cost changes | MTTR should improve faster than cost grows |
+| Unused dashboard ratio | Dashboards with 0 views in 90 days / total dashboards | < 10% |
+| Alert signal-to-noise ratio | Actionable alerts / total alerts fired | > 80% |
+
+**The golden rule**: If observability costs are growing faster than the value they deliver (measured by MTTR reduction, incident prevention, and developer productivity), something is wrong. Either the data is not being used effectively, or the collection is not targeted enough.
+
+---
+
 ## Architectural Decision Records (ADRs)
 
 ### ADR-1: Structured Logging Format
@@ -4098,9 +4637,9 @@ Observability and operations form the nervous system of a production platform. W
 - **Correlation**: The real power is connecting all three — from metric anomaly to trace to log entry in a single workflow.
 
 ### Section 2 — Alerting and Incident Response
-- **Alerts**: Design for action, not noise. Multi-window burn rate alerts on SLOs are the gold standard.
-- **SLOs**: Transform reliability from a vague goal to a measurable budget. Error budgets drive deployment decisions.
-- **Incidents**: Process discipline (IC, communication channels, postmortems) matters as much as technical skill.
+- **Alerts**: Design for action, not noise. Multi-window burn rate alerts on SLOs are the gold standard. Track alert health metrics to combat fatigue.
+- **SLOs**: Transform reliability from a vague goal to a measurable budget. Use canonical SLO templates per service archetype (API, pipeline, batch, streaming). Error budgets drive deployment decisions.
+- **Incidents**: Process discipline (IC, communication channels, postmortems) matters as much as technical skill. Use structured postmortem templates to ensure consistent learning.
 - **Chaos**: Prove resilience through experimentation, not hope. Game days build confidence and reveal gaps.
 
 ### Section 3 — Operational Excellence
@@ -4108,6 +4647,10 @@ Observability and operations form the nervous system of a production platform. W
 - **Capacity planning**: Forecast, test, benchmark, and model costs before traffic arrives.
 - **Toil reduction**: Automate everything that can be automated. Self-healing systems reduce human intervention.
 - **On-call**: Treat it as a first-class engineering practice. Measure health, compensate fairly, and continuously reduce burden.
+
+### Cross-Cutting Enhancements
+- **Instrumentation blueprint**: Every new service should ship with day-one observability — structured logs, RED metrics, and OTel-based tracing. Use the instrumentation checklist.
+- **Observability cost as budget**: Treat telemetry spend as a managed per-team budget. Track cost-efficiency metrics (cost per incident, cost per million requests) and optimize quarterly.
 
 The observability maturity of an engineering organization is one of the strongest predictors of its ability to ship reliable software at speed. Investing in these foundations pays dividends across every system described in subsequent chapters.
 

@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 28 of 60</p>
+<strong>Position:</strong> Chapter 28 of 42</p>
 <hr>
 <h2 id="overview">Overview</h2>
 <p>Security systems protect platforms from unauthorized access, data breaches, abuse, and denial-of-service attacks. Every other system in this curriculum depends on security infrastructure — authentication gates every API call, authorization controls every data access, rate limiting protects every endpoint, and fraud detection guards every financial transaction.</p>
@@ -5591,6 +5591,95 @@ Hybrid approach (recommended):
 <li><strong>Design a secrets management system with automated rotation for 500 microservices.</strong> Cover Vault architecture, rotation strategies, and emergency revocation.</li>
 <li><strong>Design an account takeover detection system.</strong> Cover device fingerprinting, impossible travel detection, and step-up authentication.</li>
 </ol>
+<h2 id="threat-model">Threat Model Template (STRIDE)</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Threat</th><th>Meaning</th><th>Example</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>S</strong>poofing</td><td>Impersonate user/service</td><td>Stolen JWT from different device</td><td>MFA; short tokens; device binding</td></tr>
+<tr><td><strong>T</strong>ampering</td><td>Data modified</td><td>API body altered in transit</td><td>TLS; HMAC; checksums</td></tr>
+<tr><td><strong>R</strong>epudiation</td><td>Deny performing action</td><td>Admin claims they didn't delete data</td><td>Append-only audit; hash chain</td></tr>
+<tr><td><strong>I</strong>nfo Disclosure</td><td>Unauthorized data access</td><td>PII in error messages/logs</td><td>Redact PII; least privilege; encryption</td></tr>
+<tr><td><strong>D</strong>enial of Service</td><td>System unavailable</td><td>DDoS flood</td><td>WAF; rate limiting; CDN; auto-scaling</td></tr>
+<tr><td><strong>E</strong>levation</td><td>Gain higher privilege</td><td>Broken access control on admin API</td><td>RBAC; authZ checks; audit</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="zero-trust">Zero Trust Implementation</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Principle</th><th>Traditional</th><th>Zero Trust</th></tr></thead>
+<tbody>
+<tr><td>Trust boundary</td><td>VPN = trusted inside</td><td>No implicit trust; every request verified</td></tr>
+<tr><td>Authentication</td><td>Once at perimeter</td><td>Per-request (tokens, mTLS)</td></tr>
+<tr><td>Authorization</td><td>Network ACLs</td><td>Per-resource, per-action (OPA/Cedar)</td></tr>
+<tr><td>Lateral movement</td><td>Easy once inside</td><td>Blocked; each service authenticates</td></tr>
+<tr><td>Secrets</td><td>Shared, long-lived</td><td>Ephemeral, auto-rotated</td></tr>
+</tbody>
+</table></div>
+<p><strong>Checklist:</strong> All service calls use mTLS; no "internal = trusted"; identity tokens per-request; centralized authZ; secrets auto-rotated; all decisions logged.</p>
+<hr>
+<h2 id="audit-compliance">Audit Logging and Compliance Mapping</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Regulation</th><th>What to Log</th><th>Retention</th><th>Tamper Protection</th></tr></thead>
+<tbody>
+<tr><td><strong>SOX</strong></td><td>Financial data access; admin actions</td><td>7 years</td><td>Hash chain; append-only</td></tr>
+<tr><td><strong>PCI-DSS</strong></td><td>Cardholder data access; auth attempts</td><td>1 year (3 months hot)</td><td>Centralized; daily review</td></tr>
+<tr><td><strong>HIPAA</strong></td><td>PHI access; system activity</td><td>6 years</td><td>Access controls; integrity checks</td></tr>
+<tr><td><strong>GDPR</strong></td><td>Processing activities; consent</td><td>Duration + reasonable</td><td>DPO access; exportable</td></tr>
+<tr><td><strong>SOC 2</strong></td><td>Access; change management</td><td>~1 year</td><td>Independent storage</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="secure-defaults">Secure-by-Default Design Patterns</h2>
+<h3 id="api-defaults">API Security Defaults</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Default</th><th>Override Requires</th></tr></thead>
+<tbody>
+<tr><td>Auth required</td><td>All endpoints require valid token</td><td>Explicit <code>@public</code> + security review</td></tr>
+<tr><td>AuthZ checked</td><td>Every request evaluated against policy</td><td>No override</td></tr>
+<tr><td>Rate limiting</td><td>Per-client on all endpoints</td><td>Custom limits with justification</td></tr>
+<tr><td>Input validation</td><td>Schema validation on all bodies</td><td>No override</td></tr>
+<tr><td>Error messages</td><td>Opaque (no stack traces/SQL)</td><td>Debug only in non-prod</td></tr>
+<tr><td>CORS</td><td>No cross-origin</td><td>Explicit allowlist + review</td></tr>
+</tbody>
+</table></div>
+<h3 id="data-defaults">Data Security Defaults</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Default</th></tr></thead>
+<tbody>
+<tr><td>Encryption at rest</td><td>AES-256 / KMS for all data</td></tr>
+<tr><td>Encryption in transit</td><td>TLS 1.3 everywhere</td></tr>
+<tr><td>PII classification</td><td>Auto-tagged at write time</td></tr>
+<tr><td>Retention policy</td><td>Per-category lifecycle rules</td></tr>
+<tr><td>Deletion</td><td>Soft delete, 30-day grace</td></tr>
+<tr><td>Backups</td><td>Encrypted, same KMS key</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="security-references">Authoritative References</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Scope</th></tr></thead>
+<tbody>
+<tr><td>OWASP Top 10</td><td>Web app security risks</td></tr>
+<tr><td>OWASP API Security Top 10</td><td>API-specific threats</td></tr>
+<tr><td>NIST Cybersecurity Framework</td><td>Risk management</td></tr>
+<tr><td>NIST 800-207</td><td>Zero Trust Architecture</td></tr>
+<tr><td>CIS Benchmarks</td><td>Platform hardening</td></tr>
+<tr><td>MITRE ATT&amp;CK</td><td>Adversary tactics</td></tr>
+</tbody>
+</table></div>
+<h3 id="security-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Identity / OAuth 2.1</td><td><a href="40-security-authentication.html">A8</a></td></tr>
+<tr><td>API gateway auth</td><td><a href="15-api-gateway-pattern.html">Ch 15</a></td></tr>
+<tr><td>Supply-chain security</td><td><a href="F11-deployment-devops.html">F11 §1.5</a></td></tr>
+<tr><td>Regulatory requirements</td><td><a href="02-types-of-requirements.html">Ch 2</a></td></tr>
+<tr><td>Fraud detection</td><td><a href="19-fintech-payments.html">Ch 19</a></td></tr>
+<tr><td>Observability / audit</td><td><a href="F10-observability-operations.html">F10</a></td></tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Security Systems are the <strong>trust layer</strong> that every other system depends on. The 6 subsystems form a defense-in-depth architecture: authentication at the front door (who are you?), authorization at every resource (what can you do?), secrets management in the vault (what credentials exist?), rate limiting as the bouncer (are you abusing this?), DDoS protection as the wall (is this an attack?), and fraud detection as the detective (is this malicious?). The key insight: <strong>security is not a feature — it's a property of the architecture</strong>. Every design decision (token lifetime, cache invalidation, error messages) has security implications.</p>
         </div>
@@ -5827,6 +5916,11 @@ Hybrid approach (recommended):
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 -&gt; V2 -&gt; V3)</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
+<li><a href="#threat-model">Threat Model (STRIDE)</a></li>
+<li><a href="#zero-trust">Zero Trust Implementation</a></li>
+<li><a href="#audit-compliance">Audit Logging &amp; Compliance</a></li>
+<li><a href="#secure-defaults">Secure-by-Default Patterns</a></li>
+<li><a href="#security-references">References</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 </ul>
 </div>

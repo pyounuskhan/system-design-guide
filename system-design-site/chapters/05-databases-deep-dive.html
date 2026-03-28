@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 2 - Core System Building Blocks<br>
-<strong>Position:</strong> Chapter 5 of 60
+<strong>Position:</strong> Chapter 5 of 42<br>
 <strong>Why this part exists:</strong> This section moves from framing to mechanics by explaining the infrastructure components that repeatedly appear in real-world systems.<br>
 <strong>This chapter builds toward:</strong> data-modeling decisions, consistency trade-offs, and storage choices that reflect access patterns rather than fashion</p>
 <h2 id="overview">Overview</h2>
@@ -1143,6 +1143,141 @@
 <li>Expect polyglot persistence in mature systems, but introduce it only when the workload truly justifies it.</li>
 <li>Model data evolution and migration cost as part of the architecture, not as future cleanup work.</li>
 </ul>
+<h2 id="isolation-levels">Isolation Levels — A Practical Primer</h2>
+<p>Transaction isolation determines what one transaction can see of another's uncommitted or recently committed changes. Choosing the wrong level causes bugs that are extremely hard to reproduce.</p>
+<h3 id="four-isolation-levels">The Four Standard Levels</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Level</th><th>What You Can See</th><th>Anomalies Allowed</th><th>Use When</th></tr></thead>
+<tbody>
+<tr><td><strong>Read Uncommitted</strong></td><td>Other transactions' uncommitted writes</td><td>Dirty reads, non-repeatable reads, phantoms</td><td>Almost never — approximate analytics only</td></tr>
+<tr><td><strong>Read Committed</strong></td><td>Only committed data (re-read may change)</td><td>Non-repeatable reads, phantoms</td><td>Default for most OLTP (PostgreSQL default)</td></tr>
+<tr><td><strong>Repeatable Read</strong></td><td>Snapshot at transaction start</td><td>Phantoms (new rows can appear)</td><td>Financial reporting, inventory checks</td></tr>
+<tr><td><strong>Serializable</strong></td><td>As if transactions ran one at a time</td><td>None</td><td>Money transfers, double-booking prevention</td></tr>
+</tbody>
+</table></div>
+<h3 id="anomaly-reference">Anomaly Quick Reference</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Anomaly</th><th>What Happens</th><th>Example</th><th>Prevented By</th></tr></thead>
+<tbody>
+<tr><td><strong>Dirty read</strong></td><td>Read uncommitted data that may roll back</td><td>See $0 balance during uncommitted transfer</td><td>Read Committed+</td></tr>
+<tr><td><strong>Non-repeatable read</strong></td><td>Same query returns different values in one txn</td><td>Inventory: 10 → re-check → 8</td><td>Repeatable Read+</td></tr>
+<tr><td><strong>Phantom</strong></td><td>New rows appear matching previous WHERE</td><td>Count orders: 50 → count again: 51</td><td>Serializable</td></tr>
+<tr><td><strong>Write skew</strong></td><td>Two txns read same data, both write, invalid state</td><td>Two doctors both go off-call → zero on-call</td><td>Serializable</td></tr>
+</tbody>
+</table></div>
+<p><strong>Practical guidance:</strong> Default to Read Committed. Use Repeatable Read for read-compute-write workflows. Use Serializable only for critical correctness paths (handle serialization failures with retries).</p>
+<h3 id="db-defaults">Database Default Isolation Levels</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Database</th><th>Default</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>PostgreSQL</td><td>Read Committed</td><td>Supports Serializable via SSI</td></tr>
+<tr><td>MySQL (InnoDB)</td><td>Repeatable Read</td><td>MVCC; phantom protection via gap locking</td></tr>
+<tr><td>SQL Server</td><td>Read Committed</td><td>Supports snapshot isolation</td></tr>
+<tr><td>CockroachDB</td><td>Serializable</td><td>Distributed DB, strongest by default</td></tr>
+<tr><td>Spanner</td><td>External consistency</td><td>Uses TrueTime</td></tr>
+</tbody>
+</table></div>
+<p><strong>Cross-reference:</strong> For how isolation interacts with distributed systems, see <strong>F2: CAP Theorem &amp; Consistency</strong> and <strong>F4: Consensus &amp; Coordination</strong>.</p>
+<hr>
+<h2 id="cdc-outbox">Change Data Capture (CDC) and the Outbox Pattern</h2>
+<p>When a database write must trigger downstream actions (update cache, publish event, sync search index), the naive dual-write approach is fragile. If the API call fails after the DB write, systems are inconsistent.</p>
+<h3 id="outbox-pattern">Transactional Outbox Pattern</h3>
+<p>Write the event to an "outbox" table inside the same database transaction as the business data. A separate relay process reads the outbox and publishes events.</p>
+<pre><code>Single Database Transaction:
+  1. INSERT INTO orders (...) VALUES (...)
+  2. INSERT INTO outbox (event_type, payload) VALUES (...)
+  COMMIT
+         ↓
+Outbox Relay (Debezium / custom poller):
+  Reads outbox → Publishes to Kafka → Marks as published
+         ↓
+Downstream Consumers:
+  Search index, cache invalidation, notifications, analytics</code></pre>
+<p><strong>Why it works:</strong> Both business write and event are in the same transaction — either both succeed or both roll back.</p>
+<h3 id="cdc-comparison">CDC Approach Comparison</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Approach</th><th>Pros</th><th>Cons</th></tr></thead>
+<tbody>
+<tr><td><strong>Outbox table</strong></td><td>Simple, works with any DB, explicit event schema</td><td>Adds table + relay process</td></tr>
+<tr><td><strong>Log-based CDC (Debezium)</strong></td><td>No app changes, captures all changes including direct DB edits</td><td>Requires WAL access, tighter DB coupling</td></tr>
+</tbody>
+</table></div>
+<h3 id="cdc-use-cases">When to Use CDC/Outbox</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Scenario</th><th>Recommended Approach</th></tr></thead>
+<tbody>
+<tr><td>Keep search index in sync with primary DB</td><td>CDC (Debezium → Kafka → Elasticsearch)</td></tr>
+<tr><td>Publish domain events after writes</td><td>Outbox pattern (explicit event schema)</td></tr>
+<tr><td>Replicate data to analytics warehouse</td><td>CDC (Debezium → Kafka → data lake)</td></tr>
+<tr><td>Invalidate cache on DB change</td><td>CDC or outbox</td></tr>
+<tr><td>Cross-service data sync in microservices</td><td>Outbox pattern (avoids distributed transactions)</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="multi-tenant-isolation">Multi-Tenant Data Isolation and Data Residency</h2>
+<p>SaaS systems serving multiple customers must decide how to isolate tenant data. The choice affects security, compliance, performance, and operational complexity.</p>
+<h3 id="tenant-models">Tenant Isolation Models</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th>Isolation Level</th><th>Cost</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>Shared DB, shared schema</strong> (<code>tenant_id</code> column)</td><td>Low (app-enforced)</td><td>Lowest</td><td>Early-stage SaaS, low compliance</td></tr>
+<tr><td><strong>Shared DB, separate schemas</strong></td><td>Medium</td><td>Moderate</td><td>Mid-tier SaaS</td></tr>
+<tr><td><strong>Separate databases</strong></td><td>High</td><td>Highest</td><td>Enterprise, regulated industries</td></tr>
+<tr><td><strong>Hybrid</strong></td><td>Variable</td><td>Moderate-High</td><td>Mixed customer tiers</td></tr>
+</tbody>
+</table></div>
+<p><strong>Tenant isolation checklist:</strong></p>
+<ul>
+<li>Every query includes <code>tenant_id</code> filter — enforce via ORM middleware</li>
+<li>Row-Level Security (RLS) enabled for defense-in-depth</li>
+<li>Cross-tenant access tested in CI (negative tests)</li>
+<li>Tenant-specific encryption keys for sensitive data</li>
+<li>Backup/restore scoped to individual tenants</li>
+<li>Noisy-neighbor protection via resource limits or separate connection pools</li>
+</ul>
+<h3 id="data-residency">Data Residency Requirements</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Requirement</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>EU data stays in EU</td><td>Deploy EU tenant data in eu-west-1; routing layer directs EU tenants to EU database</td></tr>
+<tr><td>Tenant chooses region</td><td>Region field in tenant config; app routes to tenant's chosen region</td></tr>
+<tr><td>No cross-border replication</td><td>Disable cross-region replicas for tenants with residency constraints</td></tr>
+<tr><td>Audit trail for data location</td><td>Log all data access with region tag</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="further-reading-cross-references">Further Reading and Cross-References</h2>
+<h3 id="deep-chapter-links">Cross-Links to Deep Chapters</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th><th>What You'll Learn</th></tr></thead>
+<tbody>
+<tr><td>CAP theorem and consistency</td><td>F2: CAP Theorem &amp; Consistency</td><td>Partition tolerance trade-offs</td></tr>
+<tr><td>Consensus protocols</td><td>F4: Consensus &amp; Coordination</td><td>How distributed DBs achieve agreement</td></tr>
+<tr><td>Sharding strategies</td><td>F7: Data Partitioning</td><td>Hash vs range, rebalancing</td></tr>
+<tr><td>Caching in front of DBs</td><td><a href="06-caching-systems.html">Chapter 6: Caching Systems</a></td><td>Cache-aside, write-through, invalidation</td></tr>
+<tr><td>Database observability</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td><td>Connection pool monitoring, replication lag</td></tr>
+<tr><td>DB migrations in deployment</td><td><a href="F11-deployment-devops.html">F11: Deployment &amp; DevOps</a></td><td>Expand-contract pattern</td></tr>
+</tbody>
+</table></div>
+<h3 id="cloud-db-guidance">Cloud Database Guidance</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Provider</th><th>Recommended Reading</th></tr></thead>
+<tbody>
+<tr><td>AWS</td><td>Aurora best practices, DynamoDB design patterns, RDS performance insights</td></tr>
+<tr><td>GCP</td><td>Cloud Spanner schema design, Cloud SQL for PostgreSQL, Firestore data modeling</td></tr>
+<tr><td>Azure</td><td>Cosmos DB consistency levels, Azure SQL elastic pools</td></tr>
+</tbody>
+</table></div>
+<h3 id="ddia-concepts">Key Concepts from DDIA</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>DDIA Concept</th><th>Relevance</th><th>Chapter Connection</th></tr></thead>
+<tbody>
+<tr><td>LSM trees vs B-trees</td><td>Why different DBs optimize for reads vs writes</td><td>Storage engine internals</td></tr>
+<tr><td>Linearizability vs serializability</td><td>Two consistency guarantees often confused</td><td>F2: CAP Theorem</td></tr>
+<tr><td>Stream processing and CDC</td><td>How databases feed real-time pipelines</td><td>CDC/Outbox section above</td></tr>
+<tr><td>Hash vs range partitioning</td><td>Data distribution trade-offs</td><td>F7: Data Partitioning</td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Choosing SQL or NoSQL as an identity statement instead of a workload decision.</li>
@@ -1268,6 +1403,10 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#isolation-levels">Isolation Levels Primer</a></li>
+<li><a href="#cdc-outbox">CDC and the Outbox Pattern</a></li>
+<li><a href="#multi-tenant-isolation">Multi-Tenant Isolation &amp; Data Residency</a></li>
+<li><a href="#further-reading-cross-references">Further Reading &amp; Cross-References</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

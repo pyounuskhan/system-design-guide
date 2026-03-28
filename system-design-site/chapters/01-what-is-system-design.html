@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 1 - Foundations of System Design<br>
-<strong>Position:</strong> Chapter 1 of 60
+<strong>Position:</strong> Chapter 1 of 42<br>
 <strong>Why this part exists:</strong> This opening section gives the reader the language, framing, and mental models needed to reason about systems before choosing technologies.<br>
 <strong>This chapter builds toward:</strong> requirements analysis, estimation, architecture reviews, and the ability to reason about systems as evolving business assets rather than isolated code modules</p>
 <h2 id="overview">Overview</h2>
@@ -1037,6 +1037,28 @@
 <p>Application thinking asks whether a feature works. System thinking asks how that feature behaves under load, under failure, across teams, and after three more years of product evolution.</p>
 <h3 id="trade-offs-as-the-center-of-architecture">Trade-offs as the center of architecture</h3>
 <p>No design maximizes everything simultaneously. Better latency may require more cost. Simpler operations may reduce flexibility. Strong consistency may reduce availability during partitions. System design is the art of choosing consciously.</p>
+<h3 id="reliability-security-cost">Reliability, security, and cost are requirements — not afterthoughts</h3>
+<p>A common mistake is treating reliability, security, and cost as "nice-to-haves" that can be bolted on after the core design is done. In production systems, they are requirements with the same weight as any feature:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Why It Is a Requirement</th><th>What Happens If Deferred</th></tr></thead>
+<tbody>
+<tr><td><strong>Reliability</strong></td><td>Users leave products that fail. Revenue depends on uptime. SLAs have financial penalties.</td><td>Retrofitting reliability into a fragile system is 5-10x more expensive than designing it in.</td></tr>
+<tr><td><strong>Security</strong></td><td>Breaches destroy trust, trigger regulatory penalties, and can end companies.</td><td>Adding security after launch means auditing every data flow, API, and storage decision retroactively.</td></tr>
+<tr><td><strong>Cost</strong></td><td>Cloud bills compound. An unoptimized design at 10x scale can exceed revenue.</td><td>Cost-unaware designs require painful re-architecture when the CFO asks "why is infra $2M/month?"</td></tr>
+</tbody>
+</table></div>
+<p>These three concerns, along with scalability, operability, and performance, form the <strong>well-architected pillars</strong> of system design. Every design decision should be evaluated against them:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Pillar</th><th>Core Question</th><th>Deep Chapter</th></tr></thead>
+<tbody>
+<tr><td>Reliability</td><td>"What happens when this component fails?"</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td></tr>
+<tr><td>Security</td><td>"Who can access this data, and how do we prove it?"</td><td>F9: Security Fundamentals</td></tr>
+<tr><td>Cost Efficiency</td><td>"What does this design cost at 10x scale?"</td><td><a href="F12-system-design-interview-thinking.html#51-why-cost-matters-in-interviews">F12: Interview Thinking §5</a></td></tr>
+<tr><td>Scalability</td><td>"What breaks first when traffic doubles?"</td><td>F1: Scalability Fundamentals</td></tr>
+<tr><td>Performance</td><td>"Is the user experience fast enough?"</td><td>F6: Caching Strategies, F5: Storage &amp; Databases</td></tr>
+<tr><td>Operability</td><td>"Can we deploy, monitor, and debug this at 3 AM?"</td><td><a href="F11-deployment-devops.html">F11: Deployment &amp; DevOps</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="key-terminology">Key Terminology</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -1144,6 +1166,22 @@
 <li>Design boundaries around ownership and change frequency, not around buzzwords.</li>
 <li>Make trade-offs explicit enough that another engineer can explain why the design is shaped the way it is.</li>
 </ul>
+<h2 id="system-design-deliverables">System Design Deliverables</h2>
+<p>A system design is not complete until it produces concrete, reviewable artifacts. Whether in an architecture review, a design document, or an interview, the following deliverables represent the outputs of a thorough design process:</p>
+<div class="table-wrap"><table>
+<thead><tr><th>#</th><th>Deliverable</th><th>What It Contains</th><th>Why It Matters</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>High-Level Design (HLD) Diagram</strong></td><td>Block diagram showing components, data flows, protocols, and system boundaries</td><td>Makes the architecture visible and debatable</td></tr>
+<tr><td>2</td><td><strong>API Contracts</strong></td><td>Endpoint signatures, request/response schemas, error codes, pagination, rate limits</td><td>Defines the interface between teams and between client and server</td></tr>
+<tr><td>3</td><td><strong>Data Model</strong></td><td>Entity schemas, relationships, indexes, access patterns, sharding strategy</td><td>Drives storage choices and reveals query complexity early</td></tr>
+<tr><td>4</td><td><strong>Capacity Estimates</strong></td><td>QPS, storage, bandwidth, connection counts (average and peak)</td><td>Sizes infrastructure and validates that the design can handle expected load</td></tr>
+<tr><td>5</td><td><strong>SLO Definitions</strong></td><td>Availability target (e.g., 99.9%), latency target (e.g., p99 &lt; 500ms), error budget</td><td>Makes reliability a measurable, budgetable engineering goal</td></tr>
+<tr><td>6</td><td><strong>Cost Estimate</strong></td><td>Monthly cloud spend breakdown (compute, storage, bandwidth, managed services)</td><td>Prevents budget surprises; enables cost-aware design trade-offs</td></tr>
+<tr><td>7</td><td><strong>Trade-off Register</strong></td><td>Key decisions with alternatives considered and rationale</td><td>Makes design intent auditable; enables future teams to understand constraints</td></tr>
+<tr><td>8</td><td><strong>Evolution Plan</strong></td><td>What the v1 looks like, what breaks first, what changes are planned for v2</td><td>Prevents over-engineering while ensuring the design can grow</td></tr>
+</tbody>
+</table></div>
+<p><strong>The minimum viable design</strong> (for interviews or quick reviews) includes deliverables 1-4. A production design review should include all eight.</p>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Equating system design with drawing many microservices even when the system is still small.</li>
@@ -1186,6 +1224,21 @@
 <li>Practice drawing the system boundary for products you already know, such as chat, banking, or ride-sharing.</li>
 <li>Revisit this chapter after reading the real-world design chapters and notice how the same thinking scales upward.</li>
 </ul>
+<h3 id="deep-chapter-cross-references">Deep Chapter Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>If You Want to Learn About...</th><th>Go To</th></tr></thead>
+<tbody>
+<tr><td>How to gather and prioritize requirements</td><td><a href="02-types-of-requirements.html">Chapter 2: Types of Requirements</a></td></tr>
+<tr><td>Capacity estimation and back-of-envelope math</td><td><a href="F12-system-design-interview-thinking.html">F12 §2: Capacity Estimation</a></td></tr>
+<tr><td>Choosing between SQL and NoSQL databases</td><td>F5: Storage &amp; Databases</td></tr>
+<tr><td>Caching strategies (when, where, and how)</td><td>F6: Caching Strategies</td></tr>
+<tr><td>Designing APIs and communication patterns</td><td>F8: Communication Patterns</td></tr>
+<tr><td>Making systems reliable under failure</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td></tr>
+<tr><td>Deploying safely with rollback guarantees</td><td><a href="F11-deployment-devops.html">F11: Deployment &amp; DevOps</a></td></tr>
+<tr><td>The complete interview framework</td><td><a href="F12-system-design-interview-thinking.html">F12: System Design Interview Thinking</a></td></tr>
+<tr><td>Real-world system designs</td><td>Part 5: Real-World Systems</td></tr>
+</tbody>
+</table></div>
 <h2 id="navigation">Navigation</h2>
 <ul>
 <li>Next: <a href="02-types-of-requirements.html">Types of Requirements</a></li>
@@ -1242,6 +1295,7 @@
 <li><a href="#design-goals-and-constraints">Design goals and constraints</a></li>
 <li><a href="#system-thinking-vs-application-thinking">System thinking vs application thinking</a></li>
 <li><a href="#trade-offs-as-the-center-of-architecture">Trade-offs as the center of architecture</a></li>
+<li><a href="#reliability-security-cost">Reliability, security, and cost are requirements</a></li>
 </ul>
 </li>
 <li><a href="#key-terminology">Key Terminology</a></li>
@@ -1268,11 +1322,15 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#system-design-deliverables">System Design Deliverables</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
-<li><a href="#further-exploration">Further Exploration</a></li>
+<li><a href="#further-exploration">Further Exploration</a><ul>
+<li><a href="#deep-chapter-cross-references">Deep Chapter Cross-References</a></li>
+</ul>
+</li>
 <li><a href="#navigation">Navigation</a></li>
 </ul>
 </div>

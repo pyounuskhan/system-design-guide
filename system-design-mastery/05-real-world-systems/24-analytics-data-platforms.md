@@ -3919,6 +3919,129 @@ Rate Limit: 500 requests/min
 | `COST_LIMIT_EXCEEDED` | 402 | Query would scan more data than org cost limit allows |
 | `INTERNAL_ERROR` | 500 | Unexpected server error; safe to retry with backoff |
 
+## Reference Architecture: Batch + Stream (Lambda/Kappa)
+
+```
+┌────────────────────────────────────────────────────────┐
+│  SOURCES                                                │
+│  [App Events] [Logs] [DB CDC] [Third-Party APIs]        │
+└──────────────────────┬─────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────┐
+│  INGESTION LAYER                                        │
+│  Kafka / Kinesis (durable event stream)                 │
+│  • Schema validation at ingestion (Schema Registry)     │
+│  • Dead-letter topic for malformed events               │
+└──────┬───────────────────────────┬─────────────────────┘
+       │                           │
+┌──────▼──────────┐      ┌────────▼────────────────────┐
+│ STREAM PATH      │      │ BATCH PATH                   │
+│ Flink / Spark    │      │ Spark / dbt / Airflow         │
+│ Streaming        │      │ (hourly/daily jobs)           │
+│ • Real-time      │      │ • Full recomputation          │
+│   aggregations   │      │ • Historical backfill         │
+│ • Sessionization │      │ • Complex joins               │
+│ • Anomaly detect │      │ • Data quality checks         │
+└──────┬──────────┘      └────────┬────────────────────┘
+       │                           │
+┌──────▼───────────────────────────▼─────────────────────┐
+│  SERVING LAYER                                          │
+│  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐  │
+│  │ Data Warehouse│  │ OLAP Cube   │  │ Feature Store  │  │
+│  │ (Snowflake/  │  │ (ClickHouse/│  │ (Feast/Tecton)│  │
+│  │  BigQuery/   │  │  Druid/     │  │               │  │
+│  │  Redshift)   │  │  Pinot)     │  │               │  │
+│  └──────────────┘  └─────────────┘  └───────────────┘  │
+└──────────────────────┬─────────────────────────────────┘
+                       │
+┌──────────────────────▼─────────────────────────────────┐
+│  CONSUMPTION                                            │
+│  [Dashboards (Looker/Tableau)] [Ad-hoc SQL]             │
+│  [ML Training] [API Serving] [Embedded Analytics]       │
+└────────────────────────────────────────────────────────┘
+```
+
+### Lambda vs Kappa Decision
+
+| Approach | Stream + Batch (Lambda) | Stream-Only (Kappa) |
+|----------|------------------------|---------------------|
+| **How** | Separate batch and stream paths; merge at serving | Single stream path processes everything |
+| **Correctness** | Batch is authoritative; stream is approximate | Stream must be exactly-once or idempotent |
+| **Backfill** | Batch reprocesses from raw storage | Replay Kafka from earliest offset |
+| **Complexity** | Two codepaths to maintain | One codebase, simpler |
+| **Best for** | Complex aggregations needing historical correctness | Event-driven systems with strong idempotency |
+
+---
+
+## Data Governance Model
+
+| Concern | Implementation | Owner |
+|---------|---------------|-------|
+| **Schema management** | Schema Registry (Avro/Protobuf) enforces compatibility on every publish | Data platform team |
+| **Data lineage** | Track source → transformation → destination for every table/column | Tool: OpenLineage, Marquez, dbt lineage |
+| **Data catalog** | Searchable inventory of all datasets with descriptions, owners, freshness | Tool: DataHub, Amundsen, Atlan |
+| **Access control** | Column-level permissions; PII columns restricted to authorized roles | RBAC via warehouse native policies |
+| **PII classification** | Auto-tag PII columns (name, email, phone, IP) at ingestion | ML-based classifier or regex + manual review |
+| **Retention policies** | Per-table retention: raw events 90 days, aggregated 2 years, compliance 7 years | Automated lifecycle rules |
+| **Data quality contracts** | Producer defines expected schema, freshness, volume; consumer validates | dbt tests, Great Expectations, Soda |
+
+### Data Quality Contract Example
+
+```yaml
+# data_quality_contract: orders_events
+contract:
+  owner: order-service-team
+  freshness:
+    max_delay: 5 minutes  # Event must arrive within 5 min of occurrence
+  schema:
+    required_fields: [event_id, order_id, timestamp, status, amount]
+    type_checks:
+      amount: decimal
+      timestamp: iso8601
+  volume:
+    min_events_per_hour: 1000  # Alert if below (indicates producer outage)
+    max_events_per_hour: 500000  # Alert if above (indicates duplicate storm)
+  validation:
+    amount: "> 0 AND < 1000000"  # Sanity check
+    status: "IN ('created', 'paid', 'shipped', 'delivered', 'cancelled')"
+```
+
+---
+
+## Data Pipeline SLOs
+
+| Metric | SLO Target | Measurement | Alert Threshold |
+|--------|-----------|-------------|----------------|
+| **Event ingestion freshness** | < 5 minutes from event time to warehouse | Compare event timestamp vs warehouse arrival | > 15 minutes |
+| **Batch job completion** | By 06:00 UTC daily | Job end time | Not completed by 07:00 |
+| **Dashboard freshness** | < 15 minutes for operational; < 24h for business | Dashboard "last updated" timestamp | Stale > 2x target |
+| **Data completeness** | > 99.5% of expected events ingested | Compare event count vs producer-reported count | < 98% |
+| **Schema validation pass rate** | > 99.9% of events pass validation | Dead-letter topic volume | > 0.1% in DLT |
+| **Query latency (p95)** | < 10 seconds for dashboard queries | Warehouse query metrics | > 30 seconds |
+| **Pipeline failure rate** | < 2% of scheduled jobs fail | Airflow/Dagster job metrics | > 5% |
+
+### Data Observability Signals
+
+| Signal | What to Monitor | Tool |
+|--------|----------------|------|
+| **Freshness** | When was the table last updated? | dbt freshness tests, Monte Carlo, Elementary |
+| **Volume** | Row count within expected range? | dbt tests, Great Expectations |
+| **Schema** | Did columns change unexpectedly? | Schema Registry, dbt schema tests |
+| **Distribution** | Did value distributions shift? (data drift) | Great Expectations, Monte Carlo |
+| **Lineage** | Which upstream tables feed this table? | OpenLineage, dbt docs, DataHub |
+| **Pipeline status** | Is the DAG running? Any tasks failed/retrying? | Airflow/Dagster UI + PagerDuty |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Event streaming and Kafka | Ch 8: Message Queues; Ch 16: EDA |
+| CDC and outbox for ingestion | Ch 5: Databases; Ch 8: Queues |
+| Schema evolution | Ch 8: Schema Evolution; Ch 16: EDA |
+| Cost optimization for storage | Ch 9: Storage; Ch A9: Cost |
+| ML feature stores and serving | Domain ML chapters |
+| Observability for pipelines | F10: Observability & Operations |
+
 ---
 
 ## Final Recap

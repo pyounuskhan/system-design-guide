@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 — Real-World System Design Examples
-<strong>Position:</strong> Chapter 24 of 60
+<strong>Position:</strong> Chapter 24 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -6220,6 +6220,82 @@ Rate Limit: 500 requests/min
 | <code>QUERY_TIMEOUT</code> | 408 | Query exceeded timeout; reduce scope or increase limit |
 | <code>COST_LIMIT_EXCEEDED</code> | 402 | Query would scan more data than org cost limit allows |
 | <code>INTERNAL_ERROR</code> | 500 | Unexpected server error; safe to retry with backoff |</p>
+<h2 id="batch-stream-architecture">Reference Architecture: Batch + Stream</h2>
+<pre><code>SOURCES [App Events] [Logs] [DB CDC] [Third-Party APIs]
+        ↓
+INGESTION: Kafka/Kinesis (Schema Registry validation, DLT for malformed)
+        ↓                    ↓
+STREAM PATH                  BATCH PATH
+  Flink/Spark Streaming       Spark/dbt/Airflow
+  Real-time aggregations      Full recomputation, backfill, complex joins
+        ↓                    ↓
+SERVING: [Warehouse (Snowflake/BQ)] [OLAP (ClickHouse/Druid)] [Feature Store]
+        ↓
+CONSUMPTION: [Dashboards] [Ad-hoc SQL] [ML Training] [API Serving]</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Approach</th><th>Lambda (Batch+Stream)</th><th>Kappa (Stream-Only)</th></tr></thead>
+<tbody>
+<tr><td>Correctness</td><td>Batch authoritative; stream approximate</td><td>Stream must be exactly-once/idempotent</td></tr>
+<tr><td>Backfill</td><td>Batch reprocesses from raw storage</td><td>Replay Kafka from earliest</td></tr>
+<tr><td>Complexity</td><td>Two codepaths</td><td>One codebase, simpler</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="data-governance">Data Governance Model</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Implementation</th><th>Tool</th></tr></thead>
+<tbody>
+<tr><td><strong>Schema management</strong></td><td>Registry enforces compatibility on publish</td><td>Confluent Schema Registry</td></tr>
+<tr><td><strong>Data lineage</strong></td><td>Track source → transform → destination</td><td>OpenLineage, dbt lineage</td></tr>
+<tr><td><strong>Data catalog</strong></td><td>Searchable inventory with owners, freshness</td><td>DataHub, Amundsen</td></tr>
+<tr><td><strong>Access control</strong></td><td>Column-level permissions; PII restricted</td><td>Warehouse native RBAC</td></tr>
+<tr><td><strong>PII classification</strong></td><td>Auto-tag at ingestion</td><td>ML classifier + manual</td></tr>
+<tr><td><strong>Retention</strong></td><td>Raw 90d, aggregated 2y, compliance 7y</td><td>Lifecycle rules</td></tr>
+<tr><td><strong>Quality contracts</strong></td><td>Producer defines schema, freshness, volume</td><td>dbt tests, Great Expectations</td></tr>
+</tbody>
+</table></div>
+<h3 id="quality-contract">Data Quality Contract Example</h3>
+<pre><code class="language-yaml"># orders_events quality contract
+freshness: max_delay 5 minutes
+schema: required [event_id, order_id, timestamp, status, amount]
+volume: min 1000/hour, max 500000/hour
+validation: amount &gt; 0 AND &lt; 1000000; status IN (created, paid, shipped, delivered, cancelled)</code></pre>
+<hr>
+<h2 id="pipeline-slos">Data Pipeline SLOs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>SLO</th><th>Alert</th></tr></thead>
+<tbody>
+<tr><td><strong>Ingestion freshness</strong></td><td>&lt; 5 min event-to-warehouse</td><td>&gt; 15 min</td></tr>
+<tr><td><strong>Batch completion</strong></td><td>By 06:00 UTC daily</td><td>Not done by 07:00</td></tr>
+<tr><td><strong>Dashboard freshness</strong></td><td>&lt; 15 min operational; &lt; 24h business</td><td>Stale &gt; 2x target</td></tr>
+<tr><td><strong>Data completeness</strong></td><td>&gt; 99.5% events ingested</td><td>&lt; 98%</td></tr>
+<tr><td><strong>Schema validation</strong></td><td>&gt; 99.9% pass</td><td>&gt; 0.1% in DLT</td></tr>
+<tr><td><strong>Query latency (p95)</strong></td><td>&lt; 10s for dashboards</td><td>&gt; 30s</td></tr>
+<tr><td><strong>Pipeline failure rate</strong></td><td>&lt; 2% of scheduled jobs</td><td>&gt; 5%</td></tr>
+</tbody>
+</table></div>
+<h3 id="data-observability">Data Observability Signals</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Signal</th><th>What</th><th>Tool</th></tr></thead>
+<tbody>
+<tr><td>Freshness</td><td>When was table last updated?</td><td>dbt freshness, Monte Carlo</td></tr>
+<tr><td>Volume</td><td>Row count in expected range?</td><td>dbt tests, Great Expectations</td></tr>
+<tr><td>Schema</td><td>Columns changed unexpectedly?</td><td>Schema Registry, dbt</td></tr>
+<tr><td>Distribution</td><td>Value distributions shifted?</td><td>Great Expectations, Monte Carlo</td></tr>
+<tr><td>Lineage</td><td>Which upstream tables feed this?</td><td>OpenLineage, DataHub</td></tr>
+</tbody>
+</table></div>
+<h3 id="analytics-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Event streaming / Kafka</td><td><a href="08-message-queues-event-systems.html">Ch 8</a>, <a href="16-event-driven-architecture.html">Ch 16</a></td></tr>
+<tr><td>CDC and outbox</td><td><a href="05-databases-deep-dive.html">Ch 5</a></td></tr>
+<tr><td>Schema evolution</td><td><a href="08-message-queues-event-systems.html">Ch 8</a></td></tr>
+<tr><td>Storage cost optimization</td><td><a href="09-storage-systems.html">Ch 9</a>, <a href="41-cost-optimization.html">A9</a></td></tr>
+<tr><td>Pipeline observability</td><td><a href="F10-observability-operations.html">F10</a></td></tr>
+</tbody>
+</table></div>
 <hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>Analytics &amp; Data Platforms form the <strong>decision-making infrastructure</strong> of every tech company. The 12 subsystems span the full data lifecycle: ingestion (event tracking, logs, clickstream) → processing (stream, batch, ETL) → serving (warehouse, OLAP, dashboards) → advanced (feature stores, experimentation). The key insight is that <strong>data quality, not infrastructure performance, is the biggest challenge</strong> — missing events, schema changes, late-arriving data, and training-serving skew cause more production issues than hardware failures.</p>
@@ -6436,6 +6512,9 @@ Rate Limit: 500 requests/min
 <li><a href="#data-catalog-api">Data Catalog API</a></li>
 </ul>
 </li>
+<li><a href="#batch-stream-architecture">Batch + Stream Reference Architecture</a></li>
+<li><a href="#data-governance">Data Governance Model</a></li>
+<li><a href="#pipeline-slos">Data Pipeline SLOs</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 </ul>
 </div>

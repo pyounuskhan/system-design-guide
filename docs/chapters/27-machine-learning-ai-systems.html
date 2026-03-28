@@ -6396,6 +6396,92 @@ Implementation:
 <li><strong>Design a data labeling platform for 1M annotations per month.</strong> Cover quality control, active learning, and annotator management.</li>
 <li><strong>Your recommendation model AUC dropped 3% over 2 weeks. Design the diagnosis and recovery process.</strong> Cover drift detection, data validation, and rollback.</li>
 </ol>
+<h2 id="rag-blueprint">RAG System Blueprint (LLM-Specific)</h2>
+<pre><code>INGESTION: Docs → Chunk (512 tok) → Embed → Vector DB (refresh on update)
+QUERY: Embed question → Hybrid search (BM25 + ANN) → Re-rank → Prompt → LLM → Guardrails → Response + citations
+COST: Model cascade (10-50x savings), semantic cache (20-40% fewer calls), context trimming</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>Target</th></tr></thead>
+<tbody>
+<tr><td>Answer correctness</td><td>&gt; 90% grounded in context</td></tr>
+<tr><td>Citation accuracy</td><td>&gt; 95%</td></tr>
+<tr><td>Hallucination rate</td><td>&lt; 5%</td></tr>
+<tr><td>Retrieval hit rate (top-5)</td><td>&gt; 85%</td></tr>
+<tr><td>User satisfaction</td><td>&gt; 75% thumbs up</td></tr>
+</tbody>
+</table></div>
+<p>Full RAG architecture: <a href="42-ai-in-system-design.html">Ch A10</a>; Interview walkthrough: <a href="F12-system-design-interview-thinking.html">F12 §6.4</a>.</p>
+<hr>
+<h2 id="model-monitoring-slos">Model Monitoring SLOs</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Signal</th><th>Detects</th><th>Alert Threshold</th></tr></thead>
+<tbody>
+<tr><td><strong>Prediction latency (p99)</strong></td><td>Serving degradation</td><td>&gt; 2x baseline</td></tr>
+<tr><td><strong>Feature drift</strong></td><td>Input distribution shift</td><td>PSI &gt; 0.2</td></tr>
+<tr><td><strong>Prediction drift</strong></td><td>Output distribution changed</td><td>Mean shift &gt; 2 std dev</td></tr>
+<tr><td><strong>Business metric decline</strong></td><td>Model impact on product</td><td>Drops &gt; 3% WoW</td></tr>
+<tr><td><strong>Stale features</strong></td><td>Feature store not refreshed</td><td>Age &gt; 2x expected</td></tr>
+<tr><td><strong>Data quality</strong></td><td>Missing features, nulls</td><td>Any check failure</td></tr>
+</tbody>
+</table></div>
+<h3 id="model-slo-template">Model SLO Template</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Metric</th><th>SLO</th><th>Action If Breached</th></tr></thead>
+<tbody>
+<tr><td>Prediction latency</td><td>&lt; 100ms (p99)</td><td>Scale infra; check model size</td></tr>
+<tr><td>Feature freshness</td><td>&lt; 5 min</td><td>Fix pipeline; fallback features</td></tr>
+<tr><td>Accuracy (offline)</td><td>AUC &gt; 0.85</td><td>Retrain; investigate drift</td></tr>
+<tr><td>Model availability</td><td>99.9%</td><td>Fallback to previous version</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="ai-risk-register">AI Risk Register Template</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Model bias</strong></td><td>Medium</td><td>High (legal)</td><td>Fairness metrics in eval; bias audit before launch</td></tr>
+<tr><td><strong>Hallucination</strong></td><td>High (generative)</td><td>Medium-High</td><td>RAG grounding; citations; confidence thresholds</td></tr>
+<tr><td><strong>Prompt injection</strong></td><td>Medium</td><td>High</td><td>Input sanitization; tool permission scoping; red-team</td></tr>
+<tr><td><strong>Training data PII</strong></td><td>Medium</td><td>High (privacy)</td><td>PII scan before training; anonymization; differential privacy</td></tr>
+<tr><td><strong>Model staleness</strong></td><td>High</td><td>Medium</td><td>Automated drift detection; scheduled retraining</td></tr>
+<tr><td><strong>Supply-chain</strong></td><td>Low</td><td>Very High</td><td>Pin versions; verify checksums; trusted registries</td></tr>
+<tr><td><strong>Feedback loops</strong></td><td>Medium</td><td>High</td><td>Exploration injection; offline eval against unbiased holdout</td></tr>
+</tbody>
+</table></div>
+<h3 id="training-privacy">Privacy in Training Data</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Concern</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>PII in training data</td><td>Scan + anonymize before training</td></tr>
+<tr><td>Right to erasure</td><td>Remove from future training sets; retrain if material</td></tr>
+<tr><td>Consent</td><td>Explicit consent or documented legitimate interest</td></tr>
+<tr><td>Memorization</td><td>Membership inference testing; differential privacy</td></tr>
+<tr><td>Data provenance</td><td>Track datasets per model version</td></tr>
+</tbody>
+</table></div>
+<h3 id="ml-references">References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Covers</th></tr></thead>
+<tbody>
+<tr><td>Google MLOps whitepaper</td><td>Pipeline maturity; feature stores; CI/CT/CD</td></tr>
+<tr><td>NIST AI RMF (AI 600-1)</td><td>AI risk management framework</td></tr>
+<tr><td>EU AI Act</td><td>Risk classification; transparency</td></tr>
+<tr><td>MLflow / W&amp;B docs</td><td>Experiment tracking; model registry</td></tr>
+<tr><td>HF Model Cards</td><td>Documentation standard; bias disclosure</td></tr>
+</tbody>
+</table></div>
+<h3 id="ml-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>RAG architecture</td><td><a href="42-ai-in-system-design.html">A10</a></td></tr>
+<tr><td>LLM interview topics</td><td><a href="F12-system-design-interview-thinking.html">F12 §7.7</a></td></tr>
+<tr><td>Fraud ML pipeline</td><td><a href="19-fintech-payments.html">Ch 19</a></td></tr>
+<tr><td>Feature store freshness</td><td><a href="24-analytics-data-platforms.html">Ch 24</a></td></tr>
+<tr><td>ML observability</td><td><a href="F10-observability-operations.html">F10</a></td></tr>
+</tbody>
+</table></div>
+<hr>
 <h2 id="final-recap">Final Recap</h2>
 <p>ML &amp; AI Systems are defined by the <strong>gap between model development and production serving</strong>. The model is the easy part; the infrastructure — training pipelines, feature stores, serving systems, monitoring, and data versioning — is 90% of the work. The key insight: <strong>ML systems require continuous operation</strong> (models degrade, data drifts, features go stale) unlike traditional software that works until the code changes.</p>
         </div>
@@ -6641,6 +6727,9 @@ Implementation:
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#evolution-roadmap-v1-v2-v3">Evolution Roadmap (V1 -&gt; V2 -&gt; V3)</a></li>
 <li><a href="#practice-questions">Practice Questions</a></li>
+<li><a href="#rag-blueprint">RAG Blueprint</a></li>
+<li><a href="#model-monitoring-slos">Model Monitoring SLOs</a></li>
+<li><a href="#ai-risk-register">AI Risk Register</a></li>
 <li><a href="#final-recap">Final Recap</a></li>
 </ul>
 </div>

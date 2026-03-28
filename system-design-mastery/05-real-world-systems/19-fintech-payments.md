@@ -4948,6 +4948,194 @@ flowchart LR
 
 ---
 
+## Payment Rails — Card vs Bank vs Wallet
+
+Different payment methods have fundamentally different architectures, latency profiles, and failure modes. Treating them as interchangeable leads to incorrect retry logic and broken reconciliation.
+
+| Dimension | Card Payments | Bank Transfers (ACH/SEPA) | Real-Time Rails (UPI/RTP/PIX) | Wallet (Stored Value) |
+|-----------|-------------|--------------------------|------------------------------|----------------------|
+| **Authorization latency** | 1-3 seconds | N/A (batch) | 1-5 seconds | < 100ms (internal) |
+| **Settlement time** | T+1 to T+3 days | 1-3 business days | Instant (seconds) | Instant (internal ledger) |
+| **Idempotency mechanism** | PSP idempotency key | Unique transfer reference | UPI RRN / RTP transaction ID | Internal idempotency key |
+| **Refund mechanism** | Card refund via PSP (3-10 days) | Reverse ACH/SEPA (days) | Reverse payment (seconds-hours) | Ledger credit (instant) |
+| **Failure mode** | Timeout → unknown state | Batch rejection (next day) | Timeout → callback resolution | Internal → always known |
+| **Fraud surface** | Card-not-present, stolen numbers | Account takeover | SIM swap, social engineering | Account takeover, credential theft |
+| **Regulatory framework** | PCI-DSS | ACH Rules / SEPA Rulebook | UPI NPCI / RTP TCH / BCB PIX | E-money directive / state MSB licenses |
+
+### Multi-Rail Routing Decision
+
+```
+Payment request arrives →
+  Is it a wallet-to-wallet transfer?
+    → YES: Process internally via ledger (fastest, cheapest)
+  Is real-time rail available for this corridor (country + currency)?
+    → YES: Route to UPI/RTP/PIX (instant settlement, low cost)
+  Is card payment?
+    → YES: Route to card PSP (Stripe/Adyen) with multi-PSP failover
+  Is bank transfer?
+    → YES: Queue for next ACH/SEPA batch window
+```
+
+---
+
+## Fraud and Risk Pipeline Blueprint
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  TRANSACTION ARRIVES                                     │
+│  (payment request with amount, card/account, IP, device) │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│  LAYER 1: RULE ENGINE (< 10ms)                           │
+│  • Velocity checks (5+ transactions in 1 minute)         │
+│  • Amount thresholds ($10K+ → escalate)                  │
+│  • Blocklists (known fraud cards, IPs, device IDs)       │
+│  • Geo-mismatch (card country ≠ IP country)              │
+│  Decision: PASS / BLOCK / ESCALATE                       │
+└──────────────────────┬──────────────────────────────────┘
+                       │ PASS or ESCALATE
+┌──────────────────────▼──────────────────────────────────┐
+│  LAYER 2: ML SCORING (< 50ms)                            │
+│  • Features: transaction history, device fingerprint,     │
+│    behavioral biometrics, merchant risk, time patterns    │
+│  • Model: gradient-boosted trees or neural network        │
+│  • Output: risk score 0.0-1.0                            │
+│  Decision: score < 0.3 → APPROVE                         │
+│            score 0.3-0.7 → REVIEW (or 3D Secure)         │
+│            score > 0.7 → DECLINE                          │
+└──────────────────────┬──────────────────────────────────┘
+                       │ REVIEW
+┌──────────────────────▼──────────────────────────────────┐
+│  LAYER 3: STEP-UP VERIFICATION                           │
+│  • 3D Secure (cardholder authentication)                  │
+│  • OTP/MFA for high-risk actions                          │
+│  • Manual review queue for edge cases                     │
+│  • Automatic release after N hours if not reviewed        │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────────────┐
+│  LAYER 4: POST-TRANSACTION MONITORING (batch)            │
+│  • Pattern analysis across accounts/merchants             │
+│  • Chargeback correlation (disputed transactions)         │
+│  • Model retraining with new labeled fraud data           │
+│  • SAR (Suspicious Activity Report) generation            │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Fraud Metrics to Track
+
+| Metric | Target | Why |
+|--------|--------|-----|
+| Fraud detection rate (recall) | > 95% | Catch as many fraudulent transactions as possible |
+| False positive rate | < 3% | Avoid blocking legitimate customers |
+| Rule engine latency | < 10ms | Cannot add perceptible delay to checkout |
+| ML scoring latency | < 50ms | Total fraud check must be < 100ms |
+| Chargeback rate | < 0.5% | Visa/Mastercard penalize merchants above 1% |
+| Manual review queue SLA | < 4 hours | Funds held too long frustrate legitimate buyers |
+
+---
+
+## Observability Requirements for Financial Systems
+
+Financial observability goes beyond standard application metrics. Regulatory and audit requirements add specific signal needs.
+
+### Operational Observability
+
+| Signal | What to Monitor | Alert Threshold |
+|--------|----------------|----------------|
+| Transaction success rate | % of payments authorized successfully | < 95% (investigate PSP issues) |
+| Authorization latency (p99) | Time from request to PSP response | > 3 seconds (cart abandonment risk) |
+| PSP error rate (per PSP) | % of calls returning error/timeout per provider | > 5% for any single PSP |
+| Ledger balance drift | SUM(debits) - SUM(credits) ≠ 0 | Any non-zero balance → P0 alert |
+| Settlement match rate | % of transactions matched in reconciliation | < 99.5% → investigate exceptions |
+| Fraud score distribution | Distribution shift in risk scores | Sudden spike in high-risk scores → model or attack change |
+| Queue depth (settlement batch) | Pending settlement records | Growing for > 1 hour |
+
+### Audit Trail Requirements
+
+| Requirement | Implementation | Regulatory Driver |
+|------------|---------------|-------------------|
+| Every transaction must be logged with full context | Append-only audit log with hash chain | SOX, PCI-DSS |
+| Logs must be tamper-evident | Each log entry includes hash of previous entry | SOX Section 302/404 |
+| Access to PII must be logged | Data access logging on sensitive tables/columns | GDPR, CCPA |
+| Retention: 7 years minimum | Tiered storage: hot 90 days → cold 7 years | SOX, AML directives |
+| Log integrity verification | Weekly hash-chain verification job | Internal control |
+| Export capability for regulators | On-demand export in regulatory format (SAR, CTR) | BSA/AML, FinCEN |
+
+### Privacy-by-Design Checklist for Payments
+
+- [ ] Card numbers (PAN) never stored in application database — tokenized via PSP
+- [ ] CVV/CVC never stored or logged under any circumstance (PCI-DSS)
+- [ ] PII (name, email, address) encrypted at rest with per-tenant KMS keys
+- [ ] PII redacted from application logs (mask card numbers, email addresses)
+- [ ] Data access to PII requires explicit IAM role with audit logging
+- [ ] Customer data deletion honored within 30 days of account closure (GDPR)
+- [ ] Cross-border data transfers use standard contractual clauses
+
+---
+
+## Compliance Reference Guide
+
+**Important:** Compliance requirements vary by jurisdiction, license type, and business model. The following is an *architectural reference*, not legal advice. Always consult qualified legal and compliance counsel for your specific context.
+
+| Regulation | Scope | Key Architectural Impact | Reference |
+|-----------|-------|--------------------------|-----------|
+| **PCI-DSS** | Card data handling | Tokenize PANs; network segmentation; quarterly scans; never store CVV | PCI Security Standards Council (pcisecuritystandards.org) |
+| **PSD2 / SCA** | EU payment services | Strong Customer Authentication (3D Secure); open banking APIs | European Banking Authority |
+| **SOX** | Financial reporting (US public companies) | Tamper-evident audit trails; segregation of duties; internal controls | SEC/PCAOB guidance |
+| **BSA/AML** | Anti-money laundering (US) | Transaction monitoring; SAR filing; KYC verification | FinCEN (fincen.gov) |
+| **GDPR** | EU personal data | Data minimization; right to erasure; consent; breach notification 72h | European Commission |
+| **CCPA/CPRA** | California personal data | Consumer opt-out; data access requests; no sale of PI | California AG |
+| **E-Money Directive** | EU stored-value wallets | Segregation of customer funds; licensing; capital requirements | EBA |
+
+---
+
+## Replay Safety and Idempotency Architecture
+
+In financial systems, replay safety is the #1 correctness concern. Every operation must produce the same result whether executed once or five times.
+
+### Idempotency Key Strategy by Payment Rail
+
+| Rail | Idempotency Key Source | Scope | TTL |
+|------|----------------------|-------|-----|
+| Card payment | Client-generated UUID in `Idempotency-Key` header | Per merchant + amount + currency | 24 hours |
+| Wallet transfer | `transfer:{from_wallet}:{to_wallet}:{amount}:{client_ref}` | Per transfer request | 24 hours |
+| UPI payment | UPI RRN (Retrieval Reference Number) | Global across NPCI | 48 hours |
+| ACH/SEPA | Unique instruction ID per batch file | Per originator | 7 days |
+| Refund | `refund:{original_payment_id}:{amount}` | Per payment | 30 days |
+
+### Idempotency Implementation Pattern
+
+```
+Request arrives with idempotency_key
+  → Check idempotency store (Redis or DB):
+    FOUND + completed → return cached response (200 OK)
+    FOUND + in_progress → return 409 Conflict ("processing")
+    NOT FOUND → acquire lock, process, store result, release lock
+
+Idempotency store schema:
+  key: idempotency_key
+  value: { status: "completed", response: {...}, created_at, expires_at }
+  TTL: per-rail (see table above)
+
+Race condition prevention:
+  Use Redis SET NX (set if not exists) or PostgreSQL advisory locks
+  to prevent two concurrent requests with the same key from both processing
+```
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| E-commerce checkout saga | Ch 18: E-Commerce & Marketplaces |
+| General idempotency patterns | Ch 8: Message Queues; Ch 13: Distributed Transactions |
+| Ledger and CDC patterns | Ch 5: Databases Deep Dive |
+| SLO/error budget framework | F10: Observability & Operations |
+| Supply-chain security for fintech | F11: Deployment & DevOps |
+
+---
+
 ## Final Recap
 
 Fintech & Payments is the domain where **correctness is not negotiable**. Every other system design domain tolerates some eventual consistency, some stale reads, some approximate answers. Financial systems do not. A dropped transaction is lost money. An unbalanced ledger is an audit failure. A missed fraud signal is a direct financial loss.

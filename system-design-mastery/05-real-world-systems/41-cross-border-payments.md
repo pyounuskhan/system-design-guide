@@ -3,6 +3,9 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 41 of 60
+**Last reviewed:** March 2026. Regulations, payment rails, and sanctions lists change frequently — verify against current compliance sources.
+
+**⚠️ Disclaimer:** This chapter is an *architectural reference*. It does NOT constitute financial, legal, or compliance advice. Cross-border payments involve licensing, sanctions, and AML obligations that vary by jurisdiction. Production implementations require qualified legal and compliance counsel.
 
 ---
 
@@ -4981,6 +4984,134 @@ Cross-border payments is one of the most demanding system design domains, combin
 7. **Regulation drives architecture** — Data residency, sanctions compliance, and reporting requirements shape the system more than any performance requirement.
 
 The platform that wins in cross-border payments combines operational excellence (reliability, speed, cost) with regulatory sophistication (compliance, reporting, licensing) and financial innovation (ODL, stablecoins, dynamic routing). The system design must accommodate all three simultaneously.
+
+## Cross-Border Ledger and Reconciliation Design
+
+### Double-Entry Ledger for Cross-Border Transfers
+
+```
+Transfer: $500 USD → MXN (recipient in Mexico)
+
+Step 1: DEBIT  sender wallet (USD)               $500.00 USD
+        CREDIT corridor:US→MX:holding (USD)       $500.00 USD
+
+Step 2: FX conversion at locked rate (1 USD = 17.2 MXN)
+        DEBIT  corridor:US→MX:holding (USD)       $500.00 USD
+        CREDIT corridor:US���MX:holding (MXN)       8,600.00 MXN
+
+Step 3: DEBIT  corridor:US→MX:holding (MXN)       8,600.00 MXN
+        CREDIT fees:fx_spread                      86.00 MXN  (1% spread)
+        CREDIT fees:transfer_fee                   50.00 MXN
+        CREDIT payout:partner:MX_bank              8,464.00 MXN
+
+Invariant: SUM(debits) = SUM(credits) at EVERY step
+```
+
+### Reconciliation Architecture
+
+```
+INTERNAL LEDGER                    EXTERNAL RECORDS
+  (our DB)                           (partner banks, PSPs, correspondents)
+      │                                  │
+      └──────── RECONCILIATION JOB ──────┘
+                (daily, T+1)
+  For each corridor:
+    1. Match: internal transfer records ↔ partner settlement reports
+    2. Flag: unmatched items (sent but not confirmed; confirmed but not in ledger)
+    3. Investigate: manual queue for items unmatched > 48 hours
+    4. Resolve: post adjustment entries for confirmed discrepancies
+    5. Report: daily recon summary → finance team + compliance
+```
+
+| Reconciliation Type | Frequency | SLA for Resolution |
+|--------------------|-----------|-------------------|
+| Ledger ↔ PSP settlement | Daily (T+1) | < 48 hours for investigation |
+| Ledger ↔ bank statement | Daily (T+1) | < 72 hours |
+| FX position ↔ hedging provider | Real-time (intraday) | < 4 hours |
+| Nostro/vostro balance | Daily | < 24 hours |
+
+---
+
+## Sanctions Screening Architecture
+
+```
+Transfer request arrives →
+  LAYER 1: Real-time screening (< 500ms)
+    Screen sender + recipient against:
+      - OFAC SDN list (US)
+      - EU Consolidated Sanctions list
+      - UN Security Council list
+      - Local sanctions lists (per corridor)
+    Match types: exact name, fuzzy name (Levenshtein ≤ 2), alias, DOB
+    Result: CLEAR / POTENTIAL_MATCH / BLOCKED
+
+  LAYER 2: Enhanced due diligence (for POTENTIAL_MATCH)
+    Manual review queue; analyst verifies identity
+    SLA: < 4 hours for standard; < 1 hour for high-value
+    Result: CLEARED / BLOCKED + SAR filing
+
+  LAYER 3: Ongoing monitoring (batch, daily)
+    Re-screen all active customers against updated lists
+    Flag new matches → review queue
+```
+
+### Sanctions Screening SLOs
+
+| Metric | SLO | Alert |
+|--------|-----|-------|
+| Screening latency (real-time) | < 500ms (p99) | > 2 seconds |
+| False positive rate | < 5% of transfers flagged | > 8% (analyst overload) |
+| List update freshness | < 1 hour from list publication | > 4 hours |
+| Manual review SLA | < 4 hours (standard) | > 8 hours |
+| Sanctions evasion detection | > 99% of sanctioned entities caught | Any known miss → P0 |
+
+---
+
+## Compliance and Audit Checklist
+
+| Requirement | Implementation | Regulation |
+|------------|---------------|-----------|
+| **Sanctions screening** | Real-time + batch re-screening; all lists | OFAC, EU, UN |
+| **Transaction monitoring** | Rule-based + ML anomaly detection for suspicious patterns | BSA/AML, 4AMLD/5AMLD |
+| **SAR filing** | Auto-generate Suspicious Activity Reports when thresholds met | FinCEN (US), FIU (EU) |
+| **KYC verification** | Identity verification tiered by transfer volume | FATF Recommendations |
+| **Record retention** | All transaction records + screening results: 5-7 years | BSA, 4AMLD |
+| **Audit trail** | Every transfer step logged with timestamp, actor, decision, reason | SOX, local regulations |
+| **Data residency** | Transaction data stored in jurisdiction of each corridor endpoint | GDPR, local data protection |
+| **Reporting** | Regulatory reports (CTR, SAR) filed within deadlines | FinCEN, local FIU |
+
+---
+
+## Payout and Settlement SLOs
+
+| Metric | SLO | Alert | Architecture Implication |
+|--------|-----|-------|--------------------------|
+| **End-to-end transfer time** | < 1 hour (same-day corridors) | > 2 hours | Pre-funded accounts in destination; real-time rails where available |
+| **Payout success rate** | > 98% first attempt | < 95% | Multi-partner failover per corridor |
+| **FX rate lock duration** | 15-30 minutes | Rate expired before completion → re-quote | Lock rate at confirmation; hedge immediately |
+| **Settlement to partner** | T+0 to T+2 (corridor-dependent) | T+3 for any corridor | Pre-funding for T+0; batch settlement for T+1/T+2 |
+| **Reconciliation match rate** | > 99.5% auto-matched | < 98% | Standardize reference formats per partner |
+| **Sanctions screening latency** | < 500ms | > 2 seconds | In-memory list index (Redis/Elasticsearch) |
+
+### Idempotency for Cross-Border Transfers
+
+| Operation | Idempotency Key | TTL | Why |
+|-----------|----------------|-----|-----|
+| Transfer initiation | `transfer:{sender}:{recipient}:{amount}:{currency}:{client_ref}` | 24 hours | Prevent duplicate transfers from retry |
+| FX conversion | `fx:{transfer_id}:{rate_quote_id}` | 30 minutes | Lock rate for one transfer |
+| Payout to partner | `payout:{transfer_id}:{partner_id}` | 7 days | Prevent duplicate payout instructions |
+| Refund | `refund:{transfer_id}` | 30 days | Prevent double refund |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Payment gateway and multi-PSP | Ch 19: Fintech & Payments |
+| Double-entry ledger design | Ch 19: Fintech (Ledger section) |
+| Idempotency patterns | Ch 8: Message Queues; Ch 13: Distributed Transactions |
+| Sanctions and compliance | Ch 28: Security Systems |
+| Observability and SLOs | F10: Observability & Operations |
+| Fraud detection pipeline | Ch 19: Fintech (Fraud section) |
 
 ---
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chapter 40 · Security &amp; Authentication · System Design Mastery</title>
+  <title>Chapter A8 · Security &amp; Authentication · System Design Mastery</title>
   <meta name="description" content="Security and authentication are foundational system-design concerns because every architecture choice changes the attack surface. Authentication answers “who is this principal?” Authorization answers “what may they do?” Secure system design must also consider transport security, secret management, abuse prevention, and how trust is established between services.">
   <link rel="icon" href="../assets/icons/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../assets/css/styles.css">
@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -984,13 +984,13 @@
         <span>/</span>
         <a href="../index.html#part-6">Advanced Architecture</a>
         <span>/</span>
-        <span>Chapter 40</span>
+        <span>Chapter A8</span>
       </div>
 
       <article class="chapter-article">
         <header class="chapter-hero part-6">
           <div class="chapter-hero-top">
-            <span class="chapter-kicker">Chapter 40 of 60</span>
+            <span class="chapter-kicker">Chapter A8 — Advanced Architecture</span>
             <span class="part-badge">Advanced Architecture</span>
           </div>
           <h1>Security &amp; Authentication</h1>
@@ -1014,7 +1014,8 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 6 - Advanced Architecture<br>
-<strong>Position:</strong> Chapter 40 of 60
+<strong>Position:</strong> Chapter A8 (Advanced Architecture — Security &amp; Authentication Primer)<br>
+<strong>Complements:</strong> F9: Security Fundamentals (deep chapter) covers threat modeling, encryption, and compliance. This chapter provides the conceptual primer for identity and access architecture.<br>
 <strong>Why this part exists:</strong> This section adds the production-grade concerns that separate a technically functioning system from a trustworthy one.<br>
 <strong>This chapter builds toward:</strong> identity flows, authorization design, token strategy, and secure-by-default architectural thinking</p>
 <h2 id="overview">Overview</h2>
@@ -1145,6 +1146,114 @@
 <li>Prefer short-lived credentials and least privilege to reduce blast radius.</li>
 <li>Treat service-to-service trust with the same seriousness as user login.</li>
 </ul>
+<h2 id="identity-architecture">Canonical Identity Architecture</h2>
+<pre><code>CLIENTS (Web, Mobile, Partner API, Internal SPA)
+        │ HTTPS + Authorization header
+API GATEWAY / Edge
+  • TLS termination, rate limiting, JWT validation
+        │ identity context (user_id, tenant_id, scopes)
+IDENTITY PROVIDER (IdP) — Auth0, Okta, Keycloak, Cognito
+  • Login (password, SSO, social, MFA)
+  • Token issuance (access + refresh + ID tokens)
+  • OAuth 2.1 / OIDC compliant
+        │
+AUTHORIZATION LAYER — OPA / Cedar / Casbin
+  • Input: (principal, action, resource, context)
+  • Rules: RBAC, ABAC, resource ownership, tenant scope
+  • Output: allow/deny + reason; every decision logged
+        │
+APPLICATION SERVICES
+  • Enforce authZ; pass identity via headers/gRPC metadata
+  • Service-to-service: workload identity / mTLS
+        │
+DATA LAYER
+  • Row-level security, encryption at rest (KMS), field-level PII encryption</code></pre>
+<hr>
+<h2 id="oauth-21">OAuth 2.1 and OIDC — Modern Standards</h2>
+<h3 id="oauth-changes">Key Changes from OAuth 2.0</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Change</th><th>What It Means</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td><strong>PKCE required</strong></td><td>Proof Key prevents code interception</td><td>Mobile/SPA apps are first-class</td></tr>
+<tr><td><strong>Implicit flow removed</strong></td><td>No tokens in URL fragments</td><td>Eliminates token leakage vector</td></tr>
+<tr><td><strong>Password grant removed</strong></td><td>Apps never handle passwords</td><td>Forces delegated auth</td></tr>
+<tr><td><strong>Refresh token rotation</strong></td><td>Every refresh produces new token</td><td>Limits stolen-token damage</td></tr>
+<tr><td><strong>Exact redirect URI</strong></td><td>No wildcard matching</td><td>Prevents open redirects</td></tr>
+</tbody>
+</table></div>
+<h3 id="token-strategy">Token Strategy</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Token</th><th>Lifetime</th><th>Storage</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td>Access (JWT)</td><td>5-15 min</td><td>Memory / secure storage</td><td>API authorization</td></tr>
+<tr><td>Refresh</td><td>Hours-days</td><td>HTTP-only cookie / secure</td><td>Obtain new access tokens</td></tr>
+<tr><td>ID (JWT)</td><td>5-15 min</td><td>Memory</td><td>Prove identity to client</td></tr>
+<tr><td>Session cookie</td><td>Hours</td><td>HTTP-only, Secure, SameSite</td><td>Traditional web auth</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="service-auth">Service-to-Service Authentication</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>How</th><th>Best For</th><th>Limitation</th></tr></thead>
+<tbody>
+<tr><td><strong>mTLS</strong></td><td>Both sides present certs; mesh auto-rotates</td><td>Service mesh (Istio, Linkerd)</td><td>No app-layer identity</td></tr>
+<tr><td><strong>Workload identity</strong></td><td>Cloud-native identity (IAM Role, GCP SA)</td><td>Cloud services → cloud APIs</td><td>Vendor-specific</td></tr>
+<tr><td><strong>Service JWT</strong></td><td>Short-lived JWT from IdP per service</td><td>Cross-service with claims</td><td>Token management overhead</td></tr>
+<tr><td><strong>API keys</strong></td><td>Static secret per service</td><td>Simple internal APIs</td><td>No rotation without downtime</td></tr>
+</tbody>
+</table></div>
+<h3 id="secret-rotation">Secret Rotation Architecture</h3>
+<pre><code>1. Secret created in Vault / Secrets Manager
+2. App reads via sidecar or SDK (never from env var)
+3. Rotation every 30 days (automated)
+4. New secret pushed → app picks up on next read (no restart)
+5. Old secret valid during grace period (dual-secret window)
+6. Old secret invalidated after grace period
+Tools: Vault, AWS Secrets Manager, External Secrets Operator</code></pre>
+<hr>
+<h2 id="authz-boundaries">Authorization Boundaries — Worked Examples</h2>
+<h3 id="multi-tenant-authz">Multi-Tenant SaaS</h3>
+<pre><code>Policy: Users access only their own tenant's resources
+Check:  invoice.tenant_id == user.tenant_id
+Enforce: JWT claims → app query filter → PostgreSQL RLS</code></pre>
+<h3 id="rbac-example">RBAC</h3>
+<pre><code>admin → CRUD | editor → CRU | viewer → R
+(user: bob, role: editor, action: delete) → DENY</code></pre>
+<h3 id="abac-example">ABAC</h3>
+<pre><code>Managers can approve expenses from their department ≤ approval limit
+(carol, manager, engineering, approve, expense $4,500) → ALLOW</code></pre>
+<h3 id="authz-models">Authorization Model Comparison</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Model</th><th>Decisions Based On</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>RBAC</strong></td><td>Role → permissions</td><td>Simple apps, internal tools</td></tr>
+<tr><td><strong>ABAC</strong></td><td>User + resource + context attributes</td><td>Complex policies, compliance</td></tr>
+<tr><td><strong>ReBAC</strong></td><td>Relationships (ownership, group)</td><td>Social apps, doc sharing (Zanzibar-style)</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="security-references">Well-Architected Security References</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>What You'll Learn</th></tr></thead>
+<tbody>
+<tr><td>OWASP Top 10</td><td>Critical web security risks</td></tr>
+<tr><td>OAuth 2.1 Spec</td><td>Modern consolidated auth standard</td></tr>
+<tr><td>NIST 800-63</td><td>Identity proofing, authentication assurance</td></tr>
+<tr><td>AWS Security Pillar</td><td>Cloud security design principles</td></tr>
+<tr><td>Google BeyondCorp</td><td>Zero-trust architecture reference</td></tr>
+</tbody>
+</table></div>
+<h3 id="security-cross-refs">Cross-Links</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>API gateway auth + rate limiting</td><td><a href="15-api-gateway-pattern.html">Ch 15</a></td></tr>
+<tr><td>Edge security (WAF, DDoS)</td><td><a href="04-networking-fundamentals.html">Ch 4</a></td></tr>
+<tr><td>Per-tenant data isolation</td><td><a href="05-databases-deep-dive.html">Ch 5</a></td></tr>
+<tr><td>Supply-chain security</td><td><a href="F11-deployment-devops.html">F11 §1.5</a></td></tr>
+<tr><td>Regulatory requirements</td><td><a href="02-types-of-requirements.html">Ch 2</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Using JWTs everywhere without understanding revocation and claim staleness trade-offs.</li>
@@ -1271,6 +1380,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#identity-architecture">Canonical Identity Architecture</a></li>
+<li><a href="#oauth-21">OAuth 2.1 &amp; OIDC Standards</a></li>
+<li><a href="#service-auth">Service-to-Service Authentication</a></li>
+<li><a href="#authz-boundaries">Authorization Boundaries</a></li>
+<li><a href="#security-references">Security References</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

@@ -1143,6 +1143,139 @@
 <li>Place services according to data gravity and latency sensitivity.</li>
 <li>Model failures such as packet loss, slow links, and partial regional isolation explicitly.</li>
 </ul>
+<h2 id="tls-13-connection-reuse">TLS 1.3 and Connection Reuse Patterns</h2>
+<p>TLS is not just a security checkbox — it is a latency tax on every new connection. Understanding TLS 1.3 improvements and how connection reuse eliminates repeated overhead is essential for performance-aware architecture.</p>
+<h3 id="tls-handshake-comparison">TLS Handshake Comparison</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Aspect</th><th>TLS 1.2</th><th>TLS 1.3</th></tr></thead>
+<tbody>
+<tr><td>Handshake round trips</td><td>2 RTT</td><td>1 RTT (0-RTT for resumption)</td></tr>
+<tr><td>Forward secrecy</td><td>Optional</td><td>Mandatory</td></tr>
+<tr><td>0-RTT resumption</td><td>Not supported</td><td>Supported (pre-shared key)</td></tr>
+<tr><td>New connection latency</td><td>~30-50ms (same region)</td><td>~15-25ms (same region)</td></tr>
+<tr><td>Resumed connection latency</td><td>~15-25ms</td><td>~0ms (0-RTT)</td></tr>
+</tbody>
+</table></div>
+<p><strong>0-RTT caveat:</strong> 0-RTT data is replayable — only use for idempotent requests (GETs, not POSTs with side effects).</p>
+<h3 id="connection-reuse-strategies">Connection Reuse Strategies</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How It Works</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>HTTP/1.1 Keep-Alive</strong></td><td>Reuse TCP connection for sequential requests</td><td>Simple APIs, low concurrency</td></tr>
+<tr><td><strong>HTTP/2 Multiplexing</strong></td><td>Multiple concurrent streams over one TCP connection</td><td>High-concurrency APIs, browser-to-server</td></tr>
+<tr><td><strong>HTTP/3 (QUIC)</strong></td><td>Multiple streams over UDP; no head-of-line blocking</td><td>Mobile clients, lossy networks</td></tr>
+<tr><td><strong>Connection pooling</strong></td><td>Pre-established connection pool maintained by application</td><td>Service-to-service, database connections</td></tr>
+<tr><td><strong>TLS session resumption</strong></td><td>Cache session keys to skip full handshake</td><td>Clients that reconnect frequently (mobile, IoT)</td></tr>
+</tbody>
+</table></div>
+<p><strong>Impact:</strong> Without reuse, 100 requests = 5,500ms (55ms × 100). With HTTP/2 multiplexing, 100 parallel streams over one connection = ~95ms total — 58x faster.</p>
+<hr>
+<h2 id="edge-stack">The Edge Stack — Security and Performance at the Perimeter</h2>
+<p>Modern production systems place a stack of infrastructure at the network edge — between the user and the application — handling security, performance, and traffic management before any request reaches business logic.</p>
+<h3 id="edge-stack-architecture">Edge Stack Reference Architecture</h3>
+<pre><code>USER (Browser / Mobile / API Client)
+        │ HTTPS
+DNS (Route 53 / Cloudflare)
+  • Geo-routing → nearest region
+  • Failover → avoid unhealthy endpoints
+        │
+CDN / Edge (CloudFront / Cloudflare / Fastly)
+  • Static asset caching
+  • TLS termination
+  • DDoS absorption
+        │
+WAF (Web Application Firewall)
+  • OWASP Top 10 protection (SQLi, XSS, SSRF)
+  • Rate limiting per IP / user / endpoint
+  • Bot detection and challenge
+        │
+API Gateway (Kong / AWS API GW / Envoy)
+  • Authentication (JWT, API key)
+  • Per-tenant rate limiting
+  • Request routing + transformation
+  • Observability (logs, metrics, trace ID)
+        │
+Load Balancer (ALB / Nginx / Envoy)
+  • Health checking
+  • Connection draining
+        │
+APPLICATION SERVERS</code></pre>
+<h3 id="edge-decision-guide">Edge Component Decision Guide</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>When to Add</th><th>Skip If</th></tr></thead>
+<tbody>
+<tr><td>CDN</td><td>Any user-facing system with static assets or cacheable API responses</td><td>Internal-only service, all content is dynamic</td></tr>
+<tr><td>WAF</td><td>Public-facing APIs, compliance requirements (PCI-DSS)</td><td>Internal services behind VPN/private network</td></tr>
+<tr><td>API Gateway</td><td>Multi-tenant APIs, external developer APIs, microservices needing centralized auth</td><td>Single monolith with built-in auth</td></tr>
+<tr><td>DDoS protection</td><td>Any system with public endpoints</td><td>Internal-only services</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="retry-timeout-policies">Network Retry and Timeout Policies</h2>
+<p>Network failures are inevitable. These policies should be designed alongside the architecture, not bolted on after the first outage.</p>
+<h3 id="timeout-strategy">Timeout Strategy</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Timeout Type</th><th>Where to Set</th><th>Recommended Value</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Connection timeout</td><td>Client → Server</td><td>1-3 seconds</td><td>Detect unreachable hosts fast</td></tr>
+<tr><td>Request timeout</td><td>Client → Server</td><td>5-30 seconds</td><td>Prevent indefinite hanging</td></tr>
+<tr><td>Idle timeout</td><td>Connection pool</td><td>60-300 seconds</td><td>Reclaim inactive connections</td></tr>
+<tr><td>Downstream timeout</td><td>Service → Dependency</td><td>Shorter than caller's timeout</td><td>Prevent cascading timeouts</td></tr>
+</tbody>
+</table></div>
+<p><strong>Cascading timeout rule:</strong> Each layer's timeout must be shorter than its caller's, with room for retries:</p>
+<pre><code>User → API Gateway (30s) → Service A (10s) → Service B (3s) → Database (1s)</code></pre>
+<h3 id="retry-strategy">Retry Strategy</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How It Works</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>No retry</strong></td><td>Fail immediately</td><td>Non-idempotent writes</td></tr>
+<tr><td><strong>Fixed retry</strong></td><td>Wait N seconds, retry M times</td><td>Simple internal calls</td></tr>
+<tr><td><strong>Exponential backoff</strong></td><td>1s, 2s, 4s, 8s... with jitter</td><td>External APIs, shared resources</td></tr>
+<tr><td><strong>Circuit breaker</strong></td><td>Stop retrying after failure threshold</td><td>Preventing retry storms</td></tr>
+</tbody>
+</table></div>
+<p><strong>Retry safety rules:</strong></p>
+<ol>
+<li><strong>Only retry idempotent operations</strong> — retrying a non-idempotent POST can create duplicates</li>
+<li><strong>Add jitter</strong> — without jitter, all clients retry simultaneously (thundering herd)</li>
+<li><strong>Set a retry budget</strong> — limit total retries per second across all clients</li>
+<li><strong>Propagate deadlines</strong> — if the caller's deadline has passed, do not retry</li>
+</ol>
+<h3 id="resilience-cross-references">Cross-Reference: Resilience Patterns</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Pattern</th><th>Chapter</th><th>Connection</th></tr></thead>
+<tbody>
+<tr><td>Circuit breaker</td><td>F3: Distributed Systems Patterns</td><td>Stops calling a failing dependency after threshold failures</td></tr>
+<tr><td>Bulkhead</td><td>F3: Distributed Systems Patterns</td><td>Isolates connection pools per dependency</td></tr>
+<tr><td>Retry with backoff</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td><td>Track retry rate as a signal of dependency health</td></tr>
+<tr><td>Timeout tuning</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td><td>Monitor p99 latency per dependency for informed timeout values</td></tr>
+<tr><td>Load shedding</td><td>F1: Scalability Fundamentals</td><td>Reject excess requests at the edge</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="multi-region-routing">Multi-Region Routing Policies</h2>
+<p>DNS and edge routing determine which region serves each user request. The routing policy directly affects latency, availability, and disaster recovery.</p>
+<h3 id="routing-policy-comparison">Routing Policy Comparison</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Policy</th><th>How It Works</th><th>Use Case</th><th>Limitation</th></tr></thead>
+<tbody>
+<tr><td><strong>Latency-based</strong></td><td>Route to lowest-latency region</td><td>Global consumer apps</td><td>Latency measurement has some lag</td></tr>
+<tr><td><strong>Geo-proximity</strong></td><td>Route to geographically nearest region</td><td>Data residency compliance</td><td>Nearest may not be healthiest</td></tr>
+<tr><td><strong>Weighted</strong></td><td>Distribute by percentage (90/10)</td><td>Canary deployments, gradual migration</td><td>Manual weight management</td></tr>
+<tr><td><strong>Failover</strong></td><td>Active-primary with standby</td><td>Disaster recovery (active-passive)</td><td>Recovery depends on DNS TTL</td></tr>
+<tr><td><strong>Multivalue</strong></td><td>Return multiple healthy IPs</td><td>Simple load distribution</td><td>No intelligent routing</td></tr>
+</tbody>
+</table></div>
+<h3 id="routing-example">Example: Global E-Commerce Routing</h3>
+<pre><code>User in Frankfurt → DNS latency-based routing
+  → EU region (eu-west-1): local catalog replica + local checkout primary
+  → Cross-region only for: global inventory sync (eventual consistency)
+
+Failover: EU region unhealthy
+  → Health check detects failure (30s) + TTL expires (60s)
+  → EU users routed to US (us-east-1)
+  → Trade-off: 70-150ms additional latency during failover</code></pre>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Blaming the application for latency without measuring DNS, TLS, or routing overhead.</li>
@@ -1268,6 +1401,19 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#tls-13-connection-reuse">TLS 1.3 and Connection Reuse Patterns</a></li>
+<li><a href="#edge-stack">The Edge Stack</a><ul>
+<li><a href="#edge-stack-architecture">Reference Architecture</a></li>
+<li><a href="#edge-decision-guide">Component Decision Guide</a></li>
+</ul>
+</li>
+<li><a href="#retry-timeout-policies">Network Retry and Timeout Policies</a><ul>
+<li><a href="#timeout-strategy">Timeout Strategy</a></li>
+<li><a href="#retry-strategy">Retry Strategy</a></li>
+<li><a href="#resilience-cross-references">Cross-Reference: Resilience Patterns</a></li>
+</ul>
+</li>
+<li><a href="#multi-region-routing">Multi-Region Routing Policies</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

@@ -4447,6 +4447,121 @@ FHIR Migration Path:
 
 
 
+## Healthcare Privacy Threat Model
+
+**Important:** Healthcare regulations vary by jurisdiction. This is an *architectural reference*, not legal or compliance advice.
+
+### PHI Threat Matrix
+
+| Threat | Vector | Impact | Mitigation |
+|--------|--------|--------|-----------|
+| **Unauthorized PHI access** | Overly broad DB permissions; no RLS | HIPAA violation; patient harm | Role-based access; row-level security; attribute-based access for clinical context |
+| **PHI in logs/errors** | Stack traces containing patient data | Data breach via log aggregation | PII/PHI redaction middleware; structured logging with allowlisted fields only |
+| **Insider threat** | Clinician accesses records without treatment relationship | Privacy violation; "snooping" | Break-glass audit; access anomaly detection; "did you have a reason?" confirmation for sensitive records |
+| **Data exfiltration** | Bulk export of patient records | Mass breach | DLP rules on bulk queries; export requires approval + audit; rate limiting on data access APIs |
+| **Consent violation** | Processing data without patient consent | Regulatory penalty; trust damage | Consent service enforces purpose-of-use checks before data access |
+| **Cross-tenant leakage** | Multi-provider system returns wrong patient's data | Patient safety risk; legal liability | Tenant isolation (org_id in every query); negative testing in CI |
+
+---
+
+## Audit Logging for Healthcare
+
+### What Must Be Logged (HIPAA §164.312)
+
+| Event | Required Fields | Retention |
+|-------|----------------|-----------|
+| **PHI access** (read) | who, when, which patient, which data elements, from where | 6 years minimum |
+| **PHI modification** (write) | who, when, what changed (before/after), reason | 6 years minimum |
+| **Login/logout** | who, when, success/failure, device, IP | 6 years minimum |
+| **Permission changes** | who granted/revoked what to whom, when | 6 years minimum |
+| **Consent changes** | patient, what consent was granted/revoked, when | 6 years minimum |
+| **Export/print/download** | who, when, which records, destination | 6 years minimum |
+| **Break-glass access** | who, when, which patient, justification | 6 years + immediate alert |
+
+### Audit Log Architecture
+
+```
+Application → Structured audit event (JSON, append-only)
+  → Kafka topic (audit_events) — durable, tamper-evident
+    → Audit DB (append-only, hash chain for integrity)
+    → Real-time alerting (break-glass, bulk access, anomalies)
+    → Long-term archive (6+ years, encrypted, immutable storage)
+
+Tamper protection:
+  Each audit entry includes SHA-256 hash of previous entry
+  Weekly integrity verification job
+  Audit DB access restricted to read-only for all except audit service
+```
+
+---
+
+## Consent and Identity Federation
+
+### Consent Architecture
+
+```
+Patient grants consent →
+  Consent Service stores: {
+    patient_id, data_category, purpose_of_use,
+    granted_to (provider/org), valid_from, valid_until, revocable: true
+  }
+
+Data access request →
+  1. Authenticate requestor (identity federation / SSO)
+  2. Check authorization (role: clinician, admin, researcher)
+  3. Check consent: does patient consent cover this data + this purpose + this requestor?
+  4. If all pass → serve data (log access)
+  5. If consent missing → deny (log denial)
+  6. If emergency → break-glass (serve data, log with elevated alert, require justification within 24h)
+```
+
+### Identity Federation for Healthcare
+
+| Pattern | Use Case | Standard |
+|---------|----------|---------|
+| **SAML 2.0** | Enterprise SSO between hospital systems | Legacy but widespread in healthcare |
+| **OAuth 2.0 + OIDC** | Patient-facing apps; API access | Modern; SMART on FHIR uses this |
+| **SMART on FHIR** | Third-party app access to EHR data with patient consent | HL7 standard; OAuth-based; scoped to patient/encounter |
+| **Cross-org trust** | Sharing records between hospitals | Federated identity with trust framework (e.g., TEFCA in US) |
+
+---
+
+## Healthcare Reliability and Data Minimization
+
+### Reliability SLOs for Clinical Systems
+
+| System | Availability SLO | RTO | RPO | Why |
+|--------|-----------------|-----|-----|-----|
+| **EHR (read)** | 99.99% | < 5 min | 0 | Clinicians need records during patient care |
+| **EHR (write)** | 99.95% | < 15 min | < 1 min | Delayed documentation acceptable briefly |
+| **Lab results** | 99.9% | < 30 min | 0 | Critical results must not be lost |
+| **Medication ordering** | 99.99% | < 5 min | 0 | Medication errors are patient safety events |
+| **Patient portal** | 99.9% | < 1 hour | < 5 min | Patient convenience, not clinical safety |
+| **Appointment scheduling** | 99.5% | < 4 hours | < 30 min | Can fall back to phone scheduling |
+
+### Data Minimization Principles
+
+| Principle | Implementation |
+|-----------|---------------|
+| **Collect only what's needed** | API request scopes limit fields returned; no "SELECT *" for PHI |
+| **Purpose limitation** | Consent service enforces purpose-of-use (treatment vs research vs billing) |
+| **Retention limits** | Auto-archive after treatment relationship ends; delete per policy |
+| **De-identification for research** | HIPAA Safe Harbor or Expert Determination before research use |
+| **Minimum necessary access** | Clinicians see their patients' data; not all patients in the system |
+| **Encryption of PHI at rest** | AES-256; per-org KMS keys; field-level encryption for sensitive fields |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Audit logging and compliance | Ch 28: Security Systems |
+| Access control models (RBAC/ABAC) | Ch A8: Security & Authentication |
+| Regulatory requirements templates | Ch 2: Types of Requirements |
+| Data residency and encryption | Ch 9: Storage Systems |
+| Zero trust architecture | Ch 28: Security Systems |
+
+---
+
 ## Navigation
 - Previous: [Gaming Systems](30-gaming-systems.md)
 - Next: [EdTech Systems](32-edtech-systems.md)

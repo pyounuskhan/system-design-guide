@@ -1143,6 +1143,154 @@
 <li>Expect failures, cold starts, and skewed traffic as normal operational conditions.</li>
 <li>Measure whether the cache is truly protecting the backend instead of only measuring memory usage.</li>
 </ul>
+<h2 id="invalidation-taxonomy">Cache Invalidation Taxonomy</h2>
+<p>Cache invalidation is famously hard because different data, consistency requirements, and cache layers demand different strategies.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How It Works</th><th>Freshness</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>TTL-based expiry</strong></td><td>Entry auto-expires after fixed duration</td><td>Bounded staleness (≤ TTL)</td><td>Product catalog, search results</td></tr>
+<tr><td><strong>Event-driven invalidation</strong></td><td>Backend publishes invalidation event (Kafka, CDC)</td><td>Near-real-time</td><td>Profile updates, order status</td></tr>
+<tr><td><strong>Version/tag-based</strong></td><td>Cache key includes version; new version = new key</td><td>Instant for new reads</td><td>Static assets, API responses with ETag</td></tr>
+<tr><td><strong>Write-through</strong></td><td>Cache updated as part of write path</td><td>Immediate</td><td>Session state, auth tokens</td></tr>
+<tr><td><strong>Manual/API purge</strong></td><td>Operator triggers purge via API</td><td>On-demand</td><td>Emergency fixes, content takedowns</td></tr>
+</tbody>
+</table></div>
+<h3 id="invalidation-by-layer">Invalidation in Distributed Cache Layers</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Cache Layer</th><th>Challenge</th><th>Approach</th></tr></thead>
+<tbody>
+<tr><td>Browser cache</td><td>Cannot be invalidated from server</td><td>Versioned URLs (<code>/app.js?v=abc123</code>) or short <code>max-age</code></td></tr>
+<tr><td>CDN</td><td>Purge takes seconds-minutes across PoPs</td><td>Cache tags / surrogate keys for targeted purge; <code>stale-while-revalidate</code></td></tr>
+<tr><td>API gateway</td><td>Shared; invalidation must be scoped</td><td>Use <code>Vary</code> headers correctly; invalidate by key prefix</td></tr>
+<tr><td>Application cache (Redis)</td><td>Must be coordinated across instances</td><td>Event-driven pub/sub or TTL with jitter</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="stampede-prevention">Stampede Prevention — Patterns and Pseudo-Code</h2>
+<p>A cache stampede occurs when a popular entry expires and hundreds of concurrent requests simultaneously hit the backend.</p>
+<h3 id="request-coalescing">Pattern 1: Request Coalescing (Singleflight)</h3>
+<p>Only one request fetches from backend; all concurrent requests wait for that single result.</p>
+<pre><code class="language-python"># Pseudo-code: request coalescing / singleflight
+in_flight = {}  # key → (event, result)
+
+def get_with_coalescing(key):
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    if key in in_flight:
+        # Another request is fetching — wait for it
+        in_flight[key].event.wait(timeout=5)
+        return in_flight[key].result
+
+    # I am the leader — fetch from backend
+    in_flight[key] = Flight(event=Event(), result=None)
+    result = database.query(key)
+    cache.set(key, result, ttl=300)
+    in_flight[key].result = result
+    in_flight[key].event.set()  # Wake all waiters
+    del in_flight[key]
+    return result</code></pre>
+<h3 id="stale-while-revalidate">Pattern 2: Stale-While-Revalidate</h3>
+<p>Serve stale cached value immediately while refreshing asynchronously. Users get a fast response; the next request gets fresh data.</p>
+<pre><code class="language-python"># Pseudo-code: stale-while-revalidate
+def get_with_swr(key, ttl=300, stale_ttl=600):
+    entry = cache.get_with_metadata(key)
+
+    if entry is None:
+        # True miss — fetch synchronously
+        result = database.query(key)
+        cache.set(key, result, ttl=ttl, stale_ttl=stale_ttl)
+        return result
+
+    if entry.age &lt; ttl:
+        return entry.value  # Fresh
+
+    if entry.age &lt; stale_ttl:
+        background_refresh(key)  # Refresh async
+        return entry.value       # Serve stale but fast
+
+    # Expired — must fetch synchronously
+    result = database.query(key)
+    cache.set(key, result, ttl=ttl)
+    return result</code></pre>
+<p><strong>HTTP equivalent:</strong> <code>Cache-Control: stale-while-revalidate=60</code> tells CDNs to serve stale content for up to 60 seconds while fetching fresh content in the background.</p>
+<h3 id="early-refresh">Pattern 3: Probabilistic Early Expiration</h3>
+<p>Before the TTL expires, each request has a small probability of refreshing proactively, spreading load over time.</p>
+<pre><code class="language-python"># XFetch algorithm: probabilistic early refresh
+import random, math
+
+def get_with_early_refresh(key, ttl=300, beta=1.0):
+    entry = cache.get_with_metadata(key)
+    if entry is None:
+        result = database.query(key)
+        cache.set(key, result, ttl=ttl)
+        return result
+
+    remaining = ttl - entry.age
+    if random.random() &lt; math.exp(-remaining / (beta * ttl)):
+        result = database.query(key)  # Proactive refresh
+        cache.set(key, result, ttl=ttl)
+        return result
+
+    return entry.value</code></pre>
+<hr>
+<h2 id="cache-key-design">Cache Key Design Checklist</h2>
+<p>Poorly designed cache keys cause stale data, low hit rates, or security vulnerabilities.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Why</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Include all discriminating params</strong></td><td>Different inputs → different entries</td><td><code>user:{uid}:profile</code> not just <code>profile</code></td></tr>
+<tr><td><strong>Normalize keys</strong></td><td>Same input → same entry</td><td>Lowercase, trim whitespace, sort query params</td></tr>
+<tr><td><strong>Include version</strong></td><td>Schema changes shouldn't serve stale format</td><td><code>v2:product:{id}</code></td></tr>
+<tr><td><strong>Exclude volatile fields</strong></td><td>Timestamps/nonces destroy hit rate</td><td>Exclude <code>request_id</code>, <code>timestamp</code></td></tr>
+<tr><td><strong>Scope by tenant</strong></td><td>Never leak across tenants</td><td><code>tenant:{tid}:user:{uid}</code></td></tr>
+<tr><td><strong>Scope by auth context</strong></td><td>Don't leak between permission levels</td><td>Include role hash for authZ-varying responses</td></tr>
+<tr><td><strong>Consistent prefix</strong></td><td>Enables bulk invalidation</td><td><code>catalog:product:*</code> for purging all products</td></tr>
+</tbody>
+</table></div>
+<h3 id="cdn-key-correctness">CDN Cache Key Correctness</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Pitfall</th><th>What Goes Wrong</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>Missing <code>Vary: Authorization</code></td><td>Auth/anon users see same response</td><td>Add <code>Vary: Authorization</code> or don't cache at CDN</td></tr>
+<tr><td>User-specific data at CDN</td><td>User A sees User B's profile</td><td>Never cache personalized responses at CDN</td></tr>
+<tr><td>Query params ignored</td><td><code>/search?q=cats</code> = <code>/search?q=dogs</code></td><td>Include query string in cache key</td></tr>
+<tr><td><code>Accept-Language</code> not in Vary</td><td>English user sees Spanish response</td><td>Add <code>Vary: Accept-Language</code></td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="cache-security">Cache Security Considerations</h2>
+<p>Caches amplify both performance and risk. A poisoned or leaky cache affects every user who reads from it.</p>
+<h3 id="cache-poisoning">Cache Poisoning</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Attack Vector</th><th>How It Works</th><th>Prevention</th></tr></thead>
+<tbody>
+<tr><td><strong>HTTP response splitting</strong></td><td>Attacker injects headers causing CDN to cache malicious response</td><td>Sanitize response headers; use HTTP/2+</td></tr>
+<tr><td><strong>Cache key manipulation</strong></td><td>Unkeyed headers alter response but not cache key</td><td>Audit unkeyed headers; include all varying inputs</td></tr>
+<tr><td><strong>Deceptive request routing</strong></td><td><code>/admin</code> cached and served to other users</td><td><code>Cache-Control: private</code> for admin pages</td></tr>
+</tbody>
+</table></div>
+<h3 id="authz-leakage">Authorization Leakage</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Risk</th><th>Scenario</th><th>Prevention</th></tr></thead>
+<tbody>
+<tr><td><strong>Cross-user leakage</strong></td><td>User A's profile served to User B</td><td>Include user ID in cache key; <code>Vary: Cookie</code></td></tr>
+<tr><td><strong>Privilege escalation</strong></td><td>Admin response cached for regular users</td><td><code>Cache-Control: private, no-store</code> for admin</td></tr>
+<tr><td><strong>Stale permissions</strong></td><td>Revoked permissions still visible via cache</td><td>Invalidate on permission change; short TTL</td></tr>
+<tr><td><strong>Multi-tenant leakage</strong></td><td>Tenant A data served to Tenant B</td><td>Tenant ID in cache key; enforce at middleware</td></tr>
+</tbody>
+</table></div>
+<p><strong>Security checklist:</strong></p>
+<ul>
+<li>Personalized responses use <code>Cache-Control: private</code></li>
+<li>Auth-dependent responses include auth context in cache key</li>
+<li>Admin pages never cached at shared layers</li>
+<li><code>Vary</code> headers reflect all response-varying inputs</li>
+<li>Cache keys include tenant ID in multi-tenant systems</li>
+<li>Permission changes trigger cache invalidation</li>
+<li>Sensitive data (PII, tokens) has short TTL or is not cached</li>
+</ul>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Adding a cache without clarifying the source of truth.</li>
@@ -1268,6 +1416,15 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#invalidation-taxonomy">Cache Invalidation Taxonomy</a></li>
+<li><a href="#stampede-prevention">Stampede Prevention (Pseudo-Code)</a><ul>
+<li><a href="#request-coalescing">Request Coalescing</a></li>
+<li><a href="#stale-while-revalidate">Stale-While-Revalidate</a></li>
+<li><a href="#early-refresh">Probabilistic Early Expiration</a></li>
+</ul>
+</li>
+<li><a href="#cache-key-design">Cache Key Design Checklist</a></li>
+<li><a href="#cache-security">Cache Security Considerations</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

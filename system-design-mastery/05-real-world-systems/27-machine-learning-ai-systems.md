@@ -3,6 +3,8 @@
 ## Part Context
 **Part:** Part 5 — Real-World System Design Examples
 **Position:** Chapter 27 of 60
+**Last reviewed:** March 2026. AI/ML evolves rapidly — verify tool versions and pricing against current documentation.
+**Complements:** Chapter A10 (AI in System Design) covers LLM-specific RAG and prompt engineering. This chapter covers the full ML infrastructure stack.
 
 ---
 
@@ -5075,6 +5077,114 @@ flowchart LR
 4. **Design a fraud detection ML pipeline with real-time scoring.** Cover features, class imbalance, feedback loop, and model monitoring.
 5. **Design a data labeling platform for 1M annotations per month.** Cover quality control, active learning, and annotator management.
 6. **Your recommendation model AUC dropped 3% over 2 weeks. Design the diagnosis and recovery process.** Cover drift detection, data validation, and rollback.
+
+## RAG System Blueprint (LLM-Specific)
+
+For LLM-powered features (knowledge assistants, search copilots, support bots), the RAG pattern is the dominant production architecture.
+
+```
+INGESTION: Documents → Chunk (512 tok, 64 overlap) → Embed → Vector DB
+  Refresh: webhook on update, 15-min poll for dynamic sources
+
+QUERY: User question → Embed → Hybrid search (BM25 + vector ANN)
+  → Re-rank (cross-encoder, +50ms) → Assemble prompt (system + context + query)
+  → LLM (streaming) → Guardrails (hallucination check, PII filter)
+  → Response + citations
+
+COST LEVERS:
+  Model cascade: small model for simple queries (10-50x cheaper)
+  Semantic cache: 20-40% fewer LLM calls
+  Context trimming: fewer chunks → fewer input tokens
+```
+
+### RAG Quality Metrics
+
+| Metric | What | Target |
+|--------|------|--------|
+| Answer correctness | % answers factually grounded in context | > 90% |
+| Citation accuracy | % citations matching source text | > 95% |
+| Hallucination rate | % claims not in retrieved context | < 5% |
+| Retrieval hit rate | % queries where relevant doc found in top-5 | > 85% |
+| User satisfaction | Thumbs up / total rated | > 75% |
+
+**Cross-reference:** Full RAG architecture in Chapter A10; RAG interview walkthrough in F12 §6.4.
+
+---
+
+## Model Monitoring SLOs
+
+Models degrade silently. Unlike application bugs (which fail loudly), model drift produces subtly worse outputs that erode business metrics over weeks.
+
+### Monitoring Signals
+
+| Signal | What It Detects | How | Alert Threshold |
+|--------|----------------|-----|----------------|
+| **Prediction latency (p99)** | Serving infrastructure degradation | Prometheus histogram | > 2x baseline |
+| **Feature drift** | Input distribution shift (new user behavior, seasonal) | KS test / PSI on feature distributions | PSI > 0.2 for any critical feature |
+| **Prediction drift** | Model output distribution changed | Monitor score distribution over time | Score mean shifts > 2 std dev |
+| **Label drift** | Ground truth distribution changed | Compare recent labels to training labels | Chi-squared test p < 0.01 |
+| **Business metric decline** | Model impact on product (CTR, conversion, fraud rate) | A/B test or time-series comparison | Metric drops > 3% week-over-week |
+| **Data quality** | Missing features, nulls, schema violations | Great Expectations / dbt tests on feature pipeline | Any quality check failure |
+| **Stale features** | Feature store data not refreshed on schedule | Feature freshness metric | Feature age > 2x expected refresh interval |
+
+### Model SLO Template
+
+| Metric | SLO | Error Budget (30 days) | Action If Breached |
+|--------|-----|----------------------|-------------------|
+| Prediction latency (p99) | < 100ms | 43 min above threshold | Scale serving infra; investigate model size |
+| Feature freshness | < 5 minutes | 3.6 hours stale | Fix feature pipeline; switch to fallback features |
+| Prediction accuracy (offline eval) | AUC > 0.85 | N/A (eval on retrain) | Retrain with recent data; investigate drift |
+| Model availability | 99.9% | 43 min downtime | Fallback to previous model version |
+| Business metric (e.g., fraud catch rate) | > 95% recall | N/A | Retrain; adjust thresholds; investigate data quality |
+
+---
+
+## AI Risk Register Template
+
+AI systems introduce unique risks beyond standard software. Use this register to track and mitigate them.
+
+| Risk | Likelihood | Impact | Mitigation | Owner | Status |
+|------|-----------|--------|-----------|-------|--------|
+| **Model bias** (unfair treatment of protected groups) | Medium | High (legal, reputational) | Fairness metrics in eval suite; bias audit before launch; ongoing monitoring | ML team + legal | Active |
+| **Hallucination** (LLM generates false information) | High (for generative AI) | Medium-High (trust, legal if acted upon) | Grounding via RAG; citation requirement; confidence thresholds; human review for high-stakes | ML team | Active |
+| **Prompt injection** (adversarial input manipulates LLM) | Medium | High (data exfiltration, unauthorized actions) | Input sanitization; system prompt isolation; tool permission scoping; red-team testing | Security + ML | Active |
+| **Training data leakage** (PII in model weights) | Medium | High (privacy violation, regulatory) | Data anonymization before training; PII detection in training data; differential privacy for sensitive models | Data team + privacy | Active |
+| **Model staleness** (drift degrades quality silently) | High | Medium (gradual business impact) | Automated drift detection; scheduled retraining; A/B monitoring | ML ops | Active |
+| **Supply-chain compromise** (malicious model weights or dependencies) | Low | Very High | Pin model versions; scan dependencies; verify model checksums; use trusted registries | ML ops + security | Active |
+| **Feedback loop amplification** (model reinforces its own biases) | Medium | High (systemic bias, filter bubbles) | Exploration injection; periodic offline evaluation against unbiased holdout; human audit | ML team + product | Active |
+
+### Privacy in Training Data
+
+| Concern | Implementation |
+|---------|---------------|
+| **PII in training data** | Scan all training data for PII before training; anonymize or redact |
+| **Right to erasure (GDPR)** | If user requests deletion, their data must be removed from future training sets; retrain if material impact |
+| **Consent for data use** | Training on user data requires explicit consent or legitimate interest documentation |
+| **Model memorization** | Large models can memorize training examples; test with membership inference attacks; apply differential privacy |
+| **Data provenance** | Track which datasets were used for each model version; essential for audit and debugging |
+
+### Authoritative References
+
+| Resource | What It Covers |
+|----------|---------------|
+| Google MLOps whitepaper | ML pipeline maturity levels (0-2); feature stores; CI/CT/CD for ML |
+| NIST AI RMF (AI 600-1) | AI risk management framework; governance; measurement |
+| EU AI Act | Risk classification; prohibited practices; transparency requirements |
+| MLflow / Weights & Biases docs | Experiment tracking; model registry; deployment patterns |
+| Hugging Face Model Cards | Model documentation standard; bias and limitations disclosure |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| RAG architecture (LLM-specific) | Ch A10: AI in System Design |
+| LLM interview topics | F12 §7.7 |
+| Fraud detection ML pipeline | Ch 19: Fintech & Payments |
+| Recommendation systems | Ch 20: Social Media; Ch 18: E-Commerce |
+| Feature store freshness | Ch 24: Analytics & Data Platforms |
+| Observability for ML | F10: Observability & Operations |
+
+---
 
 ## Final Recap
 

@@ -132,6 +132,201 @@ Opening a familiar website is one of the best ways to understand networking fund
 - Place services according to data gravity and latency sensitivity.
 - Model failures such as packet loss, slow links, and partial regional isolation explicitly.
 
+## TLS 1.3 and Connection Reuse Patterns
+
+TLS is not just a security checkbox — it is a latency tax on every new connection. Understanding the difference between TLS 1.2 and 1.3, and how connection reuse eliminates repeated overhead, is essential for performance-aware architecture.
+
+### TLS Handshake Comparison
+
+| Aspect | TLS 1.2 | TLS 1.3 |
+|--------|---------|---------|
+| Handshake round trips | 2 RTT | 1 RTT (0-RTT for resumption) |
+| Cipher negotiation | Client offers many, server picks | Client predicts, server confirms |
+| Forward secrecy | Optional (depends on cipher) | Mandatory (all ciphers use ephemeral keys) |
+| 0-RTT resumption | Not supported | Supported (pre-shared key from previous session) |
+| Latency for new connection | ~30-50ms (same region) | ~15-25ms (same region) |
+| Latency for resumed connection | ~15-25ms | ~0ms (0-RTT sends data with first packet) |
+
+**0-RTT caveat:** 0-RTT data is replayable — an attacker can capture and re-send the first flight. Only use 0-RTT for idempotent requests (GETs, not POSTs with side effects).
+
+### Connection Reuse Strategies
+
+Every new TCP+TLS connection costs 2-4 round trips before a single byte of application data flows. At scale, these costs dominate. Connection reuse amortizes the setup cost across many requests.
+
+| Strategy | How It Works | Best For |
+|----------|-------------|----------|
+| **HTTP/1.1 Keep-Alive** | Reuse TCP connection for sequential requests | Simple APIs, low concurrency |
+| **HTTP/2 Multiplexing** | Multiple concurrent streams over one TCP connection | High-concurrency APIs, browser-to-server |
+| **HTTP/3 (QUIC)** | Multiple streams over UDP; no head-of-line blocking | Mobile clients, lossy networks, global users |
+| **Connection pooling** | Application maintains pool of pre-established connections | Service-to-service, database connections |
+| **TLS session resumption** | Cache session keys to skip full handshake on reconnect | Clients that reconnect frequently (mobile, IoT) |
+
+**Impact example:**
+```
+Without connection reuse (new connection per request):
+  DNS: 5ms + TCP: 15ms + TLS: 25ms + Request: 10ms = 55ms per request
+  100 requests = 5,500ms total
+
+With HTTP/2 multiplexing (one connection, 100 parallel streams):
+  DNS: 5ms + TCP: 15ms + TLS: 25ms + 100 requests: 50ms = 95ms total
+  → 58x faster for 100 requests
+```
+
+---
+
+## The Edge Stack — Security and Performance at the Perimeter
+
+Modern production systems place a stack of infrastructure at the network edge — between the user and the application. This edge stack handles security, performance, and traffic management before any request reaches business logic.
+
+### Edge Stack Reference Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  USER (Browser / Mobile / API Client)                        │
+└──────────────────────┬───────────────────────────────────────┘
+                       │ HTTPS
+┌──────────────────────▼───────────────────────────────────────┐
+│  DNS (Route 53 / Cloudflare)                                  │
+│  • Geo-routing: steer to nearest region                       │
+│  • Health-check routing: avoid unhealthy endpoints            │
+│  • Failover: automatic region failover on health check fail   │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────────────────┐
+│  CDN / Edge (CloudFront / Cloudflare / Fastly)                │
+│  • Static asset caching (CSS, JS, images)                     │
+│  • TLS termination (reduces origin TLS overhead)              │
+│  • Edge compute (Cloudflare Workers, Lambda@Edge)             │
+│  • DDoS absorption (volumetric attack mitigation)             │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────────────────┐
+│  WAF (Web Application Firewall)                               │
+│  • OWASP Top 10 protection (SQLi, XSS, SSRF)                │
+│  • Rate limiting per IP / per user / per endpoint             │
+│  • Bot detection and challenge (CAPTCHA, JS challenge)        │
+│  • Geo-blocking (block traffic from restricted countries)     │
+│  • Custom rules (block specific request patterns)             │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────────────────┐
+│  API Gateway (Kong / AWS API GW / Envoy)                      │
+│  • Authentication (JWT validation, API key check)             │
+│  • Rate limiting (per-tenant, per-plan quotas)                │
+│  • Request routing (path-based, header-based)                 │
+│  • Request/response transformation                            │
+│  • Observability (access logs, metrics, trace ID injection)   │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────────────────┐
+│  Load Balancer (ALB / Nginx / Envoy)                          │
+│  • Health checking (remove unhealthy backends)                │
+│  • Connection draining (graceful shutdown)                     │
+│  • TLS re-encryption (if end-to-end encryption required)      │
+└──────────────────────┬───────────────────────────────────────┘
+                       │
+                  APPLICATION SERVERS
+```
+
+### Edge Component Decision Guide
+
+| Component | When to Add | Skip If |
+|-----------|-------------|---------|
+| CDN | Any user-facing system with static assets or cacheable API responses | Internal-only service, all content is dynamic and personalized |
+| WAF | Public-facing APIs, compliance requirements (PCI-DSS), any system exposed to the internet | Internal services behind VPN/private network |
+| API Gateway | Multi-tenant APIs, external developer APIs, microservices needing centralized auth/rate-limiting | Single monolith with built-in auth and rate limiting |
+| DDoS protection | Any system with public endpoints | Internal-only services |
+
+---
+
+## Network Retry and Timeout Policies
+
+Network failures are inevitable. The difference between a resilient system and a fragile one is how it handles timeouts, retries, and partial failures. These policies should be designed alongside the architecture, not bolted on after the first outage.
+
+### Timeout Strategy
+
+| Timeout Type | Where to Set | Recommended Value | Why |
+|-------------|-------------|-------------------|-----|
+| Connection timeout | Client → Server | 1-3 seconds | Detect unreachable hosts fast; don't wait for TCP default (often 30-120s) |
+| Request timeout | Client → Server | 5-30 seconds (depends on operation) | Prevent requests from hanging indefinitely; set per-endpoint based on expected latency |
+| Idle timeout | Connection pool | 60-300 seconds | Reclaim connections that are no longer active |
+| Downstream timeout | Service → Dependency | Shorter than caller's timeout | Prevent cascading timeouts (if caller times out at 10s, dependency must respond in < 8s) |
+
+**The cascading timeout rule:** Each layer's timeout must be shorter than its caller's timeout, with room for retries:
+
+```
+User → API Gateway (30s) → Service A (10s) → Service B (3s) → Database (1s)
+
+If Service B is slow:
+  Database times out at 1s → Service B retries once → responds at 2s
+  Service A receives response at 2s → well within 10s budget
+  API Gateway receives at 2.5s → well within 30s budget
+  User sees response at ~3s → acceptable
+```
+
+### Retry Strategy
+
+| Strategy | How It Works | Best For |
+|----------|-------------|----------|
+| **No retry** | Fail immediately | Writes that are not idempotent; user can retry manually |
+| **Fixed retry** | Wait N seconds, retry up to M times | Simple cases; adequate for most internal calls |
+| **Exponential backoff** | Wait 1s, 2s, 4s, 8s... with jitter | External APIs, shared resources, distributed systems |
+| **Retry with circuit breaker** | Stop retrying when failure rate exceeds threshold | Preventing retry storms from overloading a failing dependency |
+
+**Retry safety rules:**
+1. **Only retry idempotent operations** — retrying a non-idempotent POST can create duplicate orders, payments, or messages
+2. **Add jitter** — without jitter, all clients retry at the same time and create thundering herds
+3. **Set a retry budget** — limit total retries per second across all clients, not just per-client
+4. **Propagate deadlines** — if the caller's deadline has passed, do not retry (the response is already too late)
+
+### Cross-Reference: Resilience Patterns
+
+These network policies connect directly to broader resilience patterns covered in other chapters:
+
+| Pattern | Chapter | Connection |
+|---------|---------|------------|
+| Circuit breaker | F3: Distributed Systems Patterns | Stops calling a failing dependency after threshold failures |
+| Bulkhead | F3: Distributed Systems Patterns | Isolates connection pools per dependency to prevent cascading exhaustion |
+| Retry with backoff | F10: Observability & Operations | Must be observable — track retry rate as a signal of dependency health |
+| Timeout tuning | F10: Observability & Operations | Monitor p99 latency per dependency to set informed timeout values |
+| Load shedding | F1: Scalability Fundamentals | Reject excess requests at the edge rather than overloading backends |
+
+---
+
+## Multi-Region Routing Policies
+
+DNS and edge routing determine which region serves each user request. The routing policy directly affects latency, availability, and disaster recovery.
+
+### Routing Policy Comparison
+
+| Policy | How It Works | Use Case | Limitation |
+|--------|-------------|----------|-----------|
+| **Latency-based** | Route to the region with lowest measured latency to the user | Global consumer apps | Requires health checks; latency measurement has some lag |
+| **Geo-proximity** | Route to the geographically nearest region | Data residency compliance (EU users → EU region) | Nearest region may not be healthiest or fastest |
+| **Weighted** | Distribute traffic by percentage (e.g., 90% primary, 10% secondary) | Canary deployments, gradual region migration | Manual weight management |
+| **Failover** | Active-primary with standby; switch on health check failure | Disaster recovery (active-passive) | Recovery time depends on DNS TTL and health check interval |
+| **Multivalue answer** | Return multiple healthy IPs; client picks one | Simple load distribution without a load balancer | No intelligence in routing; client picks randomly |
+
+### Example: Global E-Commerce Routing
+
+```
+User in Frankfurt → DNS latency-based routing
+  → EU region (eu-west-1): primary for EU users
+  → Serves: product catalog (local replica), checkout (local primary)
+  → Cross-region only for: global inventory sync (eventual consistency)
+
+User in Tokyo → DNS latency-based routing
+  → APAC region (ap-northeast-1): primary for APAC users
+  → Serves: product catalog (local replica), checkout (local primary)
+
+Failover scenario: EU region unhealthy
+  → DNS health check detects failure (30s interval)
+  → TTL expires (60s)
+  → EU users routed to US region (us-east-1)
+  → Failover latency: 90s-180s (health check + TTL propagation)
+  → Trade-off: 70-150ms additional latency for EU users during failover
+```
+
 ## Common Mistakes
 - Blaming the application for latency without measuring DNS, TLS, or routing overhead.
 - Using chatty APIs that require many sequential round trips over real mobile or cross-region networks.

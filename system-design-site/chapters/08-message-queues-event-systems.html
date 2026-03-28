@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 2 - Core System Building Blocks<br>
-<strong>Position:</strong> Chapter 8 of 60
+<strong>Position:</strong> Chapter 8 of 42<br>
 <strong>Why this part exists:</strong> This section moves from framing to mechanics by explaining the infrastructure components that repeatedly appear in real-world systems.<br>
 <strong>This chapter builds toward:</strong> asynchronous workflows, decoupled systems, and event-driven architecture patterns</p>
 <h2 id="overview">Overview</h2>
@@ -1143,6 +1143,138 @@
 <li>Treat observability and replay as first-class requirements in async systems.</li>
 <li>Remember that queues move complexity; they do not remove it.</li>
 </ul>
+<h2 id="delivery-semantics">Delivery Semantics — What "Exactly-Once" Really Means</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Guarantee</th><th>Definition</th><th>Practical Reality</th><th>When to Use</th></tr></thead>
+<tbody>
+<tr><td><strong>At-most-once</strong></td><td>Delivered 0 or 1 time; may be lost</td><td>Fire-and-forget; fastest</td><td>Metrics, analytics, logging</td></tr>
+<tr><td><strong>At-least-once</strong></td><td>Delivered 1+ times; never lost, may duplicate</td><td>Default for most production systems</td><td>Orders, payments, notifications</td></tr>
+<tr><td><strong>Exactly-once</strong></td><td>Delivered exactly 1 time</td><td>Does not exist as pure guarantee; achieved via idempotent processing</td><td>Kafka transactions (within Kafka); Flink checkpointing</td></tr>
+</tbody>
+</table></div>
+<p><strong>The exactly-once myth:</strong> True exactly-once across producer → broker → consumer → side effects is impossible without cooperation from all participants. What "exactly-once" systems actually provide is <em>effectively-once</em>: at-least-once delivery + idempotent processing. Always design consumers as if they will receive duplicates.</p>
+<hr>
+<h2 id="ordering-guarantees">Ordering Guarantees and Partition Scopes</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>System</th><th>Ordering Guarantee</th><th>Scope</th><th>Implication</th></tr></thead>
+<tbody>
+<tr><td><strong>Kafka</strong></td><td>Ordered within partition</td><td>Per-partition key</td><td>Same key = ordered; different keys may be out of order</td></tr>
+<tr><td><strong>SQS Standard</strong></td><td>Best-effort</td><td>None</td><td>May arrive out of order; use FIFO for ordering</td></tr>
+<tr><td><strong>SQS FIFO</strong></td><td>Strict</td><td>Per-message-group-ID</td><td>Ordered within group</td></tr>
+<tr><td><strong>RabbitMQ</strong></td><td>Ordered per queue</td><td>Per-queue (single consumer)</td><td>Multiple consumers lose ordering</td></tr>
+<tr><td><strong>Pulsar</strong></td><td>Ordered within partition</td><td>Per-key</td><td>Like Kafka with key-shared subscriptions</td></tr>
+</tbody>
+</table></div>
+<h3 id="partition-key-choice">Choosing a Partition Key</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Use Case</th><th>Partition Key</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Order processing</td><td><code>order_id</code></td><td>All events for one order processed in sequence</td></tr>
+<tr><td>User activity</td><td><code>user_id</code></td><td>Per-user events ordered; users parallelize</td></tr>
+<tr><td>Payment</td><td><code>payment_id</code></td><td>Debit/credit for same payment stay ordered</td></tr>
+<tr><td>Chat messages</td><td><code>conversation_id</code></td><td>Messages within conversation stay in order</td></tr>
+<tr><td>IoT telemetry</td><td><code>device_id</code></td><td>Per-device readings ordered; devices independent</td></tr>
+</tbody>
+</table></div>
+<p><strong>Warning:</strong> High-cardinality keys (e.g., <code>request_id</code>) remove ordering. Low-cardinality keys (e.g., <code>country</code>) create hot partitions.</p>
+<hr>
+<h2 id="idempotent-consumption">Idempotent Consumption — Patterns and Examples</h2>
+<h3 id="dedup-store">Pattern 1: Idempotency Key with Dedup Store</h3>
+<pre><code class="language-python"># Consumer skips duplicates using idempotency key
+def process_message(message):
+    key = message.headers["idempotency-key"]  # e.g., "order-789-shipped"
+
+    if redis.exists(f"processed:{key}"):
+        return  # Duplicate — skip
+
+    send_email(message.payload)
+    update_database(message.payload)
+    redis.set(f"processed:{key}", "1", ex=86400)  # 24h dedup window</code></pre>
+<p><strong>Idempotency key examples:</strong></p>
+<div class="table-wrap"><table>
+<thead><tr><th>Domain</th><th>Idempotency Key</th><th>Format</th></tr></thead>
+<tbody>
+<tr><td>Payment</td><td><code>payment:{payment_id}:charge</code></td><td>Unique per payment attempt</td></tr>
+<tr><td>Order</td><td><code>order:{order_id}:created</code></td><td>Unique per lifecycle event</td></tr>
+<tr><td>Notification</td><td><code>notify:{user_id}:{event_type}:{entity_id}</code></td><td>Prevents duplicate per event</td></tr>
+<tr><td>Inventory</td><td><code>inventory:{sku}:{operation_id}</code></td><td>Prevents double-deduction</td></tr>
+</tbody>
+</table></div>
+<h3 id="db-upsert">Pattern 2: Database Upsert</h3>
+<pre><code class="language-sql">-- Idempotent by design: INSERT ON CONFLICT updates only if newer
+INSERT INTO processed_orders (order_id, status, updated_at)
+VALUES ('order-789', 'shipped', NOW())
+ON CONFLICT (order_id) DO UPDATE SET
+  status = EXCLUDED.status, updated_at = EXCLUDED.updated_at
+WHERE processed_orders.updated_at &lt; EXCLUDED.updated_at;</code></pre>
+<h3 id="conditional-writes">Pattern 3: Conditional Writes (Optimistic Concurrency)</h3>
+<pre><code class="language-python"># Only apply if version matches — prevents stale/duplicate updates
+result = db.execute("""
+    UPDATE orders SET status = %s, version = version + 1
+    WHERE id = %s AND version = %s
+""", (new_status, order_id, expected_version))
+if result.rowcount == 0:
+    log.warn("Stale update, skipping")  # Duplicate or out-of-order</code></pre>
+<hr>
+<h2 id="outbox-pattern">The Outbox Pattern — Safe Event Publishing</h2>
+<p>When a service must write to its database AND publish an event, the naive dual-write is unsafe. The outbox pattern writes both in a single transaction.</p>
+<pre><code>Single Database Transaction:
+  1. UPDATE orders SET status = 'shipped'
+  2. INSERT INTO outbox (event_type, payload) VALUES ('OrderShipped', '...')
+  COMMIT (both or neither)
+      ↓
+Outbox Relay (polls table or uses CDC)
+  → Publishes to Kafka → Marks as published
+      ↓
+Downstream Consumers (idempotent, at-least-once)</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Approach</th><th>Consistency</th><th>Complexity</th><th>Best For</th></tr></thead>
+<tbody>
+<tr><td><strong>Dual-write</strong></td><td>Unsafe</td><td>Low</td><td>Never for critical data</td></tr>
+<tr><td><strong>Outbox table</strong></td><td>Safe (atomic commit)</td><td>Medium</td><td>Domain events, cross-service sync</td></tr>
+<tr><td><strong>CDC (Debezium)</strong></td><td>Safe (reads committed data)</td><td>Medium-High</td><td>Replicating all changes to search/analytics</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="schema-evolution">Schema Evolution and Event Contracts</h2>
+<p>As systems evolve, event schemas change. Without a strategy, a producer update can break every consumer.</p>
+<h3 id="evolution-rules">Schema Evolution Rules</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Rule</th><th>Meaning</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td><strong>Backward compatible</strong></td><td>New schema reads old data</td><td>Adding optional field; old messages still work</td></tr>
+<tr><td><strong>Forward compatible</strong></td><td>Old schema reads new data</td><td>Old consumers ignore unknown fields</td></tr>
+<tr><td><strong>Full compatible</strong></td><td>Both directions</td><td>Add optional fields only; never remove or rename</td></tr>
+</tbody>
+</table></div>
+<h3 id="evolution-strategies">Schema Evolution Strategies</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>How It Works</th><th>Tool</th></tr></thead>
+<tbody>
+<tr><td><strong>Schema Registry</strong></td><td>Central registry validates changes; rejects breaking ones at publish</td><td>Confluent Schema Registry (Avro, Protobuf, JSON Schema)</td></tr>
+<tr><td><strong>Versioned topics</strong></td><td>Separate topic per version; consumers migrate at own pace</td><td>Any broker</td></tr>
+<tr><td><strong>Envelope pattern</strong></td><td>Event contains version + payload; consumer routes by version</td><td>Application-level</td></tr>
+<tr><td><strong>Consumer-driven contracts</strong></td><td>Consumers declare needed fields; producer tests against expectations</td><td>Pact, contract testing</td></tr>
+</tbody>
+</table></div>
+<p><strong>Practical checklist:</strong></p>
+<ul>
+<li>All events use a schema (Avro, Protobuf, or JSON Schema) — not untyped JSON</li>
+<li>Schema Registry enforces compatibility before publish</li>
+<li>New fields are always optional with sensible defaults</li>
+<li>Fields are never removed — deprecated fields remain documented</li>
+<li>Field types are never changed — add a new field instead</li>
+<li>DLQ catches deserialization failures (schema mismatch)</li>
+</ul>
+<h3 id="messaging-cross-references">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Outbox and CDC in depth</td><td><a href="05-databases-deep-dive.html">Chapter 5: Databases Deep Dive</a></td></tr>
+<tr><td>Event-driven architecture (Saga, CQRS)</td><td>F9: Event-Driven Architecture</td></tr>
+<tr><td>Async pipeline observability</td><td><a href="F10-observability-operations.html">F10: Observability &amp; Operations</a></td></tr>
+</tbody>
+</table></div>
 <h2 id="common-mistakes">Common Mistakes</h2>
 <ul>
 <li>Adding a queue without defining delivery semantics or failure handling.</li>
@@ -1268,6 +1400,11 @@
 </ul>
 </li>
 <li><a href="#architects-mindset">Architect's Mindset</a></li>
+<li><a href="#delivery-semantics">Delivery Semantics &amp; Exactly-Once</a></li>
+<li><a href="#ordering-guarantees">Ordering Guarantees &amp; Partition Scopes</a></li>
+<li><a href="#idempotent-consumption">Idempotent Consumption Patterns</a></li>
+<li><a href="#outbox-pattern">The Outbox Pattern</a></li>
+<li><a href="#schema-evolution">Schema Evolution &amp; Event Contracts</a></li>
 <li><a href="#common-mistakes">Common Mistakes</a></li>
 <li><a href="#interview-angle">Interview Angle</a></li>
 <li><a href="#quick-recap">Quick Recap</a></li>

@@ -93,7 +93,7 @@
                     <span class="nav-chapter-number">01</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Principles</strong>
-                      <small>50 min read</small>
+                      <small>43 min read</small>
                     </span>
                   </a>
                 </li>
@@ -107,7 +107,7 @@
                     <span class="nav-chapter-number">02</span>
                     <span class="nav-chapter-copy">
                       <strong>Design Patterns (GoF + Practical)</strong>
-                      <small>64 min read</small>
+                      <small>47 min read</small>
                     </span>
                   </a>
                 </li>
@@ -121,7 +121,7 @@
                     <span class="nav-chapter-number">03</span>
                     <span class="nav-chapter-copy">
                       <strong>System Architecture Styles</strong>
-                      <small>76 min read</small>
+                      <small>65 min read</small>
                     </span>
                   </a>
                 </li>
@@ -135,7 +135,7 @@
                     <span class="nav-chapter-number">04</span>
                     <span class="nav-chapter-copy">
                       <strong>Microservices &amp; Distributed Patterns</strong>
-                      <small>61 min read</small>
+                      <small>46 min read</small>
                     </span>
                   </a>
                 </li>
@@ -149,7 +149,7 @@
                     <span class="nav-chapter-number">05</span>
                     <span class="nav-chapter-copy">
                       <strong>Scalability &amp; Performance</strong>
-                      <small>68 min read</small>
+                      <small>62 min read</small>
                     </span>
                   </a>
                 </li>
@@ -163,7 +163,7 @@
                     <span class="nav-chapter-number">06</span>
                     <span class="nav-chapter-copy">
                       <strong>Data &amp; Storage Design</strong>
-                      <small>70 min read</small>
+                      <small>58 min read</small>
                     </span>
                   </a>
                 </li>
@@ -177,7 +177,7 @@
                     <span class="nav-chapter-number">07</span>
                     <span class="nav-chapter-copy">
                       <strong>Distributed System Fundamentals</strong>
-                      <small>91 min read</small>
+                      <small>79 min read</small>
                     </span>
                   </a>
                 </li>
@@ -191,7 +191,7 @@
                     <span class="nav-chapter-number">08</span>
                     <span class="nav-chapter-copy">
                       <strong>Networking Fundamentals</strong>
-                      <small>79 min read</small>
+                      <small>66 min read</small>
                     </span>
                   </a>
                 </li>
@@ -205,7 +205,7 @@
                     <span class="nav-chapter-number">09</span>
                     <span class="nav-chapter-copy">
                       <strong>Security Design</strong>
-                      <small>86 min read</small>
+                      <small>73 min read</small>
                     </span>
                   </a>
                 </li>
@@ -1014,7 +1014,7 @@
         <div class="chapter-body article-body">
           <h2 id="part-context">Part Context</h2>
 <p><strong>Part:</strong> Part 5 - Real-World System Design Examples
-<strong>Position:</strong> Chapter 36 of 60
+<strong>Position:</strong> Chapter 36 of 42
 <strong>Why this part exists:</strong> This section translates distributed-systems theory into realistic product designs across consumer apps, marketplaces, media, payments, search, notifications, collaboration, infrastructure, and operations-heavy platforms.</p>
 <hr>
 <h2 id="overview">Overview</h2>
@@ -5853,6 +5853,82 @@ Reconciliation Worker [scheduled every 5 minutes]
 <td>~0.02-0.05 ETH per block</td>
 <td>Variable based on participation</td>
 </tr>
+</tbody>
+</table></div>
+<h2 id="blockchain-limits">What Blockchain Does NOT Solve</h2>
+<h3 id="overclaims">Common Overclaims</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Claim</th><th>Reality</th><th>Actually True When</th></tr></thead>
+<tbody>
+<tr><td>"Immutable"</td><td>Given honest majority; 51% attack can rewrite</td><td>Bitcoin/Ethereum with sufficient confirmations</td></tr>
+<tr><td>"Eliminates trust"</td><td>Shifts trust to code + crypto + incentives</td><td>Settlement between adversaries</td></tr>
+<tr><td>"Smart contracts are secure"</td><td>Code has bugs; $billions lost to exploits</td><td>Execution is deterministic; logic is NOT auto-correct</td></tr>
+<tr><td>"Decentralized = censorship resistant"</td><td>Only if validators sufficiently distributed</td><td>Bitcoin; less true for &lt; 20 validators</td></tr>
+</tbody>
+</table></div>
+<h3 id="when-not">When NOT to Use Blockchain</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Scenario</th><th>Why Not</th><th>Better Alternative</th></tr></thead>
+<tbody>
+<tr><td>Internal enterprise DB</td><td>You trust all participants</td><td>PostgreSQL + audit log</td></tr>
+<tr><td>High throughput (100K+ TPS)</td><td>Most chains: 10-1000 TPS</td><td>Traditional DB with replication</td></tr>
+<tr><td>Data that needs deletion</td><td>Append-only; GDPR incompatible</td><td>Standard DB with deletion</td></tr>
+<tr><td>Low latency (&lt; 100ms)</td><td>Block confirmation: seconds-minutes</td><td>In-memory cache + DB</td></tr>
+</tbody>
+</table></div>
+<h3 id="when-yes">When Blockchain IS Right</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Scenario</th><th>Why</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Settlement between adversaries</td><td>No trusted intermediary</td><td>Cross-border payments</td></tr>
+<tr><td>Publicly verifiable records</td><td>Transparency is the requirement</td><td>Credential verification</td></tr>
+<tr><td>Programmable money</td><td>Composable without permission</td><td>DeFi; stablecoins</td></tr>
+<tr><td>Digital scarcity</td><td>Provably unique assets</td><td>NFTs; tokenized assets</td></tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="operational-risks">Operational Risks</h2>
+<h3 id="key-management">Key Management</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Lost key</strong></td><td>Permanent fund loss</td><td>Multi-sig (2-of-3); HSM; social recovery</td></tr>
+<tr><td><strong>Stolen key</strong></td><td>Attacker controls assets</td><td>Hardware wallet; cold storage; rate-limited hot wallet</td></tr>
+<tr><td><strong>No rotation</strong></td><td>Can't change address key</td><td>Transfer to new address; proxy pattern</td></tr>
+</tbody>
+</table></div>
+<h3 id="smart-contract-risks">Smart Contract Risks</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Risk</th><th>Example</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td><strong>Reentrancy</strong></td><td>DAO hack ($60M)</td><td>Checks-effects-interactions; reentrancy guards</td></tr>
+<tr><td><strong>Integer overflow</strong></td><td>Create tokens from nothing</td><td>Solidity 0.8+ built-in checks</td></tr>
+<tr><td><strong>Logic bugs</strong></td><td>Unauthorized withdrawals</td><td>Formal verification; multiple audits; bug bounty</td></tr>
+<tr><td><strong>Upgrade risks</strong></td><td>Admin key changes contract</td><td>Timelock (24-48h); multi-sig governance</td></tr>
+</tbody>
+</table></div>
+<p><strong>Security checklist:</strong> 2+ audits before mainnet; formal verification for critical logic; bug bounty; timelock on admin; multi-sig (3-of-5); monitoring (Forta); incident response plan with pause mechanism.</p>
+<hr>
+<h2 id="blockchain-references">Authoritative References</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Resource</th><th>Scope</th></tr></thead>
+<tbody>
+<tr><td>NIST IR 8202</td><td>Blockchain technology overview</td></tr>
+<tr><td>NIST IR 8403</td><td>Blockchain for access control</td></tr>
+<tr><td>Ethereum Yellow Paper</td><td>Formal EVM specification</td></tr>
+<tr><td>Bitcoin Whitepaper (2008)</td><td>Original P2P electronic cash</td></tr>
+<tr><td>Trail of Bits — Secure Smart Contracts</td><td>Practical security guide</td></tr>
+</tbody>
+</table></div>
+<h3 id="blockchain-cross-refs">Cross-References</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Topic</th><th>Chapter</th></tr></thead>
+<tbody>
+<tr><td>Consensus (Raft, Paxos)</td><td>F4: Consensus</td></tr>
+<tr><td>Distributed transactions</td><td><a href="13-distributed-transactions.html">Ch 13</a></td></tr>
+<tr><td>Key management</td><td><a href="40-security-authentication.html">A8</a>, <a href="28-security-systems.html">Ch 28</a></td></tr>
+<tr><td>Financial ledger</td><td><a href="19-fintech-payments.html">Ch 19</a></td></tr>
+<tr><td>Consistency models</td><td><a href="11-consistency-cap-theorem.html">Ch 11</a></td></tr>
 </tbody>
 </table></div>
 <hr>

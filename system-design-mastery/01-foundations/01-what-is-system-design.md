@@ -32,6 +32,26 @@ Application thinking asks whether a feature works. System thinking asks how that
 ### Trade-offs as the center of architecture
 No design maximizes everything simultaneously. Better latency may require more cost. Simpler operations may reduce flexibility. Strong consistency may reduce availability during partitions. System design is the art of choosing consciously.
 
+### Reliability, security, and cost are requirements — not afterthoughts
+A common mistake is treating reliability, security, and cost as "nice-to-haves" that can be bolted on after the core design is done. In production systems, they are requirements with the same weight as any feature:
+
+| Concern | Why It Is a Requirement | What Happens If Deferred |
+|---------|------------------------|--------------------------|
+| **Reliability** | Users leave products that fail. Revenue depends on uptime. SLAs have financial penalties. | Retrofitting reliability into a fragile system is 5-10x more expensive than designing it in. |
+| **Security** | Breaches destroy trust, trigger regulatory penalties, and can end companies. | Adding security after launch means auditing every data flow, API, and storage decision retroactively. |
+| **Cost** | Cloud bills compound. An unoptimized design at 10x scale can exceed revenue. | Cost-unaware designs require painful re-architecture when the CFO asks "why is infra $2M/month?" |
+
+These three concerns, along with scalability, operability, and performance, form the **well-architected pillars** of system design. Every design decision should be evaluated against them:
+
+| Pillar | Core Question | Deep Chapter |
+|--------|--------------|-------------|
+| Reliability | "What happens when this component fails?" | F10: Observability & Operations |
+| Security | "Who can access this data, and how do we prove it?" | F9: Security Fundamentals |
+| Cost Efficiency | "What does this design cost at 10x scale?" | F12: Interview Thinking §5 (Cost Awareness) |
+| Scalability | "What breaks first when traffic doubles?" | F1: Scalability Fundamentals |
+| Performance | "Is the user experience fast enough?" | F6: Caching Strategies, F5: Storage & Databases |
+| Operability | "Can we deploy, monitor, and debug this at 3 AM?" | F11: Deployment & DevOps |
+
 ## Key Terminology
 | Term | Definition |
 | --- | --- |
@@ -128,6 +148,23 @@ A To-Do application is a strong teaching case because it begins as a simple CRUD
 - Design boundaries around ownership and change frequency, not around buzzwords.
 - Make trade-offs explicit enough that another engineer can explain why the design is shaped the way it is.
 
+## System Design Deliverables
+
+A system design is not complete until it produces concrete, reviewable artifacts. Whether in an architecture review, a design document, or an interview, the following deliverables represent the outputs of a thorough design process:
+
+| # | Deliverable | What It Contains | Why It Matters |
+|---|------------|-----------------|----------------|
+| 1 | **High-Level Design (HLD) Diagram** | Block diagram showing components, data flows, protocols, and system boundaries | Makes the architecture visible and debatable; prevents "I thought you meant..." |
+| 2 | **API Contracts** | Endpoint signatures, request/response schemas, error codes, pagination, rate limits | Defines the interface between teams and between client and server |
+| 3 | **Data Model** | Entity schemas, relationships, indexes, access patterns, sharding strategy | Drives storage choices and reveals query complexity early |
+| 4 | **Capacity Estimates** | QPS, storage, bandwidth, connection counts (average and peak) | Sizes infrastructure and validates that the design can handle expected load |
+| 5 | **SLO Definitions** | Availability target (e.g., 99.9%), latency target (e.g., p99 < 500ms), error budget | Makes reliability a measurable, budgetable engineering goal |
+| 6 | **Cost Estimate** | Monthly cloud spend breakdown (compute, storage, bandwidth, managed services) | Prevents budget surprises; enables cost-aware design trade-offs |
+| 7 | **Trade-off Register** | Key decisions with alternatives considered and rationale ("chose X over Y because Z") | Makes design intent auditable; enables future teams to understand constraints |
+| 8 | **Evolution Plan** | What the v1 looks like, what breaks first, what changes are planned for v2 | Prevents over-engineering while ensuring the design can grow |
+
+**The minimum viable design** (for interviews or quick reviews) includes deliverables 1-4. A production design review should include all eight.
+
 ## Common Mistakes
 - Equating system design with drawing many microservices even when the system is still small.
 - Ignoring non-functional concerns such as reliability, latency, and operability until after implementation starts.
@@ -164,6 +201,20 @@ A To-Do application is a strong teaching case because it begins as a simple CRUD
 - Continue to the requirements chapter to learn how good design starts from clarified problem statements.
 - Practice drawing the system boundary for products you already know, such as chat, banking, or ride-sharing.
 - Revisit this chapter after reading the real-world design chapters and notice how the same thinking scales upward.
+
+### Deep Chapter Cross-References
+
+| If You Want to Learn About... | Go To |
+|------------------------------|-------|
+| How to gather and prioritize requirements | Chapter 2: Types of Requirements |
+| Capacity estimation and back-of-envelope math | F12 §2: Capacity Estimation |
+| Choosing between SQL and NoSQL databases | F5: Storage & Databases |
+| Caching strategies (when, where, and how) | F6: Caching Strategies |
+| Designing APIs and communication patterns | F8: Communication Patterns |
+| Making systems reliable under failure | F10: Observability & Operations |
+| Deploying safely with rollback guarantees | F11: Deployment & DevOps |
+| The complete interview framework | F12: System Design Interview Thinking |
+| Real-world system designs (URL shortener, chat, e-commerce) | Part 5: Real-World Systems |
 
 
 

@@ -128,6 +128,223 @@ Checkout is a useful case because it combines user expectations of immediacy wit
 - Design compensation paths and reconciliation tooling at the same time as the happy path.
 - Assume retries, duplicates, and ambiguous acknowledgments will occur.
 
+## 2PC vs Saga vs Outbox — Comparison
+
+These three approaches solve different problems. Use this table to choose.
+
+| Dimension | 2PC | Saga (Orchestration) | Saga (Choreography) | Transactional Outbox |
+|-----------|-----|---------------------|--------------------|--------------------|
+| **Atomicity** | Strong (all-or-nothing across participants) | Eventual (local commits + compensation) | Eventual (local commits + compensation) | Atomic within one service (DB + event in same txn) |
+| **Coupling** | Tight (all participants must be available) | Medium (orchestrator knows participants) | Loose (services react to events) | Low (producer and consumer decoupled) |
+| **Availability during failure** | Low (blocked if any participant is unavailable) | Medium (can pause and retry per step) | High (each service is independent) | High (events queued for later delivery) |
+| **Latency** | Higher (synchronous prepare+commit) | Moderate (sequential steps) | Lower (parallel where possible) | Lowest (async, non-blocking) |
+| **Compensation logic** | Rollback (automatic) | Required (explicitly coded per step) | Required (each service handles its own) | Not needed (single-service boundary) |
+| **When to use** | Tightly coupled DB-to-DB within one org (e.g., ledger entries) | Multi-step business workflows (checkout, booking) | Loosely coupled services, different team ownership | Publishing events reliably from a service |
+| **When NOT to use** | Across autonomous internet services | Simple single-service writes | Workflows needing strict ordering or central visibility | Cross-service workflow coordination |
+
+### Saga Decision Rubric
+
+Use this flowchart to choose the right distributed transaction approach:
+
+```
+Is the entire workflow within one database?
+  → YES: Use local ACID transaction (no distributed pattern needed)
+  → NO: Does it cross services?
+    → YES: Can you tolerate eventual consistency + compensation?
+      → YES: Do you need central visibility and step ordering?
+        → YES: Use SAGA with ORCHESTRATION
+        → NO:  Use SAGA with CHOREOGRAPHY
+      → NO (must be all-or-nothing):
+        → Are all participants within your org and available synchronously?
+          → YES: Use 2PC (sparingly)
+          → NO:  Redesign — 2PC across autonomous services will fail
+    → NO: Does one service need to publish events reliably?
+      → YES: Use TRANSACTIONAL OUTBOX (+ CDC relay)
+```
+
+---
+
+## Orchestration vs Choreography — Deep Comparison
+
+| Aspect | Orchestration | Choreography |
+|--------|-------------|-------------|
+| **Control flow** | Central orchestrator tells each service what to do next | Each service reacts to events and decides what to do |
+| **Visibility** | Orchestrator has full workflow state | No single service knows the full workflow |
+| **Debugging** | Query orchestrator for step status | Must correlate events across services |
+| **Coupling** | Services coupled to orchestrator | Services coupled to event schema |
+| **Adding steps** | Change orchestrator logic | Add new consumer (no change to existing services) |
+| **Failure handling** | Orchestrator triggers compensation | Each service compensates itself on failure event |
+| **Best for** | Complex multi-step workflows (checkout, onboarding, loan approval) | Loose integrations (analytics, notifications, search indexing) |
+
+### Orchestration Example (Checkout)
+
+```
+Orchestrator (Order Service):
+  Step 1: Reserve Inventory → await confirmation
+  Step 2: Authorize Payment → await confirmation
+  Step 3: Create Shipment → await confirmation
+  Step 4: Mark Order Confirmed
+
+  On Step 2 failure:
+    Compensate Step 1: Release Inventory
+    Mark Order: Failed (payment declined)
+
+  On Step 3 failure:
+    Compensate Step 2: Void Payment Authorization
+    Compensate Step 1: Release Inventory
+    Mark Order: Failed (shipment unavailable)
+```
+
+### Choreography Example (Post-Order Side Effects)
+
+```
+OrderConfirmed event published to Kafka topic
+
+Consumers (independent, no coordinator):
+  → Email Service:      Send confirmation email
+  → Analytics Service:  Record conversion event
+  → Loyalty Service:    Award points
+  → Recommendation:     Update purchase history
+
+Each consumer processes independently.
+Failure in one does not affect others.
+No compensation needed (these are side effects, not core workflow).
+```
+
+**Guideline:** Use orchestration for the core business workflow (where ordering and compensation matter). Use choreography for side effects and integrations (where independence matters more than coordination).
+
+---
+
+## Idempotent Participants — Patterns for Saga Steps
+
+Every participant in a distributed transaction must be idempotent because retries and redelivery are inevitable.
+
+### Pattern 1: Idempotency Key Per Saga Step
+
+```python
+# Each saga step uses an idempotency key derived from the workflow ID + step
+def reserve_inventory(order_id, items):
+    idempotency_key = f"reserve:{order_id}"
+
+    # Check if already processed
+    existing = db.query(
+        "SELECT * FROM inventory_reservations WHERE idempotency_key = %s",
+        (idempotency_key,)
+    )
+    if existing:
+        return existing  # Already reserved — return same result
+
+    # Perform reservation
+    reservation = create_reservation(items)
+    db.execute(
+        "INSERT INTO inventory_reservations (idempotency_key, order_id, items, status) "
+        "VALUES (%s, %s, %s, 'reserved')",
+        (idempotency_key, order_id, json.dumps(items))
+    )
+    return reservation
+```
+
+### Pattern 2: State Machine Guard
+
+```python
+# Only process if workflow is in the expected state
+def authorize_payment(order_id, amount):
+    order = db.query("SELECT status FROM orders WHERE id = %s FOR UPDATE", (order_id,))
+
+    if order.status == 'payment_authorized':
+        return  # Already done — idempotent
+    if order.status != 'inventory_reserved':
+        raise InvalidStateError(f"Cannot authorize from state: {order.status}")
+
+    # Process payment
+    result = payment_gateway.authorize(order_id, amount)
+    db.execute(
+        "UPDATE orders SET status = 'payment_authorized', payment_ref = %s WHERE id = %s",
+        (result.ref, order_id)
+    )
+```
+
+### Pattern 3: Replayable Workflow with Checkpoint
+
+```python
+# Orchestrator replays from last successful checkpoint
+def execute_saga(order_id):
+    workflow = load_workflow(order_id)
+
+    steps = [
+        ("inventory_reserved", reserve_inventory),
+        ("payment_authorized", authorize_payment),
+        ("shipment_created", create_shipment),
+        ("order_confirmed", confirm_order),
+    ]
+
+    for target_state, step_func in steps:
+        if workflow.state >= target_state:
+            continue  # Already past this step
+
+        try:
+            step_func(order_id)
+            workflow.advance_to(target_state)
+        except StepFailure as e:
+            trigger_compensation(order_id, workflow.state)
+            workflow.advance_to("failed")
+            raise
+```
+
+---
+
+## Compensation Testing Guidance
+
+Compensation paths are the most under-tested code in most systems. If you only test the happy path, you are only testing half the saga.
+
+### What to Test
+
+| Test Category | What to Verify | Example |
+|--------------|---------------|---------|
+| **Happy-path compensation** | Each step's compensation undoes its effect cleanly | Reserve inventory → Release inventory: count returns to original |
+| **Idempotent compensation** | Compensating twice produces same result as compensating once | Releasing already-released inventory does not double-add stock |
+| **Partial-failure compensation** | Compensation runs for completed steps only, not for steps that never started | If payment fails, compensate inventory but don't compensate shipment (never created) |
+| **Concurrent compensation** | Compensation races with the forward workflow | Cancellation arrives while payment is still processing — system reaches consistent state |
+| **Compensation after delay** | Compensation works even if triggered hours after the original step | Refund after 3 hours: payment provider still honors void |
+| **Compensation observability** | Compensation events are logged and visible to operators | Support team can see "order-789: inventory released, payment voided" |
+
+### Compensation Test Checklist
+
+- [ ] Every saga step has a corresponding compensation function
+- [ ] Compensation functions are idempotent (tested with duplicate invocations)
+- [ ] Compensation handles "step never completed" gracefully (no-op, not error)
+- [ ] Compensation events are published for audit and observability
+- [ ] Integration tests cover at least 3 failure scenarios (step 2 fails, step 3 fails, step N fails)
+- [ ] Load tests verify compensation under concurrent traffic
+- [ ] Reconciliation job detects orders stuck in intermediate states for > X minutes
+
+---
+
+## Exactly-Once Expectations Management
+
+"Exactly-once" in distributed transactions is a practical engineering outcome, not a protocol guarantee. Here is how to set correct expectations.
+
+| What People Say | What It Actually Means | How to Achieve It |
+|----------------|----------------------|-------------------|
+| "Exactly-once delivery" | At-least-once delivery + idempotent consumer | Idempotency keys, dedup store, upserts |
+| "Exactly-once processing" | Each message's *effect* happens once, even if delivered multiple times | State machine guards, conditional writes |
+| "No duplicate charges" | Payment authorization is idempotent; settlement uses idempotency keys | Payment provider idempotency key (e.g., Stripe `idempotency_key`) |
+| "No double-booking" | Reservation uses optimistic locking or unique constraint | `INSERT ... ON CONFLICT DO NOTHING` or `version` check |
+| "No lost events" | At-least-once delivery with durable queue | Kafka with acks=all, outbox pattern, consumer offset commit after processing |
+
+**The practical rule:** Design every participant as if it will receive every message at least twice. If the system produces the correct business outcome regardless of duplicates, you have "effectively exactly-once."
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| Outbox pattern and CDC | Ch 5: Databases; Ch 8: Message Queues |
+| Idempotent consumption patterns | Ch 8: Message Queues |
+| Consistency models (strong vs eventual) | Ch 11: Consistency & CAP |
+| Circuit breakers and retries | Ch 12: Fault Tolerance |
+| SLO for workflow completion time | F10: Observability & Operations |
+| Event-driven architecture (CQRS, event sourcing) | Architectural Patterns chapters |
+
 ## Common Mistakes
 - Assuming a local database transaction can protect a workflow that spans multiple services.
 - Using sagas without real compensating actions.

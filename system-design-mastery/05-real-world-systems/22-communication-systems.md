@@ -3741,6 +3741,181 @@ sequenceDiagram
 
 ---
 
+## Ordering and Consistency — Per-Feature Guide
+
+| Feature | Ordering Guarantee | Consistency | Mechanism | Acceptable Lag |
+|---------|-------------------|------------|-----------|---------------|
+| **1:1 messages** | Total order per conversation | Strong (per conversation) | Server-assigned sequence number (Redis INCR per conversation) | 0 (immediate for online; queued for offline) |
+| **Group messages** | Total order per group | Strong (per group) | Server-assigned sequence with membership snapshot | 0 (fan-out may take 1-5s for large groups) |
+| **Broadcast channel** | Total order per channel | Eventual (read from replicas OK) | Append-only log with publisher sequence | < 5 seconds |
+| **Typing indicators** | No ordering guarantee | Best-effort (ephemeral) | WebSocket broadcast, no persistence | Real-time (drop if late) |
+| **Presence (online/offline)** | Last-write-wins | Eventual | Heartbeat → Redis TTL; push on state change | < 30 seconds |
+| **Read receipts** | Monotonic (only advances) | Eventual | Client reports max-read-seq; server stores per-user per-conversation | < 5 seconds |
+| **Message edits** | Version per message | Strong (per message) | Optimistic locking (version check on update) | < 2 seconds |
+| **Message deletion** | Soft delete marker | Strong (per message) | Tombstone record; clients filter on display | < 5 seconds |
+| **Reactions/emoji** | Unordered set | Eventual | Append to reaction set; deduplicate by (user, emoji) | < 2 seconds |
+| **Multi-device sync** | Catch-up by sequence gap | Strong (per device state) | Device tracks last-seen-seq; fetch gap on reconnect | On reconnect |
+
+**Key insight:** Different message features require different ordering and consistency guarantees. Only 1:1 and group messages need total ordering. Typing, presence, and reactions can tolerate best-effort delivery.
+
+---
+
+## E2E Encryption Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  KEY INFRASTRUCTURE (Signal Protocol: X3DH + Double Ratchet) │
+│                                                          │
+│  Registration:                                           │
+│    Each device generates:                                │
+│    • Identity key pair (long-term, per user)              │
+│    • Signed pre-key pair (rotated monthly)                │
+│    • One-time pre-keys (100 keys, consumed on first use)  │
+│    Upload public keys to server key bundle store          │
+│                                                          │
+│  Session Establishment (X3DH):                            │
+│    Alice wants to message Bob:                            │
+│    1. Fetch Bob's key bundle from server                  │
+│    2. Perform X3DH: Alice's identity + ephemeral ×        │
+│       Bob's identity + signed pre-key + one-time pre-key  │
+│    3. Derive shared secret → initialize Double Ratchet    │
+│    4. Server deletes consumed one-time pre-key            │
+│                                                          │
+│  Message Encryption (Double Ratchet):                     │
+│    • Each message gets a unique encryption key             │
+│    • Keys derived via ratchet (DH ratchet + hash chain)   │
+│    • Forward secrecy: compromise of current key cannot     │
+│      decrypt past messages                                │
+│    • Future secrecy: new DH exchange heals after compromise│
+└─────────────────────────────────────────────────────────┘
+
+Message Flow:
+  Alice                         Server                    Bob
+    │                              │                        │
+    │ Encrypt(msg, ratchet_key)    │                        │
+    │ ────────────────────────→    │                        │
+    │                              │ Store encrypted blob   │
+    │                              │ (server CANNOT read)    │
+    │                              │ ────────────────────→   │
+    │                              │     Push notification   │
+    │                              │     (metadata only)     │
+    │                              │                        │
+    │                              │                  Decrypt│
+    │                              │                 (ratchet│
+    │                              │                  _key)  │
+
+Server sees: sender_id, conversation_id, timestamp, encrypted_blob
+Server CANNOT see: message content, media, reactions (for E2E conversations)
+```
+
+### E2E Key Management Challenges
+
+| Challenge | Solution |
+|-----------|---------|
+| **Multi-device** | Each device has its own key pair; sender encrypts to ALL of recipient's devices |
+| **Key exhaustion** | If all one-time pre-keys are consumed, fall back to signed pre-key (slightly weaker) |
+| **Device added** | New device uploads keys; existing sessions ratchet forward; new device cannot decrypt old messages |
+| **Key verification** | Users can verify safety numbers (hash of both identity keys) out-of-band |
+| **Group E2E** | Sender key protocol: one encryption per message, distributed to all group members via pairwise channels |
+
+---
+
+## Message Lifecycle Tracing
+
+Tracing a message from send to read across async boundaries requires deliberate context propagation.
+
+### Trace Spans for a 1:1 Message
+
+```
+Trace: msg_trace_abc123
+
+  [1] client.send (Alice's device)
+      ├─ span: compose_message (10ms)
+      ├─ span: encrypt_e2e (5ms)
+      └─ span: websocket_send (15ms)
+
+  [2] server.receive (Chat Service)
+      ├─ span: authenticate (3ms)
+      ├─ span: assign_sequence (2ms, Redis INCR)
+      ├─ span: persist_message (8ms, Cassandra write)
+      ├─ span: fan_out_online (5ms, check if Bob online)
+      └─ span: enqueue_offline (3ms, if Bob offline → Kafka)
+
+  [3] server.deliver (Delivery Worker)
+      ├─ span: lookup_connection (2ms, Redis → WebSocket server)
+      ├─ span: push_to_websocket (10ms)
+      └─ span: push_notification (50ms, APNS/FCM if offline)
+
+  [4] client.receive (Bob's device)
+      ├─ span: websocket_receive (5ms)
+      ├─ span: decrypt_e2e (5ms)
+      ├─ span: render_message (10ms)
+      └─ span: send_delivery_ack (5ms)
+
+  [5] client.read (Bob reads the message)
+      └─ span: send_read_receipt (5ms → server → Alice)
+
+Total: send-to-render ~120ms (online); send-to-push ~300ms (offline)
+```
+
+### Tracing Implementation
+
+```python
+# Producer (chat service): inject trace context into Kafka message
+headers = {}
+inject(headers)  # OpenTelemetry W3C TraceContext
+kafka_producer.send("message_delivery", key=conversation_id,
+                    value=encrypted_message, headers=headers)
+
+# Consumer (delivery worker): extract and continue trace
+ctx = extract(event.headers)
+with tracer.start_as_current_span("deliver_message", context=ctx):
+    deliver_to_websocket(event)
+```
+
+---
+
+## CRDT and Local-First Patterns
+
+For collaborative features (shared documents, collaborative lists, simultaneous editing), CRDTs enable offline editing with automatic conflict-free merge.
+
+| Pattern | Use Case in Messaging | Implementation |
+|---------|----------------------|---------------|
+| **LWW-Register** | User profile fields, display name | Last-writer-wins by timestamp |
+| **G-Counter** | Unread count per conversation | Each device increments independently; merge = sum |
+| **OR-Set** | Reaction set on a message | Add/remove with unique operation IDs; merge = union minus tombstones |
+| **RGA (Replicated Growable Array)** | Collaborative document editing (Google Docs-style) | Character-level CRDT with position identifiers |
+
+**When to use CRDTs in messaging:**
+- Multi-device sync where devices may be offline for extended periods
+- Collaborative features (shared notes, lists within conversations)
+- NOT for message ordering (server-assigned sequence is simpler and sufficient)
+
+---
+
+## Push Notification Governance
+
+| Control | Implementation | Why |
+|---------|---------------|-----|
+| **Per-user rate limit** | Max 50 push notifications/day per user | Prevent notification fatigue |
+| **Quiet hours** | No push between 10 PM - 8 AM user local time (unless urgent) | Respect user attention |
+| **Priority classification** | Direct messages: high; group: medium; broadcast: low | High priority wakes device; low batched |
+| **Delivery analytics** | Track: sent, delivered, opened, dismissed per notification | Measure engagement; detect delivery failures |
+| **Opt-out granularity** | Per conversation type (1:1, group, channel) and per notification type (message, reaction, mention) | User control prevents app uninstall |
+| **Collapse key** | Multiple messages in same conversation → one push ("3 new messages from Alice") | Reduce notification spam |
+
+### Cross-References
+
+| Topic | Chapter |
+|-------|---------|
+| WebSocket and connection management | Ch 4: Networking Fundamentals |
+| Event-driven fan-out | Ch 16: Event-Driven Architecture |
+| Notification platform at scale | F12 §6.5 (Mock Interview 5) |
+| Consistency models (eventual vs strong) | Ch 11: Consistency & CAP |
+| Tracing across async boundaries | Ch 16: EDA; F10: Observability |
+
+---
+
 ## Final Recap
 
 Communication Systems combine the hardest real-time infrastructure problems: persistent connections at 50M scale, message ordering guarantees, E2E encryption, offline synchronization, multi-channel delivery, and video conferencing. The key insight is that **different message types require different architectures** — 1:1 chat, group chat, broadcast channels, typing indicators, and push notifications each have distinct delivery patterns, persistence requirements, and scaling characteristics.
